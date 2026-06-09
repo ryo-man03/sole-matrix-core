@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "demo": "tsx src/demo/runRecommendationDemo.ts",
+    "demo:gemini": "tsx src/demo/runGeminiRecommendationDemo.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
