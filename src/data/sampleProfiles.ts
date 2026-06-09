@@ -1,0 +1,148 @@
+import type { PreferenceProfile, SneakerTag } from "../core/types";
+
+export type SampleProfile = PreferenceProfile & {
+  preferredTags: SneakerTag[];
+};
+
+export const sampleProfiles = [
+  {
+    userId: "demo_profile_clean_classic",
+    vector: {
+      culture: 64,
+      styleFit: 84,
+      simplicity: 90,
+      street: 30,
+      volume: 22,
+      comfort: 68,
+      durability: 72,
+    },
+    policy: {
+      priceSensitivity: 82,
+      overlapSensitivity: 76,
+      explorationTolerance: 32,
+    },
+    axisImportance: {
+      culture: 58,
+      styleFit: 86,
+      simplicity: 90,
+      street: 38,
+      volume: 34,
+      comfort: 72,
+      durability: 68,
+    },
+    sourceConfidence: {
+      diagnosis: 70,
+      ownedSneakers: 62,
+      wantedSneakers: 48,
+      feedback: 40,
+    },
+    profileVersion: 2,
+    updatedAt: "2026-06-09T00:00:00Z",
+    preferredTags: ["classic", "minimal", "low_tech", "canvas"],
+  },
+  {
+    userId: "demo_profile_street_volume",
+    vector: {
+      culture: 70,
+      styleFit: 64,
+      simplicity: 34,
+      street: 92,
+      volume: 86,
+      comfort: 62,
+      durability: 64,
+    },
+    policy: {
+      priceSensitivity: 48,
+      overlapSensitivity: 44,
+      explorationTolerance: 78,
+    },
+    axisImportance: {
+      culture: 62,
+      styleFit: 60,
+      simplicity: 30,
+      street: 96,
+      volume: 92,
+      comfort: 56,
+      durability: 54,
+    },
+    sourceConfidence: {
+      diagnosis: 68,
+      ownedSneakers: 58,
+      wantedSneakers: 60,
+      feedback: 42,
+    },
+    profileVersion: 2,
+    updatedAt: "2026-06-09T00:00:00Z",
+    preferredTags: ["street", "chunky", "basketball", "collab"],
+  },
+  {
+    userId: "demo_profile_comfort_runner",
+    vector: {
+      culture: 46,
+      styleFit: 68,
+      simplicity: 66,
+      street: 36,
+      volume: 42,
+      comfort: 92,
+      durability: 88,
+    },
+    policy: {
+      priceSensitivity: 72,
+      overlapSensitivity: 58,
+      explorationTolerance: 44,
+    },
+    axisImportance: {
+      culture: 38,
+      styleFit: 66,
+      simplicity: 62,
+      street: 34,
+      volume: 42,
+      comfort: 100,
+      durability: 94,
+    },
+    sourceConfidence: {
+      diagnosis: 72,
+      ownedSneakers: 66,
+      wantedSneakers: 50,
+      feedback: 44,
+    },
+    profileVersion: 2,
+    updatedAt: "2026-06-09T00:00:00Z",
+    preferredTags: ["running", "comfortable", "durable", "trail"],
+  },
+  {
+    userId: "demo_profile_muted_heritage",
+    vector: {
+      culture: 78,
+      styleFit: 78,
+      simplicity: 74,
+      street: 50,
+      volume: 36,
+      comfort: 64,
+      durability: 70,
+    },
+    policy: {
+      priceSensitivity: 64,
+      overlapSensitivity: 68,
+      explorationTolerance: 38,
+    },
+    axisImportance: {
+      culture: 82,
+      styleFit: 80,
+      simplicity: 70,
+      street: 52,
+      volume: 38,
+      comfort: 62,
+      durability: 68,
+    },
+    sourceConfidence: {
+      diagnosis: 66,
+      ownedSneakers: 64,
+      wantedSneakers: 54,
+      feedback: 38,
+    },
+    profileVersion: 2,
+    updatedAt: "2026-06-09T00:00:00Z",
+    preferredTags: ["heritage", "retro", "classic", "premium"],
+  },
+] satisfies SampleProfile[];
