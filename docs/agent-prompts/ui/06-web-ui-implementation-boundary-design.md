@@ -177,6 +177,9 @@ UI-06は、次のWeb UI実装Promptを安全に作るための境界仕様です
 * Geminiや外部価格APIの呼び出し口を作らない
 * APIキーやSecretsを要求しない
 * `.env` を追加しない
+* CoreをClient Componentから直接importできるかは、WEB-02以降で確認する
+* CoreがNode専用API、環境変数、外部API、サーバー専用処理に依存している場合は、直接Client Componentからimportしない
+* その場合は作業を止め、別PromptでAdapter方針を設計する
 
 ## Gemini / AI説明の扱い
 
@@ -427,6 +430,7 @@ Next.js導入が必要な場合は、WEB-02以降の別Promptで明示的に扱�
 * 価格・在庫・真贋・購入リンクを禁止している
 * package.json / pnpm-lock.yamlをUI-06では変更しないことが明確になっている
 * Next.js導入は後続Promptで明示的に扱うことが明確になっている
+* CoreをClient Componentから直接importしてよいかはWEB-02以降で確認する方針が明確になっている
 * 次のWEB-01実装計画Promptへ渡せる内容になっている
 
 ## 実行すべきコマンド
