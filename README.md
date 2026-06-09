@@ -1,5 +1,7 @@
 # SOLE//MATRIX Core v0.1
 
+[![CI](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml/badge.svg)](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml)
+
 ## 1. プロジェクト名
 
 SOLE//MATRIX Core v0.1
