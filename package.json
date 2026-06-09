@@ -5,6 +5,7 @@
   "description": "SOLE//MATRIX Core v0.1 recommendation logic and golden tests.",
   "type": "module",
   "scripts": {
+    "demo": "tsx src/demo/runRecommendationDemo.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
