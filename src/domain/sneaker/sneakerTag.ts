@@ -1,0 +1,17 @@
+export type SneakerTag =
+  | "classic"
+  | "low_tech"
+  | "canvas"
+  | "minimal"
+  | "street"
+  | "chunky"
+  | "basketball"
+  | "running"
+  | "comfortable"
+  | "durable"
+  | "retro"
+  | "collab"
+  | "trail"
+  | "outdoor"
+  | "premium"
+  | "heritage";
