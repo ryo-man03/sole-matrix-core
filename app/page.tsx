@@ -1,4 +1,5 @@
 import { AppShell } from "./_components/AppShell";
+import { CandidateSneakerCheckFlow } from "./_components/CandidateSneakerCheckFlow";
 import { HomeEntryCard } from "./_components/HomeEntryCard";
 import { MainContainer } from "./_components/MainContainer";
 import { PreferenceDiagnosisFlow } from "./_components/PreferenceDiagnosisFlow";
@@ -47,9 +48,13 @@ export default function Page() {
           <p className="diagnosis-entry-note">
             下の診断フローで、まずは好みの方向だけを試せます。
           </p>
+          <p className="candidate-entry-note">
+            気になる一足の入力も、このページ下部で試せます。
+          </p>
         </section>
 
         <PreferenceDiagnosisFlow />
+        <CandidateSneakerCheckFlow />
       </MainContainer>
     </AppShell>
   );
