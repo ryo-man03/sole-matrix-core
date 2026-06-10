@@ -4,7 +4,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "SOLE//MATRIX",
-  description: "Web UI setup check for SOLE//MATRIX Core v0.1.",
+  description:
+    "スニーカーの好みと候補を静かに整理する購入判断サポートです。",
 };
 
 export default function RootLayout({
