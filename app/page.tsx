@@ -6,16 +6,26 @@ import { PreferenceDiagnosisFlow } from "./_components/PreferenceDiagnosisFlow";
 
 const entryCards = [
   {
-    title: "好みを診断する",
+    eyebrow: "What this prototype does",
+    title: "一足について、順番に整理する",
     description:
-      "履き方や見た目の好みを整理して、自分に合う一足を考えるための軸を作ります。",
-    helper: "今は好みを言葉にする入口です。",
+      "答えを急がず、気になっている理由や好みを言葉にしていきます。",
+    items: [
+      "気になる一足の情報を整理する",
+      "好みや理由を言葉にする",
+      "推薦準備チェックへ進む",
+    ],
   },
   {
-    title: "気になる一足をチェックする",
+    eyebrow: "Current boundary",
+    title: "今は、情報整理に集中します",
     description:
-      "候補の印象や気になる点を、購入前に落ち着いて見直すための入口です。",
-    helper: "候補との相性を確認する入口です。",
+      "この画面で購入の答えを出すのではなく、次に確認したいことを見つけるための入口です。",
+    items: [
+      "購入判断を確定しない",
+      "推薦結果・スコア・ランキングを表示しない",
+      "入力した内容の整理状態を確認する",
+    ],
   },
 ];
 
@@ -24,37 +34,40 @@ export default function Page() {
     <AppShell>
       <MainContainer labelledBy="home-title">
         <section className="home-hero">
-          <p className="home-kicker">Preference-based sneaker check</p>
-          <h1 id="home-title">SOLE//MATRIX</h1>
+          <p className="home-kicker">SOLE//MATRIX</p>
+          <h1 id="home-title" className="home-title">
+            買う前に、気持ちと理由を整える。
+          </h1>
           <p className="home-lead">
-            スニーカーの好みと個性を、価格や販売情報から少し離れて静かに整理するための判断サポートです。
+            今は購入判断ではなく、気になる一足の情報整理に集中します。
+          </p>
+          <a className="home-primary-cta" href="#candidate-flow">
+            <span>気になる一足を整理する</span>
+            <span aria-hidden="true">→</span>
+          </a>
+          <p className="home-cta-note">
+            入力後は、推薦に進む前の準備状態を確認できます。
           </p>
         </section>
 
-        <section className="entry-section" aria-label="入口">
+        <section className="entry-section" aria-label="このプロトタイプについて">
           <div className="entry-grid">
             {entryCards.map((card) => (
               <HomeEntryCard
                 key={card.title}
+                eyebrow={card.eyebrow}
                 title={card.title}
                 description={card.description}
-                helper={card.helper}
+                items={card.items}
               />
             ))}
           </div>
-          <p className="result-note">
-            結果の見方は、後続のResult画面実装で追加予定です。
-          </p>
-          <p className="diagnosis-entry-note">
-            下の診断フローで、まずは好みの方向だけを試せます。
-          </p>
-          <p className="candidate-entry-note">
-            気になる一足の入力も、このページ下部で試せます。
-          </p>
         </section>
 
         <PreferenceDiagnosisFlow />
-        <CandidateSneakerCheckFlow />
+        <div id="candidate-flow" className="candidate-flow-anchor">
+          <CandidateSneakerCheckFlow />
+        </div>
       </MainContainer>
     </AppShell>
   );

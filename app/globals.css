@@ -62,20 +62,20 @@ body {
   width: 100%;
   max-width: 960px;
   margin: 0 auto;
-  padding: 72px 20px 40px;
+  padding: 52px 20px 40px;
   flex: 1;
 }
 
 .home-hero {
-  max-width: 720px;
+  max-width: 680px;
 }
 
 .home-kicker {
-  margin: 0 0 14px;
+  margin: 0 0 18px;
   color: #40546c;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
 }
 
 h1,
@@ -91,74 +91,121 @@ h1 {
   line-height: 1;
 }
 
+.home-title {
+  font-size: clamp(2.35rem, 7.5vw, 4.25rem);
+  line-height: 1.16;
+  letter-spacing: -0.04em;
+}
+
 .home-lead {
-  max-width: 620px;
-  margin: 24px 0 0;
+  max-width: 520px;
+  margin: 22px 0 0;
   color: #333b46;
-  font-size: 1rem;
-  line-height: 1.9;
+  font-size: 0.98rem;
+  line-height: 1.85;
+}
+
+.home-primary-cta {
+  width: 100%;
+  min-height: 56px;
+  margin-top: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border: 1px solid #17202b;
+  border-radius: 10px;
+  background: #17202b;
+  padding: 0 18px;
+  color: #ffffff;
+  font-size: 0.98rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.home-primary-cta:focus-visible {
+  outline: 3px solid rgba(64, 84, 108, 0.28);
+  outline-offset: 3px;
+}
+
+.home-cta-note {
+  margin: 12px 0 0;
+  color: #66717f;
+  font-size: 0.82rem;
+  line-height: 1.7;
 }
 
 .entry-section {
-  margin-top: 56px;
+  margin-top: 52px;
 }
 
 .entry-grid {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   grid-template-columns: minmax(0, 1fr);
 }
 
 .home-entry-card {
   min-width: 0;
   border: 1px solid rgba(35, 43, 55, 0.14);
-  border-radius: 8px;
+  border-radius: 12px;
   background: #fffefa;
-  padding: 24px;
+  padding: 22px;
 }
 
 .home-entry-card h2 {
-  margin: 0;
+  margin: 10px 0 0;
   color: #151a21;
-  font-size: 1.15rem;
+  font-size: 1.18rem;
   line-height: 1.45;
 }
 
-.home-entry-description {
-  margin: 14px 0 0;
-  color: #3b424d;
-  font-size: 0.95rem;
-  line-height: 1.8;
-}
-
-.home-entry-helper {
-  margin: 22px 0 0;
-  border-top: 1px solid rgba(35, 43, 55, 0.11);
-  padding-top: 14px;
+.home-entry-eyebrow {
+  margin: 0;
   color: #607086;
-  font-size: 0.88rem;
-  line-height: 1.7;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.result-note {
-  margin: 26px 0 0;
-  color: #4f5b69;
-  font-size: 0.92rem;
-  line-height: 1.8;
-}
-
-.diagnosis-entry-note {
+.home-entry-description {
   margin: 12px 0 0;
-  color: #40546c;
+  color: #3b424d;
   font-size: 0.92rem;
-  line-height: 1.8;
+  line-height: 1.75;
 }
 
-.candidate-entry-note {
-  margin: 8px 0 0;
-  color: #40546c;
-  font-size: 0.92rem;
-  line-height: 1.8;
+.home-entry-list {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  border-top: 1px solid rgba(35, 43, 55, 0.11);
+  padding: 16px 0 0;
+  list-style: none;
+}
+
+.home-entry-list li {
+  position: relative;
+  padding-left: 18px;
+  color: #3f4956;
+  font-size: 0.86rem;
+  line-height: 1.65;
+}
+
+.home-entry-list li::before {
+  position: absolute;
+  top: 0.68em;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #40546c;
+  content: "";
+}
+
+.candidate-flow-anchor {
+  scroll-margin-top: 24px;
 }
 
 .preference-diagnosis-section {
@@ -801,8 +848,14 @@ h1 {
     padding-top: 96px;
   }
 
+  .home-primary-cta {
+    width: fit-content;
+    min-width: 290px;
+  }
+
   .entry-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
   }
 
   .home-entry-card {
