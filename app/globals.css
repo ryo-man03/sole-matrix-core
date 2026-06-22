@@ -464,6 +464,10 @@ h1 {
 
 .candidate-intro {
   max-width: 700px;
+  border: 1px solid rgba(35, 43, 55, 0.12);
+  border-radius: 12px;
+  background: #fffefa;
+  padding: 22px;
 }
 
 .candidate-kicker,
@@ -491,24 +495,85 @@ h1 {
   line-height: 1.85;
 }
 
-.candidate-step-indicator {
+.candidate-intro .candidate-flow-boundary {
+  margin-top: 12px;
+  border-left: 3px solid #40546c;
+  padding-left: 12px;
+  color: #40546c;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.candidate-progress-summary {
   display: grid;
   gap: 10px;
-  margin: 28px 0 18px;
+  margin-top: 22px;
+}
+
+.candidate-progress-summary div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.candidate-progress-summary span {
+  color: #607086;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.candidate-progress-summary strong {
+  color: #17202b;
+  font-size: 0.92rem;
+}
+
+.candidate-progress-summary progress {
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: #e3e1da;
+}
+
+.candidate-progress-summary progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: #e3e1da;
+}
+
+.candidate-progress-summary progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: #40546c;
+}
+
+.candidate-progress-summary progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: #40546c;
+}
+
+.candidate-step-indicator {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 18px;
   padding: 0;
   list-style: none;
 }
 
 .candidate-step-item {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
+  justify-items: center;
+  gap: 7px;
   border: 1px solid rgba(35, 43, 55, 0.12);
   border-radius: 8px;
   background: #fffefa;
-  padding: 12px;
+  padding: 10px 8px;
   color: #4c5664;
+  text-align: center;
 }
 
 .candidate-step-item[data-current="true"] {
@@ -535,11 +600,13 @@ h1 {
 
 .candidate-step-label {
   color: #17202b;
-  font-size: 0.92rem;
+  font-size: 0.78rem;
   font-weight: 700;
+  line-height: 1.35;
 }
 
 .candidate-step-state {
+  display: none;
   color: #607086;
   font-size: 0.8rem;
   font-weight: 700;
@@ -777,6 +844,39 @@ h1 {
   margin: 12px 0 0;
 }
 
+.candidate-preparation-note,
+.candidate-preparation-bridge {
+  border: 1px solid rgba(64, 84, 108, 0.18);
+  border-radius: 8px;
+  background: #f4f3ee;
+  color: #3b4654;
+}
+
+.candidate-preparation-note {
+  margin: 14px 0 0;
+  padding: 14px;
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.candidate-preparation-bridge {
+  margin-top: 18px;
+  padding: 18px;
+}
+
+.candidate-preparation-bridge h3 {
+  margin: 8px 0 0;
+  color: #17202b;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+.candidate-preparation-bridge p:not(.candidate-step-kicker) {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
 .candidate-actions,
 .candidate-edit-actions {
   display: flex;
@@ -898,6 +998,27 @@ h1 {
 
   .candidate-step-indicator {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .candidate-intro {
+    padding: 28px;
+  }
+
+  .candidate-step-item {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    justify-items: stretch;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    text-align: left;
+  }
+
+  .candidate-step-label {
+    font-size: 0.92rem;
+  }
+
+  .candidate-step-state {
+    display: inline;
   }
 
   .candidate-card {

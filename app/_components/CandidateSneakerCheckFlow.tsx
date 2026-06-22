@@ -14,6 +14,8 @@ import { CandidateStepIndicator } from "./CandidateStepIndicator";
 import { CandidateTagStep } from "./CandidateTagStep";
 import { PrototypeReadinessPanel } from "./PrototypeReadinessPanel";
 
+const candidateStepLabels = ["基本情報", "特徴タグ", "入力確認"];
+
 export function CandidateSneakerCheckFlow() {
   const [currentStep, setCurrentStep] = useState(1);
   const [sneakerName, setSneakerName] = useState("");
@@ -79,11 +81,26 @@ export function CandidateSneakerCheckFlow() {
       aria-labelledby="candidate-check-title"
     >
       <div className="candidate-intro">
-        <p className="candidate-kicker">気になる一足の確認</p>
+        <p className="candidate-kicker">入力の流れ</p>
         <h2 id="candidate-check-title">気になる一足を整理する</h2>
         <p>
-          まだ買うかどうかを決めずに、名前・金額メモ・特徴タグを落ち着いて見直します。
+          気になる一足について、名前・理由・メモを順番に整理します。
         </p>
+        <p className="candidate-flow-boundary">
+          今は購入判断や推薦結果ではなく、入力内容の整理に集中します。
+        </p>
+      </div>
+
+      <div className="candidate-progress-summary" aria-live="polite">
+        <div>
+          <span>Step {currentStep} / {candidateStepLabels.length}</span>
+          <strong>{candidateStepLabels[currentStep - 1]}</strong>
+        </div>
+        <progress
+          aria-label={`入力ステップ ${currentStep} / ${candidateStepLabels.length}`}
+          max={candidateStepLabels.length}
+          value={currentStep}
+        />
       </div>
 
       <CandidateStepIndicator currentStep={currentStep} />
@@ -137,12 +154,27 @@ export function CandidateSneakerCheckFlow() {
             selectedTagIds={selectedTagIds}
             sneakerName={sneakerName}
           />
-          <PrototypeReadinessPanel
-            candidateDisplayName={sneakerName.trim()}
-            hasBudgetMemo={Boolean(budgetText.trim())}
-            hasPriceMemo={Boolean(seenPriceText.trim())}
-            selectedTagLabels={selectedTagLabels}
-          />
+          {isSummaryVisible ? (
+            <>
+              <div className="candidate-preparation-bridge">
+                <p className="candidate-step-kicker">Next</p>
+                <h3>整理した内容から、準備状態を確認します</h3>
+                <p>
+                  ここから先も推薦結果ではありません。入力した内容が、次の確認へ進める状態かを見直します。
+                </p>
+              </div>
+              <PrototypeReadinessPanel
+                candidateDisplayName={sneakerName.trim()}
+                hasBudgetMemo={Boolean(budgetText.trim())}
+                hasPriceMemo={Boolean(seenPriceText.trim())}
+                selectedTagLabels={selectedTagLabels}
+              />
+            </>
+          ) : (
+            <p className="candidate-preparation-note">
+              入力内容を確認すると、推薦準備チェックで整理状態を確認できます。
+            </p>
+          )}
         </>
       ) : null}
 
