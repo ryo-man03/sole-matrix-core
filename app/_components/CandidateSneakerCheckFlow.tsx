@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import {
+  candidateSneakerTagOptions,
   maxCandidateTagSelection,
   type CandidateTagId,
 } from "../_data/candidateSneakerOptions";
@@ -11,6 +12,7 @@ import { CandidateBasicInfoStep } from "./CandidateBasicInfoStep";
 import { CandidateConfirmStep } from "./CandidateConfirmStep";
 import { CandidateStepIndicator } from "./CandidateStepIndicator";
 import { CandidateTagStep } from "./CandidateTagStep";
+import { PrototypeReadinessPanel } from "./PrototypeReadinessPanel";
 
 export function CandidateSneakerCheckFlow() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -23,6 +25,9 @@ export function CandidateSneakerCheckFlow() {
   const [isSummaryVisible, setIsSummaryVisible] = useState(false);
   const [sneakerNameError, setSneakerNameError] = useState("");
   const [tagError, setTagError] = useState("");
+  const selectedTagLabels = candidateSneakerTagOptions
+    .filter((tag) => selectedTagIds.includes(tag.id))
+    .map((tag) => tag.label);
 
   function handleNextFromBasicInfo() {
     if (!sneakerName.trim()) {
@@ -113,24 +118,32 @@ export function CandidateSneakerCheckFlow() {
       ) : null}
 
       {currentStep === 3 ? (
-        <CandidateConfirmStep
-          brand={brand}
-          budgetText={budgetText}
-          isSummaryVisible={isSummaryVisible}
-          memo={memo}
-          onConfirm={handleConfirm}
-          onEditBasicInfo={() => {
-            setIsSummaryVisible(false);
-            setCurrentStep(1);
-          }}
-          onEditTags={() => {
-            setIsSummaryVisible(false);
-            setCurrentStep(2);
-          }}
-          seenPriceText={seenPriceText}
-          selectedTagIds={selectedTagIds}
-          sneakerName={sneakerName}
-        />
+        <>
+          <CandidateConfirmStep
+            brand={brand}
+            budgetText={budgetText}
+            isSummaryVisible={isSummaryVisible}
+            memo={memo}
+            onConfirm={handleConfirm}
+            onEditBasicInfo={() => {
+              setIsSummaryVisible(false);
+              setCurrentStep(1);
+            }}
+            onEditTags={() => {
+              setIsSummaryVisible(false);
+              setCurrentStep(2);
+            }}
+            seenPriceText={seenPriceText}
+            selectedTagIds={selectedTagIds}
+            sneakerName={sneakerName}
+          />
+          <PrototypeReadinessPanel
+            candidateDisplayName={sneakerName.trim()}
+            hasBudgetMemo={Boolean(budgetText.trim())}
+            hasPriceMemo={Boolean(seenPriceText.trim())}
+            selectedTagLabels={selectedTagLabels}
+          />
+        </>
       ) : null}
 
       {currentStep < 3 ? (

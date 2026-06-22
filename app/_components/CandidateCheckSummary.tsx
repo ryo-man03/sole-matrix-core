@@ -45,12 +45,12 @@ export function CandidateCheckSummary({
             <dd>{displayValue(brand)}</dd>
           </div>
           <div>
-            <dt>見かけた金額・購入予定額</dt>
-            <dd>{displayValue(seenPriceText)}</dd>
+            <dt>価格メモ</dt>
+            <dd>{seenPriceText.trim() ? "入力あり" : "入力なし"}</dd>
           </div>
           <div>
-            <dt>予算</dt>
-            <dd>{displayValue(budgetText)}</dd>
+            <dt>予算メモ</dt>
+            <dd>{budgetText.trim() ? "入力あり" : "入力なし"}</dd>
           </div>
           <div>
             <dt>メモ</dt>
