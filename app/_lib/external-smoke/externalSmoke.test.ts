@@ -9,6 +9,13 @@ import {
   isRakutenItemSearchResponse,
 } from "./responseValidators";
 import { runRakutenIsolatedSmoke } from "./rakutenSmoke";
+import {
+  formatExternalSmokeStatusSummary,
+  printExternalSmokeStatusSummary,
+  runGeminiIsolatedSmokeStatusReport,
+  runRakutenIsolatedSmokeStatusReport,
+  summarizeExternalSmokeResult,
+} from "./statusReport";
 
 describe("external smoke readiness", () => {
   it("classifies missing environment variables before the opt-in flag", () => {
@@ -108,7 +115,8 @@ describe("external smoke isolation", () => {
 
 describe("Gemini isolated smoke", () => {
   it("runs the environment-gated smoke entrypoint", async () => {
-    const result = await runGeminiIsolatedSmoke();
+    const result = await runGeminiIsolatedSmokeStatusReport();
+    printExternalSmokeStatusSummary("Gemini", result);
 
     if (!process.env.GEMINI_API_KEY?.trim()) {
       expect(result.status).toBe("missing_env");
@@ -121,6 +129,9 @@ describe("Gemini isolated smoke", () => {
         "invalid_response_shape",
       ]).toContain(result.status);
     }
+    expect(result.provider).toBe("gemini");
+    expect(typeof result.networkAttempted).toBe("boolean");
+    expect(typeof result.shapeValid).toBe("boolean");
   });
 
   it("returns missing_env without calling fetch", async () => {
@@ -195,7 +206,8 @@ describe("Gemini isolated smoke", () => {
 
 describe("Rakuten isolated smoke", () => {
   it("runs the environment-gated smoke entrypoint", async () => {
-    const result = await runRakutenIsolatedSmoke();
+    const result = await runRakutenIsolatedSmokeStatusReport();
+    printExternalSmokeStatusSummary("Rakuten", result);
     const hasCredentials =
       Boolean(process.env.RAKUTEN_APPLICATION_ID?.trim()) &&
       Boolean(process.env.RAKUTEN_ACCESS_KEY?.trim());
@@ -211,6 +223,9 @@ describe("Rakuten isolated smoke", () => {
         "invalid_response_shape",
       ]).toContain(result.status);
     }
+    expect(result.provider).toBe("rakuten");
+    expect(typeof result.networkAttempted).toBe("boolean");
+    expect(typeof result.shapeValid).toBe("boolean");
   });
 
   it("returns missing_env without calling fetch", async () => {
@@ -291,5 +306,90 @@ describe("Rakuten isolated smoke", () => {
       provider: "rakuten",
       status: "invalid_response_shape",
     });
+  });
+});
+
+describe("external smoke status report", () => {
+  it("evaluates Gemini credentials independently from Rakuten credentials", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const summary = await runGeminiIsolatedSmokeStatusReport({
+      env: {
+        RAKUTEN_APPLICATION_ID: "application-id",
+        RAKUTEN_ACCESS_KEY: "access-key",
+        RUN_EXTERNAL_SMOKE: "1",
+      },
+      fetcher,
+    });
+
+    expect(summary.status).toBe("missing_env");
+    expect(summary.networkAttempted).toBe(false);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("evaluates Rakuten credentials independently from Gemini credentials", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const summary = await runRakutenIsolatedSmokeStatusReport({
+      env: {
+        GEMINI_API_KEY: "credential-placeholder",
+        RUN_EXTERNAL_SMOKE: "1",
+      },
+      fetcher,
+    });
+
+    expect(summary.status).toBe("missing_env");
+    expect(summary.networkAttempted).toBe(false);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("summarizes readiness without carrying credential metadata", () => {
+    const summary = summarizeExternalSmokeResult({
+      provider: "gemini",
+      status: "missing_env",
+      missingEnvVars: ["GEMINI_API_KEY"],
+    });
+
+    expect(summary).toEqual({
+      provider: "gemini",
+      status: "missing_env",
+      networkAttempted: false,
+      shapeValid: false,
+    });
+    expect(JSON.stringify(summary)).not.toContain("GEMINI_API_KEY");
+  });
+
+  it("reports only a sanitized error kind after a failed attempt", () => {
+    const summary = summarizeExternalSmokeResult({
+      provider: "rakuten",
+      status: "network_error",
+    });
+
+    expect(summary).toEqual({
+      provider: "rakuten",
+      status: "network_error",
+      networkAttempted: true,
+      shapeValid: false,
+      errorKind: "network_error",
+    });
+  });
+
+  it("formats only the approved status summary fields", () => {
+    const output = formatExternalSmokeStatusSummary("Gemini", {
+      provider: "gemini",
+      status: "invalid_response_shape",
+      networkAttempted: true,
+      shapeValid: false,
+      errorKind: "invalid_response_shape",
+    });
+
+    expect(output).toBe(
+      [
+        "Gemini isolated smoke status summary:",
+        "provider: gemini",
+        "status: invalid_response_shape",
+        "networkAttempted: true",
+        "shapeValid: false",
+        "errorKind: invalid_response_shape",
+      ].join("\n")
+    );
   });
 });

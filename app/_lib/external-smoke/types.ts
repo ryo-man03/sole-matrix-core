@@ -14,4 +14,20 @@ export type ExternalSmokeResult = {
   missingEnvVars?: string[];
 };
 
+export type ExternalSmokeErrorKind =
+  | "http_404"
+  | "http_429"
+  | "auth_error"
+  | "rate_limited"
+  | "network_error"
+  | "invalid_response_shape";
+
+export type ExternalSmokeStatusSummary = {
+  provider: ExternalSmokeProvider;
+  status: ExternalSmokeStatus;
+  networkAttempted: boolean;
+  shapeValid: boolean;
+  errorKind?: ExternalSmokeErrorKind;
+};
+
 export type ExternalSmokeEnvironment = Record<string, string | undefined>;
