@@ -48,10 +48,20 @@ export async function runRakutenIsolatedSmokeStatusReport(
   }
 
   const result = await runRakutenIsolatedSmoke(reportOptions);
-  return summarizeExternalSmokeResult(
+  const summary = summarizeExternalSmokeResult(
     result,
     result.diagnostic?.networkAttempted ?? networkAttempted
   );
+
+  if (options.accessKeyTransport && summary.transport === undefined) {
+    return {
+      ...summary,
+      transport: options.accessKeyTransport,
+      accessKeyTransport: options.accessKeyTransport,
+    };
+  }
+
+  return summary;
 }
 
 export async function runRakutenIsolatedSmokeTransportStatusReports(
@@ -233,6 +243,50 @@ export function formatExternalSmokeStatusSummary(
   }
 
   return lines.join("\n");
+}
+
+export function formatRakutenTransportStatusSummary(
+  label: "header" | "query",
+  summary: ExternalSmokeStatusSummary
+): string {
+  const render = (value: unknown) => (value === undefined ? "" : String(value));
+  const lines = [
+    `${label} transport result:`,
+    `transport: ${render(summary.transport)}`,
+    `networkAttempted: ${summary.networkAttempted}`,
+    `phase: ${render(summary.phase)}`,
+    `httpStatus: ${render(summary.httpStatus)}`,
+    `responseOk: ${render(summary.responseOk)}`,
+    `status: ${summary.status}`,
+    `shapeValid: ${summary.shapeValid}`,
+    `errorKind: ${render(summary.errorKind)}`,
+    `normalizationReadiness: ${render(summary.normalizationReadiness)}`,
+    `next: ${render(summary.next)}`,
+    `endpointContractOk: ${render(summary.endpointContractOk)}`,
+    `requiredParameterNamesPresent: ${render(
+      summary.requiredParameterNamesPresent
+    )}`,
+    `accessKeyTransport: ${render(summary.accessKeyTransport)}`,
+    `bodyReadable: ${render(summary.bodyReadable)}`,
+    `bodyErrorCodeKind: ${render(summary.bodyErrorCodeKind)}`,
+  ];
+
+  return lines.join("\n");
+}
+
+export function formatRakutenTransportStatusReports(
+  reports: RakutenTransportStatusReports
+): string {
+  return [
+    formatRakutenTransportStatusSummary("header", reports.header),
+    formatRakutenTransportStatusSummary("query", reports.query),
+  ].join("\n\n");
+}
+
+export function printRakutenTransportStatusReports(
+  reports: RakutenTransportStatusReports
+): void {
+  console.info(formatRakutenTransportStatusReports(reports));
 }
 
 export function printExternalSmokeStatusSummary(

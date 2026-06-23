@@ -11,7 +11,9 @@ import {
 import { runRakutenIsolatedSmoke } from "./rakutenSmoke";
 import {
   formatExternalSmokeStatusSummary,
+  formatRakutenTransportStatusReports,
   printExternalSmokeStatusSummary,
+  printRakutenTransportStatusReports,
   runGeminiIsolatedSmokeStatusReport,
   runRakutenIsolatedSmokeStatusReport,
   runRakutenIsolatedSmokeTransportStatusReports,
@@ -227,6 +229,40 @@ describe("Rakuten isolated smoke", () => {
     expect(result.provider).toBe("rakuten");
     expect(typeof result.networkAttempted).toBe("boolean");
     expect(typeof result.shapeValid).toBe("boolean");
+  });
+
+  it("runs the environment-gated transport comparison entrypoint", async () => {
+    const reports = await runRakutenIsolatedSmokeTransportStatusReports();
+    printRakutenTransportStatusReports(reports);
+
+    const hasCredentials =
+      Boolean(process.env.RAKUTEN_APPLICATION_ID?.trim()) &&
+      Boolean(process.env.RAKUTEN_ACCESS_KEY?.trim());
+
+    for (const result of [reports.header, reports.query]) {
+      if (!hasCredentials) {
+        expect(result.status).toBe("missing_env");
+        expect(result.networkAttempted).toBe(false);
+      } else if (process.env.RUN_EXTERNAL_SMOKE !== "1") {
+        expect(result.status).toBe("skipped_external_smoke");
+        expect(result.networkAttempted).toBe(false);
+      } else {
+        expect([
+          "ok",
+          "network_error",
+          "invalid_response_shape",
+        ]).toContain(result.status);
+        expect(result.networkAttempted).toBe(true);
+      }
+
+      expect(result.provider).toBe("rakuten");
+      expect(typeof result.shapeValid).toBe("boolean");
+    }
+
+    expect(reports.header.transport).toBe("header");
+    expect(reports.header.accessKeyTransport).toBe("header");
+    expect(reports.query.transport).toBe("query");
+    expect(reports.query.accessKeyTransport).toBe("query");
   });
 
   it("returns missing_env without calling fetch", async () => {
@@ -861,6 +897,86 @@ describe("external smoke status report", () => {
         "bodyErrorCodeKind: referrer_or_origin_possible",
       ].join("\n")
     );
+  });
+
+  it("formats Rakuten transport comparison reports without request or response data", () => {
+    const output = formatRakutenTransportStatusReports({
+      header: {
+        provider: "rakuten",
+        status: "network_error",
+        networkAttempted: true,
+        shapeValid: false,
+        transport: "header",
+        phase: "http_response",
+        httpStatus: 403,
+        responseOk: false,
+        errorKind: "http_403",
+        normalizationReadiness: "blocked_forbidden",
+        next:
+          "WEB-12F.5 dashboard / credential / permission / referrer-origin manual check",
+        endpointContractOk: true,
+        requiredParameterNamesPresent: true,
+        accessKeyTransport: "header",
+        bodyReadable: true,
+        bodyErrorCodeKind: "referrer_or_origin_possible",
+      },
+      query: {
+        provider: "rakuten",
+        status: "ok",
+        networkAttempted: true,
+        shapeValid: true,
+        transport: "query",
+        phase: "shape_validation",
+        httpStatus: 200,
+        responseOk: true,
+        normalizationReadiness: "ready",
+        next: "WEB-12G response normalization design",
+        endpointContractOk: true,
+        requiredParameterNamesPresent: true,
+        accessKeyTransport: "query",
+      },
+    });
+
+    expect(output).toBe(
+      [
+        "header transport result:",
+        "transport: header",
+        "networkAttempted: true",
+        "phase: http_response",
+        "httpStatus: 403",
+        "responseOk: false",
+        "status: network_error",
+        "shapeValid: false",
+        "errorKind: http_403",
+        "normalizationReadiness: blocked_forbidden",
+        "next: WEB-12F.5 dashboard / credential / permission / referrer-origin manual check",
+        "endpointContractOk: true",
+        "requiredParameterNamesPresent: true",
+        "accessKeyTransport: header",
+        "bodyReadable: true",
+        "bodyErrorCodeKind: referrer_or_origin_possible",
+        "",
+        "query transport result:",
+        "transport: query",
+        "networkAttempted: true",
+        "phase: shape_validation",
+        "httpStatus: 200",
+        "responseOk: true",
+        "status: ok",
+        "shapeValid: true",
+        "errorKind: ",
+        "normalizationReadiness: ready",
+        "next: WEB-12G response normalization design",
+        "endpointContractOk: true",
+        "requiredParameterNamesPresent: true",
+        "accessKeyTransport: query",
+        "bodyReadable: ",
+        "bodyErrorCodeKind: ",
+      ].join("\n")
+    );
+    expect(output).not.toContain("sensitive");
+    expect(output).not.toContain("https://");
+    expect(output).not.toContain("Smoke Sneaker");
   });
 });
 
