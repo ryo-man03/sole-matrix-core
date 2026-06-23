@@ -50,6 +50,28 @@ export type RakutenAccessKeyTransport =
   | "both_tested"
   | "unknown";
 
+export type RakutenNormalizationReadiness =
+  | "ready"
+  | "blocked_shape_mismatch"
+  | "blocked_parameter_contract"
+  | "blocked_auth"
+  | "blocked_forbidden"
+  | "blocked_endpoint_contract"
+  | "blocked_rate_limit"
+  | "blocked_server_error"
+  | "blocked_network";
+
+export type RakutenNextStep =
+  | "WEB-12G response normalization design"
+  | "WEB-12G-PRE shape contract review"
+  | "WEB-12F.5 parameter contract fix"
+  | "WEB-12F.5 credential check"
+  | "WEB-12F.5 dashboard / credential / permission / referrer-origin manual check"
+  | "WEB-12F.5 endpoint contract fix"
+  | "WEB-12F.5 rate limit policy"
+  | "degraded behavior / retry policy"
+  | "WEB-12F.5 transport / network check";
+
 export type RakutenForbiddenBodyErrorKind =
   | "invalid_access_key_possible"
   | "requested_scope_possible"
@@ -80,9 +102,14 @@ export type RakutenSmokeDiagnostic = {
   provider: "rakuten";
   phase: RakutenSmokeDiagnosticPhase;
   networkAttempted: boolean;
+  accessKeyTransport?: RakutenAccessKeyTransport;
+  endpointContractOk?: boolean;
+  requiredParameterNamesPresent?: boolean;
   httpStatus?: number;
   responseOk?: boolean;
   errorKind?: ExternalSmokeErrorKind;
+  normalizationReadiness?: RakutenNormalizationReadiness;
+  next?: RakutenNextStep;
   credentialContractCheck?: RakutenCredentialContractCheck;
 };
 
@@ -92,9 +119,12 @@ export type ExternalSmokeStatusSummary = {
   networkAttempted: boolean;
   shapeValid: boolean;
   phase?: RakutenSmokeDiagnosticPhase;
+  transport?: RakutenAccessKeyTransport;
   httpStatus?: number;
   responseOk?: boolean;
   errorKind?: ExternalSmokeErrorKind;
+  normalizationReadiness?: RakutenNormalizationReadiness;
+  next?: RakutenNextStep;
   endpointContractOk?: boolean;
   requiredParameterNamesPresent?: boolean;
   accessKeyTransport?: RakutenAccessKeyTransport;
@@ -103,3 +133,8 @@ export type ExternalSmokeStatusSummary = {
 };
 
 export type ExternalSmokeEnvironment = Record<string, string | undefined>;
+
+export type RakutenTransportStatusReports = {
+  header: ExternalSmokeStatusSummary;
+  query: ExternalSmokeStatusSummary;
+};

@@ -7,6 +7,8 @@ import type {
   RakutenAccessKeyTransport,
   RakutenCredentialContractCheck,
   RakutenForbiddenBodyErrorKind,
+  RakutenNextStep,
+  RakutenNormalizationReadiness,
   RakutenSmokeDiagnostic,
 } from "./types";
 
@@ -15,7 +17,6 @@ const rakutenItemSearchEndpoint =
   "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401";
 const rakutenEndpointHost = "openapi.rakuten.co.jp";
 const rakutenEndpointPathname = "/ichibams/api/IchibaItem/Search/20260401";
-const rakutenAccessKeyTransport: RakutenAccessKeyTransport = "header";
 
 export async function runRakutenIsolatedSmoke(
   options: {
@@ -23,6 +24,7 @@ export async function runRakutenIsolatedSmoke(
     fetcher?: typeof fetch;
     endpointContractAvailable?: boolean;
     endpoint?: string;
+    accessKeyTransport?: Extract<RakutenAccessKeyTransport, "header" | "query">;
   } = {}
 ): Promise<ExternalSmokeResult> {
   const env = options.env ?? process.env;
@@ -41,12 +43,18 @@ export async function runRakutenIsolatedSmoke(
   const applicationId = env.RAKUTEN_APPLICATION_ID?.trim();
   const accessKey = env.RAKUTEN_ACCESS_KEY?.trim();
   const fetcher = options.fetcher ?? globalThis.fetch;
+  const accessKeyTransport = options.accessKeyTransport ?? "header";
 
   if (!applicationId || !accessKey || typeof fetcher !== "function") {
     return rakutenFailure("network_error", {
       phase: "before_fetch",
       networkAttempted: false,
+      accessKeyTransport,
+      endpointContractOk: false,
+      requiredParameterNamesPresent: false,
       errorKind: "network_error",
+      normalizationReadiness: "blocked_network",
+      next: "WEB-12F.5 transport / network check",
     });
   }
 
@@ -58,7 +66,12 @@ export async function runRakutenIsolatedSmoke(
     return rakutenFailure("network_error", {
       phase: "url_build",
       networkAttempted: false,
+      accessKeyTransport,
+      endpointContractOk: false,
+      requiredParameterNamesPresent: false,
       errorKind: "url_build_error",
+      normalizationReadiness: "blocked_network",
+      next: "WEB-12F.5 transport / network check",
     });
   }
 
@@ -69,17 +82,33 @@ export async function runRakutenIsolatedSmoke(
   url.searchParams.set("formatVersion", "2");
   url.searchParams.set("elements", "itemName,itemPrice,itemUrl");
 
+  if (accessKeyTransport === "query") {
+    url.searchParams.set("accessKey", accessKey);
+  }
+
+  const endpointContractOk = isRakutenEndpointContractOk(url);
+  const requiredParameterNamesPresent = hasRequiredParameterNames({
+    url,
+    accessKeyTransport,
+  });
+
   let response: Response;
 
   try {
-    response = await fetcher(url, {
-      headers: { accessKey },
-    });
+    response = await fetcher(
+      url,
+      accessKeyTransport === "header" ? { headers: { accessKey } } : undefined
+    );
   } catch {
     return rakutenFailure("network_error", {
       phase: "fetch_throw",
       networkAttempted: true,
+      accessKeyTransport,
+      endpointContractOk,
+      requiredParameterNamesPresent,
       errorKind: "fetch_throw",
+      normalizationReadiness: "blocked_network",
+      next: "WEB-12F.5 transport / network check",
     });
   }
 
@@ -92,14 +121,19 @@ export async function runRakutenIsolatedSmoke(
     return rakutenFailure("network_error", {
       phase: "http_response",
       networkAttempted: true,
+      accessKeyTransport,
+      endpointContractOk,
+      requiredParameterNamesPresent,
       httpStatus: response.status,
       responseOk: response.ok,
       errorKind: classifyHttpError(response.status),
+      normalizationReadiness: classifyNormalizationReadiness(response.status),
+      next: classifyNextStep(response.status),
       ...(response.status === 403
         ? {
             credentialContractCheck: buildCredentialContractCheck({
               url,
-              accessKeyTransport: rakutenAccessKeyTransport,
+              accessKeyTransport,
               httpStatus: response.status,
               responseOk: response.ok,
               bodyReadable: forbiddenBody?.bodyReadable,
@@ -115,12 +149,17 @@ export async function runRakutenIsolatedSmoke(
   try {
     responseBody = (await response.json()) as unknown;
   } catch {
-    return rakutenFailure("network_error", {
+    return rakutenFailure("invalid_response_shape", {
       phase: "json_parse",
       networkAttempted: true,
+      accessKeyTransport,
+      endpointContractOk,
+      requiredParameterNamesPresent,
       httpStatus: response.status,
       responseOk: response.ok,
       errorKind: "json_parse_error",
+      normalizationReadiness: "blocked_shape_mismatch",
+      next: "WEB-12G-PRE shape contract review",
     });
   }
 
@@ -128,9 +167,14 @@ export async function runRakutenIsolatedSmoke(
     return rakutenFailure("invalid_response_shape", {
       phase: "shape_validation",
       networkAttempted: true,
+      accessKeyTransport,
+      endpointContractOk,
+      requiredParameterNamesPresent,
       httpStatus: response.status,
       responseOk: response.ok,
       errorKind: "invalid_response_shape",
+      normalizationReadiness: "blocked_shape_mismatch",
+      next: "WEB-12G-PRE shape contract review",
     });
   }
 
@@ -141,8 +185,13 @@ export async function runRakutenIsolatedSmoke(
       provider: "rakuten",
       phase: "shape_validation",
       networkAttempted: true,
+      accessKeyTransport,
+      endpointContractOk,
+      requiredParameterNamesPresent,
       httpStatus: response.status,
       responseOk: response.ok,
+      normalizationReadiness: "ready",
+      next: "WEB-12G response normalization design",
     },
   };
 }
@@ -155,6 +204,30 @@ function classifyHttpError(status: number): ExternalSmokeErrorKind {
   if (status === 429) return "http_429";
   if (status >= 500) return "http_5xx";
   return "network_error";
+}
+
+function classifyNormalizationReadiness(
+  status: number
+): RakutenNormalizationReadiness {
+  if (status === 400) return "blocked_parameter_contract";
+  if (status === 401) return "blocked_auth";
+  if (status === 403) return "blocked_forbidden";
+  if (status === 404) return "blocked_endpoint_contract";
+  if (status === 429) return "blocked_rate_limit";
+  if (status >= 500) return "blocked_server_error";
+  return "blocked_network";
+}
+
+function classifyNextStep(status: number): RakutenNextStep {
+  if (status === 400) return "WEB-12F.5 parameter contract fix";
+  if (status === 401) return "WEB-12F.5 credential check";
+  if (status === 403) {
+    return "WEB-12F.5 dashboard / credential / permission / referrer-origin manual check";
+  }
+  if (status === 404) return "WEB-12F.5 endpoint contract fix";
+  if (status === 429) return "WEB-12F.5 rate limit policy";
+  if (status >= 500) return "degraded behavior / retry policy";
+  return "WEB-12F.5 transport / network check";
 }
 
 async function classifyForbiddenResponseBody(
@@ -255,12 +328,11 @@ function buildCredentialContractCheck(input: {
   bodyReadable?: boolean | undefined;
   bodyErrorCodeKind?: RakutenForbiddenBodyErrorKind | undefined;
 }): RakutenCredentialContractCheck {
-  const endpointContractOk =
-    input.url.hostname === rakutenEndpointHost &&
-    input.url.pathname === rakutenEndpointPathname;
-  const requiredParameterNamesPresent =
-    input.url.searchParams.has("applicationId") &&
-    input.accessKeyTransport === "header";
+  const endpointContractOk = isRakutenEndpointContractOk(input.url);
+  const requiredParameterNamesPresent = hasRequiredParameterNames({
+    url: input.url,
+    accessKeyTransport: input.accessKeyTransport,
+  });
 
   return {
     provider: "rakuten",
@@ -282,6 +354,30 @@ function buildCredentialContractCheck(input: {
       bodyErrorCodeKind: input.bodyErrorCodeKind,
     }),
   };
+}
+
+function isRakutenEndpointContractOk(url: URL): boolean {
+  return (
+    url.hostname === rakutenEndpointHost &&
+    url.pathname === rakutenEndpointPathname
+  );
+}
+
+function hasRequiredParameterNames(input: {
+  url: URL;
+  accessKeyTransport: RakutenAccessKeyTransport;
+}): boolean {
+  const hasApplicationId = input.url.searchParams.has("applicationId");
+
+  if (input.accessKeyTransport === "header") {
+    return hasApplicationId;
+  }
+
+  if (input.accessKeyTransport === "query") {
+    return hasApplicationId && input.url.searchParams.has("accessKey");
+  }
+
+  return false;
 }
 
 function classifyCredentialContractError(input: {

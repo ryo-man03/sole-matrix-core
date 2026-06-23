@@ -14,6 +14,7 @@ import {
   printExternalSmokeStatusSummary,
   runGeminiIsolatedSmokeStatusReport,
   runRakutenIsolatedSmokeStatusReport,
+  runRakutenIsolatedSmokeTransportStatusReports,
   summarizeExternalSmokeResult,
 } from "./statusReport";
 
@@ -291,8 +292,13 @@ describe("Rakuten isolated smoke", () => {
         provider: "rakuten",
         phase: "shape_validation",
         networkAttempted: true,
+        accessKeyTransport: "header",
+        endpointContractOk: true,
+        requiredParameterNamesPresent: true,
         httpStatus: 200,
         responseOk: true,
+        normalizationReadiness: "ready",
+        next: "WEB-12G response normalization design",
       },
     });
     expect(fetcher).toHaveBeenCalledOnce();
@@ -315,46 +321,75 @@ describe("Rakuten isolated smoke", () => {
         provider: "rakuten",
         phase: "fetch_throw",
         networkAttempted: true,
+        accessKeyTransport: "header",
+        endpointContractOk: true,
+        requiredParameterNamesPresent: true,
         errorKind: "fetch_throw",
+        normalizationReadiness: "blocked_network",
+        next: "WEB-12F.5 transport / network check",
       },
     });
     expect(JSON.stringify(result)).not.toContain("credential-like-sensitive-text");
   });
 
   it.each([
-    [400, "http_400"],
-    [401, "http_401"],
-    [404, "http_404"],
-    [429, "http_429"],
-    [500, "http_5xx"],
-  ] as const)("classifies HTTP %i safely", async (status, errorKind) => {
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        new Response("credential-like-sensitive-response", { status })
-      );
+    [
+      400,
+      "http_400",
+      "blocked_parameter_contract",
+      "WEB-12F.5 parameter contract fix",
+    ],
+    [401, "http_401", "blocked_auth", "WEB-12F.5 credential check"],
+    [
+      404,
+      "http_404",
+      "blocked_endpoint_contract",
+      "WEB-12F.5 endpoint contract fix",
+    ],
+    [429, "http_429", "blocked_rate_limit", "WEB-12F.5 rate limit policy"],
+    [
+      500,
+      "http_5xx",
+      "blocked_server_error",
+      "degraded behavior / retry policy",
+    ],
+  ] as const)(
+    "classifies HTTP %i safely",
+    async (status, errorKind, normalizationReadiness, next) => {
+      const fetcher = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          new Response("credential-like-sensitive-response", { status })
+        );
 
-    const result = await runRakutenIsolatedSmoke({
-      env: rakutenOptInEnv(),
-      fetcher,
-    });
+      const result = await runRakutenIsolatedSmoke({
+        env: rakutenOptInEnv(),
+        fetcher,
+      });
 
-    expect(result).toEqual({
-      provider: "rakuten",
-      status: "network_error",
-      diagnostic: {
+      expect(result).toEqual({
         provider: "rakuten",
-        phase: "http_response",
-        networkAttempted: true,
-        httpStatus: status,
-        responseOk: false,
-        errorKind,
-      },
-    });
-    expect(JSON.stringify(result)).not.toContain(
-      "credential-like-sensitive-response"
-    );
-  });
+        status: "network_error",
+        diagnostic: {
+          provider: "rakuten",
+          phase: "http_response",
+          networkAttempted: true,
+          accessKeyTransport: "header",
+          endpointContractOk: true,
+          requiredParameterNamesPresent: true,
+          httpStatus: status,
+          responseOk: false,
+          errorKind,
+          normalizationReadiness,
+          next,
+        },
+      });
+
+      expect(JSON.stringify(result)).not.toContain(
+        "credential-like-sensitive-response"
+      );
+    }
+  );
 
   it("classifies an HTTP 403 response with a safe credential contract check", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
@@ -379,9 +414,15 @@ describe("Rakuten isolated smoke", () => {
         provider: "rakuten",
         phase: "http_response",
         networkAttempted: true,
+        accessKeyTransport: "header",
+        endpointContractOk: true,
+        requiredParameterNamesPresent: true,
         httpStatus: 403,
         responseOk: false,
         errorKind: "http_403",
+        normalizationReadiness: "blocked_forbidden",
+        next:
+          "WEB-12F.5 dashboard / credential / permission / referrer-origin manual check",
         credentialContractCheck: {
           provider: "rakuten",
           endpointContractOk: true,
@@ -493,6 +534,72 @@ describe("Rakuten isolated smoke", () => {
     expect(serialized).not.toContain("unknown forbidden");
   });
 
+  it("can compare header and query transports without retaining credential values", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+      const url = input instanceof URL ? input : new URL(input.toString());
+
+      if (init?.headers) {
+        expect(init.headers).toEqual({
+          accessKey: "sensitive-access-key-value",
+        });
+        expect(url.searchParams.has("accessKey")).toBe(false);
+      } else {
+        expect(url.searchParams.has("accessKey")).toBe(true);
+      }
+
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              itemName: "Smoke Sneaker",
+              itemPrice: 12_000,
+              itemUrl: "https://example.test/item",
+            },
+          ],
+        }),
+        { status: 200 }
+      );
+    });
+
+    const reports = await runRakutenIsolatedSmokeTransportStatusReports({
+      env: {
+        RAKUTEN_APPLICATION_ID: "sensitive-application-id-value",
+        RAKUTEN_ACCESS_KEY: "sensitive-access-key-value",
+        RUN_EXTERNAL_SMOKE: "1",
+      },
+      fetcher,
+    });
+
+    expect(reports.header).toMatchObject({
+      transport: "header",
+      networkAttempted: true,
+      status: "ok",
+      shapeValid: true,
+      endpointContractOk: true,
+      requiredParameterNamesPresent: true,
+      normalizationReadiness: "ready",
+      next: "WEB-12G response normalization design",
+    });
+    expect(reports.query).toMatchObject({
+      transport: "query",
+      networkAttempted: true,
+      status: "ok",
+      shapeValid: true,
+      endpointContractOk: true,
+      requiredParameterNamesPresent: true,
+      normalizationReadiness: "ready",
+      next: "WEB-12G response normalization design",
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    const serialized = JSON.stringify(reports);
+
+    expect(serialized).not.toContain("sensitive-application-id-value");
+    expect(serialized).not.toContain("sensitive-access-key-value");
+    expect(serialized).not.toContain("Smoke Sneaker");
+    expect(serialized).not.toContain("https://example.test/item");
+  });
+
   it("classifies invalid JSON without retaining the response body", async () => {
     const fetcher = vi
       .fn<typeof fetch>()
@@ -503,13 +610,22 @@ describe("Rakuten isolated smoke", () => {
       fetcher,
     });
 
-    expect(result.diagnostic).toEqual({
+    expect(result).toEqual({
       provider: "rakuten",
-      phase: "json_parse",
-      networkAttempted: true,
-      httpStatus: 200,
-      responseOk: true,
-      errorKind: "json_parse_error",
+      status: "invalid_response_shape",
+      diagnostic: {
+        provider: "rakuten",
+        phase: "json_parse",
+        networkAttempted: true,
+        accessKeyTransport: "header",
+        endpointContractOk: true,
+        requiredParameterNamesPresent: true,
+        httpStatus: 200,
+        responseOk: true,
+        errorKind: "json_parse_error",
+        normalizationReadiness: "blocked_shape_mismatch",
+        next: "WEB-12G-PRE shape contract review",
+      },
     });
     expect(JSON.stringify(result)).not.toContain("not-json-and-sensitive");
   });
@@ -531,9 +647,14 @@ describe("Rakuten isolated smoke", () => {
         provider: "rakuten",
         phase: "shape_validation",
         networkAttempted: true,
+        accessKeyTransport: "header",
+        endpointContractOk: true,
+        requiredParameterNamesPresent: true,
         httpStatus: 200,
         responseOk: true,
         errorKind: "invalid_response_shape",
+        normalizationReadiness: "blocked_shape_mismatch",
+        next: "WEB-12G-PRE shape contract review",
       },
     });
   });
@@ -582,7 +703,12 @@ describe("Rakuten isolated smoke", () => {
         provider: "rakuten",
         phase: "url_build",
         networkAttempted: false,
+        accessKeyTransport: "header",
+        endpointContractOk: false,
+        requiredParameterNamesPresent: false,
         errorKind: "url_build_error",
+        normalizationReadiness: "blocked_network",
+        next: "WEB-12F.5 transport / network check",
       },
     });
     expect(fetcher).not.toHaveBeenCalled();

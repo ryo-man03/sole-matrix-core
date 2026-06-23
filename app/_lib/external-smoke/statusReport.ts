@@ -4,12 +4,15 @@ import type {
   ExternalSmokeEnvironment,
   ExternalSmokeResult,
   ExternalSmokeStatusSummary,
+  RakutenAccessKeyTransport,
+  RakutenTransportStatusReports,
 } from "./types";
 
 type SmokeRunOptions = {
   env?: ExternalSmokeEnvironment;
   fetcher?: typeof fetch;
   endpointContractAvailable?: boolean;
+  accessKeyTransport?: Extract<RakutenAccessKeyTransport, "header" | "query">;
 };
 
 export async function runGeminiIsolatedSmokeStatusReport(
@@ -51,6 +54,23 @@ export async function runRakutenIsolatedSmokeStatusReport(
   );
 }
 
+export async function runRakutenIsolatedSmokeTransportStatusReports(
+  options: Omit<SmokeRunOptions, "accessKeyTransport"> = {}
+): Promise<RakutenTransportStatusReports> {
+  const [header, query] = await Promise.all([
+    runRakutenIsolatedSmokeStatusReport({
+      ...options,
+      accessKeyTransport: "header",
+    }),
+    runRakutenIsolatedSmokeStatusReport({
+      ...options,
+      accessKeyTransport: "query",
+    }),
+  ]);
+
+  return { header, query };
+}
+
 export function summarizeExternalSmokeResult(
   result: ExternalSmokeResult,
   networkAttempted = [
@@ -69,6 +89,21 @@ export function summarizeExternalSmokeResult(
       networkAttempted: result.diagnostic.networkAttempted,
       shapeValid: result.status === "ok",
       phase: result.diagnostic.phase,
+      ...(result.diagnostic.accessKeyTransport === undefined
+        ? {}
+        : {
+            transport: result.diagnostic.accessKeyTransport,
+            accessKeyTransport: result.diagnostic.accessKeyTransport,
+          }),
+      ...(result.diagnostic.endpointContractOk === undefined
+        ? {}
+        : { endpointContractOk: result.diagnostic.endpointContractOk }),
+      ...(result.diagnostic.requiredParameterNamesPresent === undefined
+        ? {}
+        : {
+            requiredParameterNamesPresent:
+              result.diagnostic.requiredParameterNamesPresent,
+          }),
       ...(result.diagnostic.httpStatus === undefined
         ? {}
         : { httpStatus: result.diagnostic.httpStatus }),
@@ -78,6 +113,15 @@ export function summarizeExternalSmokeResult(
       ...(result.diagnostic.errorKind === undefined
         ? {}
         : { errorKind: result.diagnostic.errorKind }),
+      ...(result.diagnostic.normalizationReadiness === undefined
+        ? {}
+        : {
+            normalizationReadiness:
+              result.diagnostic.normalizationReadiness,
+          }),
+      ...(result.diagnostic.next === undefined
+        ? {}
+        : { next: result.diagnostic.next }),
       ...(credentialContractCheck === undefined
         ? {}
         : {
@@ -142,6 +186,10 @@ export function formatExternalSmokeStatusSummary(
     lines.push(`phase: ${summary.phase}`);
   }
 
+  if (summary.transport) {
+    lines.push(`transport: ${summary.transport}`);
+  }
+
   if (summary.httpStatus !== undefined) {
     lines.push(`httpStatus: ${summary.httpStatus}`);
   }
@@ -152,6 +200,14 @@ export function formatExternalSmokeStatusSummary(
 
   if (summary.errorKind) {
     lines.push(`errorKind: ${summary.errorKind}`);
+  }
+
+  if (summary.normalizationReadiness) {
+    lines.push(`normalizationReadiness: ${summary.normalizationReadiness}`);
+  }
+
+  if (summary.next) {
+    lines.push(`next: ${summary.next}`);
   }
 
   if (summary.endpointContractOk !== undefined) {
