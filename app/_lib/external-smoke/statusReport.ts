@@ -45,7 +45,10 @@ export async function runRakutenIsolatedSmokeStatusReport(
   }
 
   const result = await runRakutenIsolatedSmoke(reportOptions);
-  return summarizeExternalSmokeResult(result, networkAttempted);
+  return summarizeExternalSmokeResult(
+    result,
+    result.diagnostic?.networkAttempted ?? networkAttempted
+  );
 }
 
 export function summarizeExternalSmokeResult(
@@ -56,6 +59,25 @@ export function summarizeExternalSmokeResult(
     "invalid_response_shape",
   ].includes(result.status)
 ): ExternalSmokeStatusSummary {
+  if (result.provider === "rakuten" && result.diagnostic) {
+    return {
+      provider: result.provider,
+      status: result.status,
+      networkAttempted: result.diagnostic.networkAttempted,
+      shapeValid: result.status === "ok",
+      phase: result.diagnostic.phase,
+      ...(result.diagnostic.httpStatus === undefined
+        ? {}
+        : { httpStatus: result.diagnostic.httpStatus }),
+      ...(result.diagnostic.responseOk === undefined
+        ? {}
+        : { responseOk: result.diagnostic.responseOk }),
+      ...(result.diagnostic.errorKind === undefined
+        ? {}
+        : { errorKind: result.diagnostic.errorKind }),
+    };
+  }
+
   if (result.status === "network_error") {
     return {
       provider: result.provider,
@@ -95,6 +117,18 @@ export function formatExternalSmokeStatusSummary(
     `networkAttempted: ${summary.networkAttempted}`,
     `shapeValid: ${summary.shapeValid}`,
   ];
+
+  if (summary.phase) {
+    lines.push(`phase: ${summary.phase}`);
+  }
+
+  if (summary.httpStatus !== undefined) {
+    lines.push(`httpStatus: ${summary.httpStatus}`);
+  }
+
+  if (summary.responseOk !== undefined) {
+    lines.push(`responseOk: ${summary.responseOk}`);
+  }
 
   if (summary.errorKind) {
     lines.push(`errorKind: ${summary.errorKind}`);

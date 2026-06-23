@@ -284,8 +284,98 @@ describe("Rakuten isolated smoke", () => {
         },
         fetcher,
       })
-    ).resolves.toEqual({ provider: "rakuten", status: "ok" });
+    ).resolves.toEqual({
+      provider: "rakuten",
+      status: "ok",
+      diagnostic: {
+        provider: "rakuten",
+        phase: "shape_validation",
+        networkAttempted: true,
+        httpStatus: 200,
+        responseOk: true,
+      },
+    });
     expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it("classifies a fetch throw without retaining the thrown error", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockRejectedValue(new Error("credential-like-sensitive-text"));
+
+    const result = await runRakutenIsolatedSmoke({
+      env: rakutenOptInEnv(),
+      fetcher,
+    });
+
+    expect(result).toEqual({
+      provider: "rakuten",
+      status: "network_error",
+      diagnostic: {
+        provider: "rakuten",
+        phase: "fetch_throw",
+        networkAttempted: true,
+        errorKind: "fetch_throw",
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("credential-like-sensitive-text");
+  });
+
+  it.each([
+    [400, "http_400"],
+    [401, "http_401"],
+    [403, "http_403"],
+    [404, "http_404"],
+    [429, "http_429"],
+    [500, "http_5xx"],
+  ] as const)("classifies HTTP %i safely", async (status, errorKind) => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response("credential-like-sensitive-response", { status })
+      );
+
+    const result = await runRakutenIsolatedSmoke({
+      env: rakutenOptInEnv(),
+      fetcher,
+    });
+
+    expect(result).toEqual({
+      provider: "rakuten",
+      status: "network_error",
+      diagnostic: {
+        provider: "rakuten",
+        phase: "http_response",
+        networkAttempted: true,
+        httpStatus: status,
+        responseOk: false,
+        errorKind,
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain(
+      "credential-like-sensitive-response"
+    );
+  });
+
+  it("classifies invalid JSON without retaining the response body", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response("not-json-and-sensitive"));
+
+    const result = await runRakutenIsolatedSmoke({
+      env: rakutenOptInEnv(),
+      fetcher,
+    });
+
+    expect(result.diagnostic).toEqual({
+      provider: "rakuten",
+      phase: "json_parse",
+      networkAttempted: true,
+      httpStatus: 200,
+      responseOk: true,
+      errorKind: "json_parse_error",
+    });
+    expect(JSON.stringify(result)).not.toContain("not-json-and-sensitive");
   });
 
   it("classifies an invalid fake response without exposing it to Core", async () => {
@@ -295,17 +385,64 @@ describe("Rakuten isolated smoke", () => {
 
     await expect(
       runRakutenIsolatedSmoke({
-        env: {
-          RAKUTEN_APPLICATION_ID: "application-id",
-          RAKUTEN_ACCESS_KEY: "access-key",
-          RUN_EXTERNAL_SMOKE: "1",
-        },
+        env: rakutenOptInEnv(),
         fetcher,
       })
     ).resolves.toEqual({
       provider: "rakuten",
       status: "invalid_response_shape",
+      diagnostic: {
+        provider: "rakuten",
+        phase: "shape_validation",
+        networkAttempted: true,
+        httpStatus: 200,
+        responseOk: true,
+        errorKind: "invalid_response_shape",
+      },
     });
+  });
+
+  it("builds only the expected Rakuten endpoint and parameter names", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = input instanceof URL ? input : new URL(input.toString());
+
+      expect(url.origin).toBe("https://openapi.rakuten.co.jp");
+      expect(url.pathname).toBe(
+        "/ichibams/api/IchibaItem/Search/20260401"
+      );
+      expect([...url.searchParams.keys()].sort()).toEqual(
+        ["applicationId", "elements", "formatVersion", "hits", "keyword"].sort()
+      );
+
+      return new Response(JSON.stringify({ items: [{}] }));
+    });
+
+    await runRakutenIsolatedSmoke({
+      env: rakutenOptInEnv(),
+      fetcher,
+    });
+  });
+
+  it("classifies URL construction failure before network access", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+
+    await expect(
+      runRakutenIsolatedSmoke({
+        env: rakutenOptInEnv(),
+        fetcher,
+        endpoint: "not a url",
+      })
+    ).resolves.toEqual({
+      provider: "rakuten",
+      status: "network_error",
+      diagnostic: {
+        provider: "rakuten",
+        phase: "url_build",
+        networkAttempted: false,
+        errorKind: "url_build_error",
+      },
+    });
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });
 
@@ -392,4 +529,39 @@ describe("external smoke status report", () => {
       ].join("\n")
     );
   });
+
+  it("formats Rakuten diagnostics without request or response data", () => {
+    const output = formatExternalSmokeStatusSummary("Rakuten", {
+      provider: "rakuten",
+      status: "network_error",
+      networkAttempted: true,
+      shapeValid: false,
+      phase: "http_response",
+      httpStatus: 401,
+      responseOk: false,
+      errorKind: "http_401",
+    });
+
+    expect(output).toBe(
+      [
+        "Rakuten isolated smoke status summary:",
+        "provider: rakuten",
+        "status: network_error",
+        "networkAttempted: true",
+        "shapeValid: false",
+        "phase: http_response",
+        "httpStatus: 401",
+        "responseOk: false",
+        "errorKind: http_401",
+      ].join("\n")
+    );
+  });
 });
+
+function rakutenOptInEnv() {
+  return {
+    RAKUTEN_APPLICATION_ID: "application-id",
+    RAKUTEN_ACCESS_KEY: "access-key",
+    RUN_EXTERNAL_SMOKE: "1",
+  };
+}
