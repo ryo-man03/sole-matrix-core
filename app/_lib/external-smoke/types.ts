@@ -32,11 +32,49 @@ export type ExternalSmokeErrorKind =
   | "http_404"
   | "http_429"
   | "http_5xx"
+  | "invalid_access_key_possible"
+  | "requested_scope_possible"
+  | "referrer_or_origin_possible"
+  | "endpoint_contract_mismatch"
+  | "access_key_transport_mismatch"
+  | "unknown_forbidden"
   | "json_parse_error"
   | "auth_error"
   | "rate_limited"
   | "network_error"
   | "invalid_response_shape";
+
+export type RakutenAccessKeyTransport =
+  | "header"
+  | "query"
+  | "both_tested"
+  | "unknown";
+
+export type RakutenForbiddenBodyErrorKind =
+  | "invalid_access_key_possible"
+  | "requested_scope_possible"
+  | "referrer_or_origin_possible"
+  | "unknown_forbidden";
+
+export type RakutenCredentialContractCheck = {
+  provider: "rakuten";
+  endpointContractOk: boolean;
+  requiredParameterNamesPresent: boolean;
+  accessKeyTransport: RakutenAccessKeyTransport;
+  httpStatus?: number;
+  responseOk?: boolean;
+  bodyReadable?: boolean;
+  bodyErrorCodeKind?: RakutenForbiddenBodyErrorKind;
+  errorKind: Extract<
+    ExternalSmokeErrorKind,
+    | "invalid_access_key_possible"
+    | "requested_scope_possible"
+    | "referrer_or_origin_possible"
+    | "endpoint_contract_mismatch"
+    | "access_key_transport_mismatch"
+    | "unknown_forbidden"
+  >;
+};
 
 export type RakutenSmokeDiagnostic = {
   provider: "rakuten";
@@ -45,6 +83,7 @@ export type RakutenSmokeDiagnostic = {
   httpStatus?: number;
   responseOk?: boolean;
   errorKind?: ExternalSmokeErrorKind;
+  credentialContractCheck?: RakutenCredentialContractCheck;
 };
 
 export type ExternalSmokeStatusSummary = {
@@ -56,6 +95,11 @@ export type ExternalSmokeStatusSummary = {
   httpStatus?: number;
   responseOk?: boolean;
   errorKind?: ExternalSmokeErrorKind;
+  endpointContractOk?: boolean;
+  requiredParameterNamesPresent?: boolean;
+  accessKeyTransport?: RakutenAccessKeyTransport;
+  bodyReadable?: boolean;
+  bodyErrorCodeKind?: RakutenForbiddenBodyErrorKind;
 };
 
 export type ExternalSmokeEnvironment = Record<string, string | undefined>;

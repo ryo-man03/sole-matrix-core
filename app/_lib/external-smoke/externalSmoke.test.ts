@@ -324,7 +324,6 @@ describe("Rakuten isolated smoke", () => {
   it.each([
     [400, "http_400"],
     [401, "http_401"],
-    [403, "http_403"],
     [404, "http_404"],
     [429, "http_429"],
     [500, "http_5xx"],
@@ -355,6 +354,143 @@ describe("Rakuten isolated smoke", () => {
     expect(JSON.stringify(result)).not.toContain(
       "credential-like-sensitive-response"
     );
+  });
+
+  it("classifies an HTTP 403 response with a safe credential contract check", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error_description:
+            "invalid access key credential-like-sensitive-response",
+        }),
+        { status: 403 }
+      )
+    );
+
+    const result = await runRakutenIsolatedSmoke({
+      env: rakutenOptInEnv(),
+      fetcher,
+    });
+
+    expect(result).toEqual({
+      provider: "rakuten",
+      status: "network_error",
+      diagnostic: {
+        provider: "rakuten",
+        phase: "http_response",
+        networkAttempted: true,
+        httpStatus: 403,
+        responseOk: false,
+        errorKind: "http_403",
+        credentialContractCheck: {
+          provider: "rakuten",
+          endpointContractOk: true,
+          requiredParameterNamesPresent: true,
+          accessKeyTransport: "header",
+          httpStatus: 403,
+          responseOk: false,
+          bodyReadable: true,
+          bodyErrorCodeKind: "invalid_access_key_possible",
+          errorKind: "invalid_access_key_possible",
+        },
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain(
+      "credential-like-sensitive-response"
+    );
+    expect(JSON.stringify(result)).not.toContain("error_description");
+  });
+
+  it.each([
+    [
+      { error: "requested scope is not allowed" },
+      "requested_scope_possible",
+    ],
+    [
+      { message: "blocked by allowed domain or origin" },
+      "referrer_or_origin_possible",
+    ],
+    [{ code: "forbidden_without_detail" }, "requested_scope_possible"],
+    [{ detail: "unrecognized" }, "unknown_forbidden"],
+  ] as const)(
+    "classifies a readable 403 body as %s without retaining it",
+    async (body, bodyErrorCodeKind) => {
+      const fetcher = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(JSON.stringify(body), { status: 403 }));
+
+      const result = await runRakutenIsolatedSmoke({
+        env: rakutenOptInEnv(),
+        fetcher,
+      });
+
+      expect(
+        result.diagnostic?.credentialContractCheck?.bodyErrorCodeKind
+      ).toBe(bodyErrorCodeKind);
+      expect(result.diagnostic?.credentialContractCheck?.bodyReadable).toBe(
+        true
+      );
+      expect(JSON.stringify(result)).not.toContain(JSON.stringify(body));
+    }
+  );
+
+  it("classifies an unreadable 403 body without retaining it", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response("not-json-sensitive-body", { status: 403 })
+      );
+
+    const result = await runRakutenIsolatedSmoke({
+      env: rakutenOptInEnv(),
+      fetcher,
+    });
+
+    expect(result.diagnostic?.credentialContractCheck).toMatchObject({
+      provider: "rakuten",
+      endpointContractOk: true,
+      requiredParameterNamesPresent: true,
+      accessKeyTransport: "header",
+      httpStatus: 403,
+      responseOk: false,
+      bodyReadable: false,
+      errorKind: "unknown_forbidden",
+    });
+    expect(JSON.stringify(result)).not.toContain("not-json-sensitive-body");
+  });
+
+  it("uses accessKey header transport without retaining credential values", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (_input, init) => {
+        expect(init?.headers).toEqual({
+          accessKey: "sensitive-access-key-value",
+        });
+
+        return new Response(JSON.stringify({ detail: "unknown forbidden" }), {
+          status: 403,
+        });
+      });
+
+    const result = await runRakutenIsolatedSmoke({
+      env: {
+        RAKUTEN_APPLICATION_ID: "sensitive-application-id-value",
+        RAKUTEN_ACCESS_KEY: "sensitive-access-key-value",
+        RUN_EXTERNAL_SMOKE: "1",
+      },
+      fetcher,
+    });
+
+    const serialized = JSON.stringify(result);
+
+    expect(result.diagnostic?.credentialContractCheck).toMatchObject({
+      accessKeyTransport: "header",
+      endpointContractOk: true,
+      requiredParameterNamesPresent: true,
+    });
+    expect(serialized).not.toContain("sensitive-application-id-value");
+    expect(serialized).not.toContain("sensitive-access-key-value");
+    expect(serialized).not.toContain("unknown forbidden");
   });
 
   it("classifies invalid JSON without retaining the response body", async () => {
@@ -411,7 +547,14 @@ describe("Rakuten isolated smoke", () => {
         "/ichibams/api/IchibaItem/Search/20260401"
       );
       expect([...url.searchParams.keys()].sort()).toEqual(
-        ["applicationId", "elements", "formatVersion", "hits", "keyword"].sort()
+        [
+          "applicationId",
+          "elements",
+          "format",
+          "formatVersion",
+          "hits",
+          "keyword",
+        ].sort()
       );
 
       return new Response(JSON.stringify({ items: [{}] }));
@@ -553,6 +696,43 @@ describe("external smoke status report", () => {
         "httpStatus: 401",
         "responseOk: false",
         "errorKind: http_401",
+      ].join("\n")
+    );
+  });
+
+  it("formats Rakuten credential checks without secret or body data", () => {
+    const output = formatExternalSmokeStatusSummary("Rakuten", {
+      provider: "rakuten",
+      status: "network_error",
+      networkAttempted: true,
+      shapeValid: false,
+      phase: "http_response",
+      httpStatus: 403,
+      responseOk: false,
+      errorKind: "http_403",
+      endpointContractOk: true,
+      requiredParameterNamesPresent: true,
+      accessKeyTransport: "header",
+      bodyReadable: true,
+      bodyErrorCodeKind: "referrer_or_origin_possible",
+    });
+
+    expect(output).toBe(
+      [
+        "Rakuten isolated smoke status summary:",
+        "provider: rakuten",
+        "status: network_error",
+        "networkAttempted: true",
+        "shapeValid: false",
+        "phase: http_response",
+        "httpStatus: 403",
+        "responseOk: false",
+        "errorKind: http_403",
+        "endpointContractOk: true",
+        "requiredParameterNamesPresent: true",
+        "accessKeyTransport: header",
+        "bodyReadable: true",
+        "bodyErrorCodeKind: referrer_or_origin_possible",
       ].join("\n")
     );
   });

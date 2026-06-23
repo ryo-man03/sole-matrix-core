@@ -60,6 +60,9 @@ export function summarizeExternalSmokeResult(
   ].includes(result.status)
 ): ExternalSmokeStatusSummary {
   if (result.provider === "rakuten" && result.diagnostic) {
+    const credentialContractCheck =
+      result.diagnostic.credentialContractCheck;
+
     return {
       provider: result.provider,
       status: result.status,
@@ -75,6 +78,23 @@ export function summarizeExternalSmokeResult(
       ...(result.diagnostic.errorKind === undefined
         ? {}
         : { errorKind: result.diagnostic.errorKind }),
+      ...(credentialContractCheck === undefined
+        ? {}
+        : {
+            endpointContractOk: credentialContractCheck.endpointContractOk,
+            requiredParameterNamesPresent:
+              credentialContractCheck.requiredParameterNamesPresent,
+            accessKeyTransport: credentialContractCheck.accessKeyTransport,
+            ...(credentialContractCheck.bodyReadable === undefined
+              ? {}
+              : { bodyReadable: credentialContractCheck.bodyReadable }),
+            ...(credentialContractCheck.bodyErrorCodeKind === undefined
+              ? {}
+              : {
+                  bodyErrorCodeKind:
+                    credentialContractCheck.bodyErrorCodeKind,
+                }),
+          }),
     };
   }
 
@@ -132,6 +152,28 @@ export function formatExternalSmokeStatusSummary(
 
   if (summary.errorKind) {
     lines.push(`errorKind: ${summary.errorKind}`);
+  }
+
+  if (summary.endpointContractOk !== undefined) {
+    lines.push(`endpointContractOk: ${summary.endpointContractOk}`);
+  }
+
+  if (summary.requiredParameterNamesPresent !== undefined) {
+    lines.push(
+      `requiredParameterNamesPresent: ${summary.requiredParameterNamesPresent}`
+    );
+  }
+
+  if (summary.accessKeyTransport) {
+    lines.push(`accessKeyTransport: ${summary.accessKeyTransport}`);
+  }
+
+  if (summary.bodyReadable !== undefined) {
+    lines.push(`bodyReadable: ${summary.bodyReadable}`);
+  }
+
+  if (summary.bodyErrorCodeKind) {
+    lines.push(`bodyErrorCodeKind: ${summary.bodyErrorCodeKind}`);
   }
 
   return lines.join("\n");
