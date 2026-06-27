@@ -86,6 +86,12 @@ Gemini出力からscore、Decision、budgetFit、riskを読み込む経路はあ
 
 スクリーンショットを更新する場合は、秘密情報が画面・DevTools・ファイル名へ含まれていないことを確認して`docs/screenshots/`へ保存します。
 
+現行の確認済み証跡:
+
+- `docs/screenshots/core-v1-recommendation-result.png`
+- `docs/screenshots/core-v1-readiness-feedback.png`
+- `docs/screenshots/core-v1-feedback-saved.png`
+
 ## 変更時の回帰確認
 
 - Balanced Scoreのadapter・表示内訳: `scoring.ts`

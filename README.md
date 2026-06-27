@@ -182,6 +182,16 @@ src/core/
 
 詳しい境界と画面確認手順は[docs/core-v1-architecture.md](docs/core-v1-architecture.md)を参照してください。
 
+## 画面証跡
+
+実APIを有効にしたローカルQAで、推薦結果、外部API readiness、Feedback保存を確認しています。
+
+![Balanced/Ryo ScoreとGemini説明](docs/screenshots/core-v1-recommendation-result.png)
+
+![GeminiとRakutenのreadiness](docs/screenshots/core-v1-readiness-feedback.png)
+
+![Feedbackのmock repository保存](docs/screenshots/core-v1-feedback-saved.png)
+
 ## 現在の制限と今後
 
 - 楽天候補は検索結果であり、在庫・真贋・市場価格の保証はしない
