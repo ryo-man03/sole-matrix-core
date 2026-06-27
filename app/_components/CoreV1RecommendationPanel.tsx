@@ -45,6 +45,16 @@ const decisionLabels: Record<RecommendationResult["decision"], string> = {
   unknown: "UNKNOWN",
 };
 
+const candidateSourceLabels: Record<
+  RecommendationResult["candidate"]["source"],
+  string
+> = {
+  local: "診断 / ローカル候補",
+  mock: "mock候補",
+  fallback: "fallback候補",
+  rakuten: "楽天取得データ",
+};
+
 export function CoreV1RecommendationPanel({
   selectedAnswerByQuestionId,
 }: CoreV1RecommendationPanelProps) {
@@ -200,9 +210,39 @@ export function CoreV1RecommendationPanel({
             Decisionは、二つのスコアに予算適合度・リスク・情報の揃い方を加えてCore v1が決定したものです。
           </p>
 
-          <p className="core-v1-local-notice">
-            外部検索結果ではなく、診断結果または入力内容をもとにした仮候補です。
+          <p className="core-v1-local-notice" data-source={result.candidate.source}>
+            候補ソース: {candidateSourceLabels[result.candidate.source]}
+            {result.candidate.source === "rakuten"
+              ? " — 楽天APIから取得し、検証・正規化した候補です。"
+              : " — 診断結果とローカルデータをもとにした候補です。"}
           </p>
+
+          {result.candidate.source === "rakuten" ? (
+            <dl className="core-v1-product-meta">
+              {result.candidate.priceYen !== undefined ? (
+                <div>
+                  <dt>取得時価格</dt>
+                  <dd>{formatYen(result.candidate.priceYen)}</dd>
+                </div>
+              ) : null}
+              {result.candidate.shopName ? (
+                <div>
+                  <dt>ショップ</dt>
+                  <dd>{result.candidate.shopName}</dd>
+                </div>
+              ) : null}
+              {result.candidate.url ? (
+                <div>
+                  <dt>商品情報</dt>
+                  <dd>
+                    <a href={result.candidate.url} rel="noreferrer">
+                      楽天の商品ページで確認する
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : null}
 
           <div className="core-v1-score-grid">
             <ScoreCard
@@ -226,7 +266,7 @@ export function CoreV1RecommendationPanel({
             <p>{result.explanation.summary}</p>
             <p className="core-v1-provider-note">
               {result.explanation.source === "gemini"
-                ? "AI補助による説明を表示しています。"
+                ? "Gemini APIから実際に生成され、shape検証を通過した説明を表示しています。"
                 : "AI補助が利用できないため、ルールベースで説明しています。"}
             </p>
             <div className="core-v1-explanation-columns">
@@ -268,15 +308,16 @@ export function CoreV1RecommendationPanel({
             <p className="diagnosis-summary-kicker">Readiness</p>
             <h4 id="core-v1-readiness-title">外部APIの状態</h4>
             <div>
-              <strong>Gemini: {result.readiness.gemini.status}</strong>
+              <strong data-status={result.readiness.gemini.status}>
+                Gemini: {result.readiness.gemini.status}
+              </strong>
               <p>{result.readiness.gemini.detail}</p>
             </div>
             <div>
-              <strong>Rakuten: {result.readiness.rakuten.status}</strong>
+              <strong data-status={result.readiness.rakuten.status}>
+                Rakuten: {result.readiness.rakuten.status}
+              </strong>
               <p>{result.readiness.rakuten.detail}</p>
-              <p>
-                楽天APIは現在利用できないため、外部商品データではなく、診断結果とローカル/仮候補をもとに判定しています。
-              </p>
             </div>
           </section>
 
@@ -362,4 +403,12 @@ function normalizeBudget(value: string): number | null | undefined {
   const budget = Number(value);
 
   return Number.isInteger(budget) && budget > 0 ? budget : null;
+}
+
+function formatYen(value: number): string {
+  return new Intl.NumberFormat("ja-JP", {
+    style: "currency",
+    currency: "JPY",
+    maximumFractionDigits: 0,
+  }).format(value);
 }

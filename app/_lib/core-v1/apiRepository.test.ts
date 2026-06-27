@@ -1,8 +1,9 @@
 import { POST as postFeedback } from "../../api/core-v1/feedback/route";
-import { POST as postRecommendation } from "../../api/core-v1/recommend/route";
-import { createRakutenReadiness } from "./readiness";
+import { createRecommendHandler } from "../../api/core-v1/recommend/route";
 import { createMockFeedbackRepository } from "./repository";
 import { validateFeedbackRequest } from "./validation";
+
+const postRecommendation = createRecommendHandler({ env: {} });
 
 describe("Core v1 recommend API", () => {
   it("returns a safe validation error", async () => {
@@ -92,25 +93,6 @@ describe("Core v1 feedback API and repository", () => {
     await expect(validResponse.json()).resolves.toEqual({
       ok: true,
       data: { saved: true, repository: "mock" },
-    });
-  });
-});
-
-describe("Rakuten readiness", () => {
-  it("reports blocked_forbidden without exposing response data", () => {
-    expect(
-      createRakutenReadiness(
-        {
-          RAKUTEN_APPLICATION_ID: "configured",
-          RAKUTEN_ACCESS_KEY: "configured",
-        },
-        "blocked_forbidden",
-      ),
-    ).toEqual({
-      provider: "rakuten",
-      status: "blocked_forbidden",
-      detail:
-        "楽天APIは現在HTTP 403のため、商品データ取得には使っていません。Dashboard / credential / referrer-origin確認が必要です。",
     });
   });
 });

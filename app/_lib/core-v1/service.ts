@@ -1,10 +1,13 @@
 import { decideRecommendation } from "./decision";
 import type { ExplanationInput } from "./explanation";
-import {
-  createGeminiFallbackReadiness,
-  createRakutenReadiness,
-} from "./readiness";
+import { createGeminiFallbackReadiness } from "./readiness";
 import { generateCoreV1Explanation } from "./geminiExplanation";
+import {
+  fetchRakutenCandidates,
+  type RakutenCandidateProvider,
+  type RakutenCandidateProviderResult,
+} from "./rakutenProvider";
+import { createRakutenProviderReadiness } from "./rakutenReadiness";
 import {
   mockCandidateRepository,
   type CandidateRepository,
@@ -21,13 +24,17 @@ export type ExplanationProvider = (
   input: ExplanationInput,
 ) => Promise<RecommendationExplanation>;
 
+export type RecommendCoreV1Dependencies = {
+  candidateRepository?: CandidateRepository;
+  explanationProvider?: ExplanationProvider;
+  rakutenCandidateProvider?: RakutenCandidateProvider;
+  geminiFetcher?: typeof fetch;
+  env?: Record<string, string | undefined>;
+};
+
 export async function recommendCoreV1(
   input: RecommendRequestInput,
-  dependencies: {
-    candidateRepository?: CandidateRepository;
-    explanationProvider?: ExplanationProvider;
-    env?: Record<string, string | undefined>;
-  } = {},
+  dependencies: RecommendCoreV1Dependencies = {},
 ): Promise<RecommendationResult> {
   const candidateRepository =
     dependencies.candidateRepository ?? mockCandidateRepository;
@@ -36,9 +43,23 @@ export async function recommendCoreV1(
     answers: input.diagnosisAnswers,
     tags: input.preferenceTags,
   });
-  const candidates = await candidateRepository.listCandidates({
+  const candidateInput = {
     ...(input.budgetYen === undefined ? {} : { budgetYen: input.budgetYen }),
-  });
+  };
+  const rakutenCandidateProvider =
+    dependencies.rakutenCandidateProvider ??
+    ((providerInput) =>
+      fetchRakutenCandidates(providerInput, {
+        env,
+      }));
+  const [localCandidates, rakutenResult] = await Promise.all([
+    candidateRepository.listCandidates(candidateInput),
+    loadRakutenCandidatesSafely(rakutenCandidateProvider, {
+      ...candidateInput,
+      preferenceTags: input.preferenceTags,
+    }),
+  ]);
+  const candidates = [...localCandidates, ...rakutenResult.candidates];
 
   const scoredCandidates = candidates.map((candidate) => {
     const balancedScore = calculateBalancedScore({
@@ -65,7 +86,7 @@ export async function recommendCoreV1(
   )[0];
 
   if (!best) {
-    throw new Error("LOCAL_CANDIDATE_UNAVAILABLE");
+    throw new Error("CANDIDATE_UNAVAILABLE");
   }
 
   const explanationInput: ExplanationInput = {
@@ -79,6 +100,9 @@ export async function recommendCoreV1(
     : await generateCoreV1Explanation(explanationInput, {
         ...(env["GEMINI_API_KEY"]
           ? { apiKey: env["GEMINI_API_KEY"] }
+          : {}),
+        ...(dependencies.geminiFetcher
+          ? { fetcher: dependencies.geminiFetcher }
           : {}),
       });
 
@@ -96,7 +120,25 @@ export async function recommendCoreV1(
               detail: "AI補助による説明を表示しています。",
             }
           : createGeminiFallbackReadiness(Boolean(env["GEMINI_API_KEY"])),
-      rakuten: createRakutenReadiness(env),
+      rakuten: rakutenResult.readiness,
     },
   };
+}
+
+async function loadRakutenCandidatesSafely(
+  provider: RakutenCandidateProvider,
+  input: Parameters<RakutenCandidateProvider>[0],
+): Promise<RakutenCandidateProviderResult> {
+  try {
+    return await provider(input);
+  } catch {
+    return {
+      status: "network_or_http_error",
+      candidates: [],
+      readiness: createRakutenProviderReadiness("network_or_http_error"),
+      networkAttempted: true,
+      responseOk: false,
+      shapeValid: false,
+    };
+  }
 }

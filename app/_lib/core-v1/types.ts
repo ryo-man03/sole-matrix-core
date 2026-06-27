@@ -87,8 +87,7 @@ export type ProviderReadinessStatus =
   | "blocked_rate_limit"
   | "network_or_http_error"
   | "invalid_response"
-  | "not_checked"
-  | "ready_not_connected";
+  | "not_checked";
 
 export type ProviderReadiness = {
   provider: "gemini" | "rakuten";

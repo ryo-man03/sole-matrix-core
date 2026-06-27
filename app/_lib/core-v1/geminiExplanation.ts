@@ -156,7 +156,7 @@ function createGeminiPrompt(
     "The TypeScript Core has already finalized every score and decision.",
     "Never calculate, change, reinterpret, or override scores or decision.",
     "Never invent a product, price, stock state, URL, authenticity claim, or market fact.",
-    "The candidate is a local archetype, not an external product listing.",
+    "The candidate facts are already normalized and may represent a local archetype or a validated external listing.",
     "Return JSON only and exactly follow the supplied schema.",
     "Keep reasons and cautions grounded only in the safe facts.",
     "Safe facts:",

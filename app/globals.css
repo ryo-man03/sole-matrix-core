@@ -567,6 +567,45 @@ h1 {
   font-weight: 700;
 }
 
+.core-v1-result .core-v1-local-notice[data-source="rakuten"] {
+  background: #e9f2ec;
+  color: #28563a;
+}
+
+.core-v1-product-meta {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  border: 1px solid rgba(35, 43, 55, 0.12);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.core-v1-product-meta div {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.core-v1-product-meta dt,
+.core-v1-product-meta dd {
+  margin: 0;
+}
+
+.core-v1-product-meta dt {
+  color: #566070;
+  font-size: 0.82rem;
+}
+
+.core-v1-product-meta dd {
+  color: #17202b;
+  font-weight: 700;
+}
+
+.core-v1-product-meta a {
+  color: #284d74;
+}
+
 .core-v1-score-grid,
 .core-v1-explanation-columns {
   display: grid;
