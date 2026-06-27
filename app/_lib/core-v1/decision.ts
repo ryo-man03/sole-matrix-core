@@ -42,6 +42,7 @@ export function decideRecommendation(input: {
   if (
     balancedScore.total >= 78 &&
     ryoScore.total >= 72 &&
+    budgetFit >= 70 &&
     risk === "low" &&
     readiness === "ready_local"
   ) {

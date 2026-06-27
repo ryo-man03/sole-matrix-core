@@ -1,169 +1,175 @@
-# SOLE//MATRIX Core v0.2
+# SOLE//MATRIX Core v1 MVP
 
 [![CI](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml/badge.svg)](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml)
 
-## プロジェクト概要
+SOLE//MATRIX は、スニーカーの好みを診断し、一般的な勧めやすさと個人らしい納得感を分けて表示する判断支援プロトタイプです。
 
-SOLE//MATRIX Coreは、スニーカー購入判断を支援するためのTypeScript製推薦ロジックです。
+Core v1 MVP では、診断から推薦結果・説明・feedback skeleton までを Web UI と API Route で一貫して実行できます。score と Decision は TypeScript の決定論的なロジックが確定し、Gemini は説明文の生成だけを補助します。
 
-このリポジトリでは、ユーザーの好み、予算、所有済みスニーカーとの重複、履きやすさ、耐久性などをCoreが決定論的に計算し、候補スニーカーごとに推薦結果を返します。
+## セットアップ
 
-v0.2相当では、公開API `recommendSneakers(input)`、サンプルデータ、CLI demo、rule-based説明文生成、Gemini Adapter、Gemini確認用CLI demoまでを扱います。Coreが判定し、Geminiは説明文の自然化補助だけを担当します。
-
-## 現在できること
-
-- `src/data/**` のサンプルデータを使った推薦デモ
-- 公開API `recommendSneakers(input)` による推薦結果生成
-- `finalScore` / `rawDecision` / `finalDecision` / `demotions` の表示
-- rule-based説明文生成
-- Gemini説明生成Adapter
-- `GEMINI_API_KEY` なしでのrule-based fallback動作
-- 通常CLI demoの実行: `pnpm demo`
-- Gemini CLI demoの実行: `pnpm demo:gemini`
-- `pnpm test` による既存テスト実行
-- `pnpm typecheck` による型チェック
-- GitHub ActionsによるCI
-
-## 現在できないこと
-
-- Web UIは未実装
-- DBは未実装
-- ログイン / 認証は未実装
-- API Routeは未実装
-- 外部価格API連携は未実装
-- スクレイピングは未実装
-- プレ値予測は未実装
-- 実在在庫や真贋判定は扱わない
-- Geminiは購入判定を決めない
-
-## 必要環境
-
-- Node.js
-- pnpm
-- Git
-- Gemini APIキーは任意
-
-## セットアップ手順
+必要環境は Node.js、pnpm、Git です。
 
 ```bash
 pnpm install
-pnpm test
-pnpm typecheck
-pnpm demo
+pnpm web:dev
 ```
 
-詳細なCLI利用手順は [docs/usage/v0.2-cli-usage.md](docs/usage/v0.2-cli-usage.md) を参照してください。
+開発サーバーは通常 `http://localhost:3000` で起動します。
 
-## 通常demoの実行方法
-
-```bash
-pnpm demo
-```
-
-通常demoはAIを使わず、サンプルデータをCore推薦ロジックに渡して推薦結果を表示します。出力には `finalScore`、`rawDecision`、`finalDecision`、`demotions` が含まれます。
-
-## Gemini demoの実行方法
-
-```bash
-pnpm demo:gemini
-```
-
-Gemini demoは、まずCoreが推薦結果を決定し、その結果に対して説明文を生成します。`GEMINI_API_KEY` が設定されている場合はGemini Adapterによる説明文生成を試し、APIキーがない場合やGemini呼び出しに失敗した場合はrule-based説明文にfallbackします。
-
-APIキーがない場合の表示例:
-
-```txt
-GEMINI_API_KEY not set; using rule-based fallback.
-```
-
-PowerShellで一時的にAPIキーを使う例:
-
-```powershell
-$env:GEMINI_API_KEY="your_api_key_here"
-pnpm demo:gemini
-```
-
-## Gemini APIキーの扱い
-
-- APIキーをGitHubにcommitしない
-- `.env` は今回作成しない
-- README内に本物のAPIキーを書かない
-- v0.2では `GOOGLE_API_KEY` は読まない
-- APIキーがない場合でもdemoは壊れない
-- Gemini失敗時もrule-based fallbackで表示する
-- Gemini APIにはレート制限があるため、無制限利用を前提にしない
-
-## fallback設計
-
-SOLE//MATRIX Coreでは、説明文生成においてrule-based説明を必ずfallbackとして残します。
-
-`pnpm demo` はAIなしで動きます。`pnpm demo:gemini` も、Coreの推薦結果を先に確定させたうえで説明文だけを生成します。Geminiは `finalScore`、`rawDecision`、`finalDecision`、`demotions` を変更しません。
-
-## テストと型チェック
+## 検証
 
 ```bash
 pnpm test
 pnpm typecheck
+pnpm web:build
 ```
 
-テストでは、Core推薦ロジック、公開API、サンプルデータ、説明文生成、Gemini Adapter、CLI表示フォーマットなどを検証します。型チェックは `tsc --noEmit` で実行されます。
+現時点の `package.json` に lint script はありません。テストは Vitest、型チェックは `tsc --noEmit`、production build は Next.js で行います。
 
-## GitHub Actions CI
-
-GitHub Actions CIでは、リポジトリ上でテストと型チェックを実行します。CIバッジはREADME上部に表示しています。
-
-## ディレクトリ構成
+## Core v1 MVP の流れ
 
 ```txt
+8問の診断 / 対応タグ
+→ PreferenceVector（0〜100の8軸）
+→ local/mock候補
+→ Balanced Score
+→ Ryo Score
+→ Decision
+→ Gemini structured explanation または rule-based fallback
+→ Recommendation UI
+→ Feedback API skeleton / mock repository
+```
+
+PreferenceVector の軸:
+
+```txt
+culture / styleFit / simplicity / street
+volume / comfort / durability / priceLevel
+```
+
+Decision:
+
+```txt
+strong_buy / consider / wait / avoid / unknown
+```
+
+Balanced Score は、既存の `recommendSneakers` と Core score breakdown を薄い adapter から再利用します。Ryo Score は文化背景、クラシック／レトロ、ストリート、落ち着いた合わせやすさ、趣味としての納得感を別の純粋関数で評価します。
+
+## API
+
+### Recommendation
+
+`POST /api/core-v1/recommend`
+
+```json
+{
+  "diagnosisAnswers": {
+    "trusted-classic": "like",
+    "simple-daily": "neutral"
+  },
+  "preferenceTags": ["classic", "minimal"],
+  "budgetYen": 20000
+}
+```
+
+診断回答または対応タグが少なくとも1つ必要です。予算は任意です。候補は外部商品ではなく、`app/_lib/core-v1/repository.ts` のローカル仮候補を使います。
+
+### Feedback skeleton
+
+`POST /api/core-v1/feedback`
+
+```json
+{
+  "recommendationId": "core-v1:local-classic-daily",
+  "sentiment": "helpful",
+  "comment": "理由が分かりやすかった"
+}
+```
+
+`sentiment` は `helpful`、`not_helpful`、`unsure` のいずれかです。現在は process 内の mock repository へ保存し、Supabase 未設定でも落ちません。永続化・認証・本番DB接続はまだ行いません。
+
+## Gemini の役割と fallback
+
+Gemini に渡すのは、Core が確定した Decision、Balanced/Ryo Score、安全な候補要約、タグ、予算、rule-based explanation です。
+
+Gemini は以下を行いません。
+
+- score の計算・変更
+- Decision の決定・変更
+- 実在価格、在庫、URL、真贋の判断
+- Rakuten response や個人情報の処理
+
+出力は次の structured JSON schema を検証します。
+
+```ts
+type GeminiExplanationJson = {
+  summary: string;
+  reasons: string[];
+  cautions: string[];
+  balancedView: string;
+  ryoView: string;
+  finalTone: "positive" | "balanced" | "cautious" | "negative" | "unknown";
+};
+```
+
+APIキー未設定、通信失敗、HTTPエラー、JSON不正、schema不一致、安全でない表現のいずれでも rule-based explanation へ fallback します。Gemini の API キーは URL へ含めず、request header から送信します。
+
+## Rakuten readiness
+
+Rakuten API は Core v1 の商品候補、価格、budgetFit、URL に接続していません。現在の既知状態は `blocked_forbidden` で、UI には外部商品データを使っていないことを表示します。
+
+`RUN_EXTERNAL_SMOKE=1` のときだけ隔離 smoke を明示実行できます。HTTP 200 と response shape が確認できても、normalizer を実装して明示接続するまでは本線へ混ぜません。
+
+## 環境変数
+
+`.env.example` を参照してください。本物の値は commit しません。
+
+```env
+GEMINI_API_KEY=
+RAKUTEN_APPLICATION_ID=
+RAKUTEN_ACCESS_KEY=
+RUN_EXTERNAL_SMOKE=
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+```
+
+Gemini と Supabase は未設定でもアプリが動きます。Rakuten は設定の有無に関係なく Core v1 の推薦候補へは使いません。
+
+## 主なディレクトリ
+
+```txt
+app/_lib/core-v1/
+  diagnosis / PreferenceVector / scoring / Decision
+  explanation / Gemini provider / readiness
+  service / repository / validation
+
+app/api/core-v1/
+  recommend / feedback Route Handlers
+
+app/_components/CoreV1RecommendationPanel.tsx
+  Recommendation UI / readiness / feedback skeleton
+
 src/core/
-  recommendSneakers(input) の公開API
-
-src/domain/
-  score / Decision / Demotion などのCore推薦ロジック
-
-src/data/
-  CLI demoで使うサンプルプロフィール、候補、所有済みスニーカー
-
-src/demo/
-  pnpm demo / pnpm demo:gemini の実行エントリと表示整形
-
-src/explanation/
-  rule-based説明文生成
-
-src/ai/
-  Gemini説明生成Adapter
-
-docs/ui/
-  B2Y風診断UI設計書
-
-docs/usage/
-  CLI利用手順
-
-docs/agent-prompts/
-  開発作業ごとのPrompt記録
+  既存 recommendSneakers 公開API（Core v1からadapter経由で再利用）
 ```
 
-## 実装上の安全方針
+設計境界、provider追加、Supabase移行案は [docs/core-v1-architecture.md](docs/core-v1-architecture.md) を参照してください。
 
-- Coreのscore / Decision / Demotionは決定論的に計算する
-- rule-based説明はfallbackとして必ず残す
-- Geminiは説明文の補助のみ
-- Geminiが購入判定を決める設計にはしない
-- 外部価格APIやスクレイピングはv0.2では扱わない
-- APIキーはソース管理に含めない
-- 通常demoとGemini demoを分ける
-- `pnpm demo` はAIなしでも動く
+## 現在の制限
 
-## 今後のロードマップ
+- 候補は商品カタログではなくローカルの仮候補
+- 実在価格、在庫、市場価格、真贋は扱わない
+- Rakuten 商品検索は本線へ未接続
+- Feedback は process 内 mock のため再起動で消える
+- Supabase 本番接続、認証、RLS 運用は未実装
+- 検索入力型 UI は補助レーンで、Core v1 の別 Decision ロジックは持たない
 
-- 診断UIの実装
-- 診断回答から `PreferenceProfile` へ変換する処理の追加
-- CLI以外の利用口の検討
-- DB保存の検討
-- API Routeの検討
-- 認証の検討
-- 外部価格API連携の調査
-- スクレイピングを使わない価格情報取得方針の検討
-- プレ値予測を扱う場合の根拠、責任範囲、検証方法の設計
+## Legacy / CLI
 
-現時点では、Web UI、DB、API Route、認証、外部価格API、スクレイピング、プレ値予測は未実装です。
+既存の `recommendSneakers`、サンプルデータ、CLI demo、v0.2テストは維持しています。
+
+```bash
+pnpm demo
+pnpm demo:gemini
+```

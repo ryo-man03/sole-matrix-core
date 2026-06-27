@@ -55,6 +55,7 @@ export async function generateCoreV1Explanation(
     const model = options.model ?? defaultModel;
     const response = await fetcher(createGeminiEndpoint(model), {
       method: "POST",
+      signal: AbortSignal.timeout(8_000),
       headers: {
         "Content-Type": "application/json",
         "x-goog-api-key": apiKey,
