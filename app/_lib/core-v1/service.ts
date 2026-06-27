@@ -1,12 +1,10 @@
 import { decideRecommendation } from "./decision";
-import {
-  createRuleBasedExplanation,
-  type ExplanationInput,
-} from "./explanation";
+import type { ExplanationInput } from "./explanation";
 import {
   createGeminiFallbackReadiness,
   createRakutenReadiness,
 } from "./readiness";
+import { generateCoreV1Explanation } from "./geminiExplanation";
 import {
   mockCandidateRepository,
   type CandidateRepository,
@@ -78,7 +76,11 @@ export async function recommendCoreV1(
   };
   const explanation = dependencies.explanationProvider
     ? await dependencies.explanationProvider(explanationInput)
-    : createRuleBasedExplanation(explanationInput);
+    : await generateCoreV1Explanation(explanationInput, {
+        ...(env["GEMINI_API_KEY"]
+          ? { apiKey: env["GEMINI_API_KEY"] }
+          : {}),
+      });
 
   return {
     recommendationId: `core-v1:${best.candidate.id}`,
@@ -86,7 +88,14 @@ export async function recommendCoreV1(
     ...best,
     explanation,
     readiness: {
-      gemini: createGeminiFallbackReadiness(Boolean(env["GEMINI_API_KEY"])),
+      gemini:
+        explanation.source === "gemini"
+          ? {
+              provider: "gemini",
+              status: "ready",
+              detail: "AI補助による説明を表示しています。",
+            }
+          : createGeminiFallbackReadiness(Boolean(env["GEMINI_API_KEY"])),
       rakuten: createRakutenReadiness(env),
     },
   };
