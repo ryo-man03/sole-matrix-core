@@ -136,8 +136,8 @@ export function CoreV1RecommendationPanel({
         <p className="diagnosis-summary-kicker">Core v1</p>
         <h3 id="core-v1-recommendation-title">診断から推薦結果を作る</h3>
         <p>
-          回答を8軸のPreferenceVectorへ変換し、Balanced ScoreとRyo
-          Scoreを純粋なルールで計算します。
+          回答を8軸のPreferenceVectorへ変換し、候補との相性を二つの視点で比較します。
+          スコアと最終判定は、外部AIではなくCore v1の決定論的なルールが確定します。
         </p>
       </div>
 
@@ -152,7 +152,7 @@ export function CoreV1RecommendationPanel({
           value={budgetText}
         />
         <small>
-          外部価格ではなく、ローカル仮候補の価格帯との相対評価にだけ使います。
+          ローカル候補では価格帯との相対評価に、検証済みの商品価格がある場合は予算適合度の補助に使います。
         </small>
       </label>
 
@@ -162,12 +162,24 @@ export function CoreV1RecommendationPanel({
         onClick={handleRecommend}
         type="button"
       >
-        {isLoading ? "判定中…" : "Core v1で判定する"}
+        {isLoading ? "候補を比較しています…" : "推薦結果を見る"}
       </button>
+
+      {isLoading ? (
+        <p className="core-v1-status" role="status">
+          診断ベクトルを作成し、利用可能な候補を安全に比較しています。
+        </p>
+      ) : null}
 
       {errorMessage ? (
         <p className="core-v1-error" role="alert">
           {errorMessage}
+        </p>
+      ) : null}
+
+      {!result && !isLoading && !errorMessage ? (
+        <p className="core-v1-empty">
+          推薦結果はまだありません。予算は空欄のままでも判定できます。
         </p>
       ) : null}
 
@@ -184,6 +196,10 @@ export function CoreV1RecommendationPanel({
             </strong>
           </div>
 
+          <p className="core-v1-decision-note">
+            Decisionは、二つのスコアに予算適合度・リスク・情報の揃い方を加えてCore v1が決定したものです。
+          </p>
+
           <p className="core-v1-local-notice">
             外部検索結果ではなく、診断結果または入力内容をもとにした仮候補です。
           </p>
@@ -191,9 +207,14 @@ export function CoreV1RecommendationPanel({
           <div className="core-v1-score-grid">
             <ScoreCard
               label="Balanced Score"
+              description="合わせやすさ・予算・情報の確かさを含む、一般的な勧めやすさ"
               value={result.balancedScore.total}
             />
-            <ScoreCard label="Ryo Score" value={result.ryoScore.total} />
+            <ScoreCard
+              label="Ryo Score"
+              description="カルチャーやスタイルの好みを含む、あなたらしい納得感"
+              value={result.ryoScore.total}
+            />
           </div>
 
           <section
@@ -288,7 +309,7 @@ export function CoreV1RecommendationPanel({
             <p aria-live="polite">
               {feedbackState === "saving" ? "保存中…" : null}
               {feedbackState === "saved"
-                ? "フィードバックをmock repositoryへ保存しました。"
+                ? "フィードバックをこのセッションのmock repositoryへ保存しました。"
                 : null}
               {feedbackState === "error"
                 ? "フィードバックを保存できませんでした。"
@@ -301,12 +322,21 @@ export function CoreV1RecommendationPanel({
   );
 }
 
-function ScoreCard({ label, value }: { label: string; value: number }) {
+function ScoreCard({
+  label,
+  description,
+  value,
+}: {
+  label: string;
+  description: string;
+  value: number;
+}) {
   return (
     <div className="core-v1-score-card">
       <span>{label}</span>
       <strong>{value}</strong>
       <meter max="100" min="0" value={value} />
+      <small>{description}</small>
     </div>
   );
 }

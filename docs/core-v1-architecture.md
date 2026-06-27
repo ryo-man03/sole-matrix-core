@@ -1,98 +1,96 @@
-# Core v1 architecture and extension points
+# Core v1 architecture and verification
 
-## 責務境界
+## 守る境界
 
-```txt
-validation.ts
-  HTTP入力の安全な正規化
+Core v1の推薦本線は、外部APIがなくても必ず完結します。
 
-diagnosis.ts / preferenceVector.ts
-  診断回答・タグ → 8軸 PreferenceVector
-
-scoring.ts
-  Balanced Score adapter / Ryo Score 純粋関数
-
-decision.ts
-  score・budgetFit・risk・情報量・readiness → Decision
-
-explanation.ts
-  常に利用できる rule-based explanation
-
-geminiExplanation.ts
-  structured explanation provider。失敗時は rule-based へ戻る
-
-repository.ts
-  CandidateRepository / FeedbackRepository と mock実装
-
-service.ts
-  上記を組み合わせる唯一の推薦本線
+```text
+Web UI
+  → POST /api/core-v1/recommend (Web Request / Response)
+    → validation
+    → diagnosis → PreferenceVector
+    → local repository ───────────────┐
+    → Rakuten provider → normalizer ─┤ 候補だけを合流
+                                      ↓
+              scoring → decision (TypeScript)
+                                      ↓
+              Gemini explanation provider
+                    ↘ rule-based fallback
+                                      ↓
+                    safe result + readiness → UI
 ```
 
-検索入力や別UIを追加する場合も、最終判定は `recommendCoreV1` へ寄せます。別の Decision ロジックは作りません。
+`scoring.ts`と`decision.ts`は外部APIを呼びません。Geminiは計算済みfactsの説明だけを返し、楽天のraw responseはnormalizerより先へ進みません。
 
-## Explanation provider を追加する
+## ファイルごとの責務
 
-`service.ts` の `ExplanationProvider` を実装します。provider が受け取る `ExplanationInput` は Core 確定後の読み取り専用 facts です。
+| ファイル | 責務 |
+| --- | --- |
+| `validation.ts` | HTTP入力を安全なCore inputへ正規化 |
+| `diagnosis.ts` / `preferenceVector.ts` | 診断回答・タグを8軸へ変換 |
+| `repository.ts` | local candidateとfeedback mock |
+| `rakutenProvider.ts` | server-side通信、HTTP状態の安全な分類 |
+| `rakutenNormalizer.ts` | `unknown`を検証済み候補へ変換する純粋関数 |
+| `rakutenReadiness.ts` | provider結果をUI向けreadinessへ変換 |
+| `scoring.ts` | Balanced Score adapter / Ryo Score純粋関数 |
+| `decision.ts` | score・budgetFit・risk・情報量からDecisionを決定 |
+| `explanation.ts` | 常に利用できるrule-based explanation |
+| `geminiExplanation.ts` | structured explanation。失敗時はfallback |
+| `geminiActualSmoke.ts` | 実生成の有無とshapeだけを安全に報告 |
+| `service.ts` | 候補の合流から返却までを組み合わせる推薦本線 |
 
-provider は `RecommendationExplanation` を返し、score や Decision を返しません。OpenAIなど別providerを追加する場合も、JSON schema validation と `createRuleBasedExplanation` fallback を同じ境界で維持します。
+## 楽天providerの安全条件
 
-## Candidate provider を追加する
+providerはRoute Handlerからserver sideでのみ呼びます。`RAKUTEN_APPLICATION_ID`と`RAKUTEN_ACCESS_KEY`はprocess envから読み、browser bundleやAPI responseへ含めません。access keyは通常headerへ載せ、ログにはURL、query全文、header、raw bodyを出しません。
 
-`CandidateRepository` の `listCandidates` を実装し、`CandidateProfile` へ正規化します。
+候補として利用できるのは次をすべて満たす場合だけです。
 
-新providerの応答を service や scoring へ直接渡してはいけません。次を検証してから repository 境界を通します。
+1. HTTP 200 / `response.ok === true`
+2. JSON parse成功
+3. `formatVersion=2`相当の`items[]`
+4. 全候補がnormalizerを通過
+5. 空でない商品名、正の有限価格、安全なHTTPS URL
 
-- 8軸が0〜100
-- tagが既知の `SneakerTag`
-- risk / informationCompleteness / readiness が明示的
-- 外部価格の根拠と取得時刻が追跡可能
+失敗時は候補配列を空にしてlocal候補だけで継続します。readinessは`missing_config`、`blocked_forbidden`、`blocked_rate_limit`、`network_or_http_error`、`invalid_response`のいずれかです。403/429をアプリ全体のエラーへ昇格させません。
 
-## Rakuten が HTTP 200 になった場合
+正規化済み価格はbudgetFitの補助にだけ使用します。price、name、URLが不正なitemをrawのまま採用しません。商品URLはHTTPSだけをUIへ渡します。
 
-1. 隔離 smoke で `shapeValid: true` を確認する。
-2. raw response を保存・表示せず、専用 normalizer を追加する。
-3. normalizer の fixture test を追加する。
-4. `CandidateRepository` 実装として接続する。
-5. local fallback を残したまま provider readiness を切り替える。
+## Gemini structured explanation
 
-Core v1 の `scoring.ts` や `decision.ts` から Rakuten を直接呼びません。
+Geminiへ渡すのはCore確定後のfactsです。返却JSONは`summary`、1件以上の`reasons`、配列の`cautions`、非空の`balancedView`と`ryoView`、許可済み`finalTone`を必須にします。
 
-## Supabase feedback 移行案
+次の情報はprovider境界を越えません。
 
-現行の `createMockFeedbackRepository` を `SupabaseFeedbackRepository` へ差し替えられる構造です。本番接続時は API Route の server side だけに client を置き、ブラウザへ service role key を渡しません。
+- API key
+- request URL / query全文
+- Geminiまたは楽天のraw response
+- prompt全文
+- 個人情報
 
-参考 migration 案（未適用）:
+Gemini出力からscore、Decision、budgetFit、riskを読み込む経路はありません。不正出力、通信失敗、未設定時は`createRuleBasedExplanation`へ戻ります。
 
-```sql
-create table public.recommendation_feedback (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  recommendation_id text not null,
-  sentiment text not null check (sentiment in ('helpful', 'not_helpful', 'unsure')),
-  comment text check (char_length(comment) <= 500),
-  created_at timestamptz not null default now()
-);
+## Feedback境界
 
-alter table public.recommendation_feedback enable row level security;
+現行の`createMockFeedbackRepository`はprocess内保存です。本番移行時は同じinterfaceを実装する`SupabaseFeedbackRepository`をRoute Handlerのserver sideに置きます。認証前に本番migrationやservice role keyを導入しません。
 
-create policy "users insert own feedback"
-on public.recommendation_feedback
-for insert to authenticated
-with check (auth.uid() = user_id);
+## 画面確認手順
 
-create policy "users read own feedback"
-on public.recommendation_feedback
-for select to authenticated
-using (auth.uid() = user_id);
-```
+1. `pnpm web:dev`を実行し、トップの「Core v1診断を始める」から診断へ移動する。
+2. 8問に回答して確認画面を開く。未回答を含んでも導線が壊れないことを確認する。
+3. 予算を空欄、正常な整数、不正値で試し、empty/loading/error stateを確認する。
+4. 推薦結果で候補名、source、Decision、Balanced/Ryo Score、理由、注意点を確認する。
+5. Geminiが成功した場合は実生成表示、未設定・失敗時はrule-based表示を確認する。
+6. 楽天readinessが成功、設定不足、403、429などに応じた文言になり、失敗時もlocal候補が出ることを確認する。
+7. Feedbackを送信し、saving/saved/errorの表示を確認する。
+8. browser consoleと画面にraw response、API key、request URLが出ていないことを確認する。
 
-認証を導入するまではこの migration を適用せず、mock repository を使います。
+スクリーンショットを更新する場合は、秘密情報が画面・DevTools・ファイル名へ含まれていないことを確認して`docs/screenshots/`へ保存します。
 
-## Scoring rule を変更する
+## 変更時の回帰確認
 
-- Balanced Score の legacy adapter・表示用内訳: `scoring.ts`
-- Ryo Score の重み: `scoring.ts`
+- Balanced Scoreのadapter・表示内訳: `scoring.ts`
+- Ryo Scoreの重み: `scoring.ts`
 - Decision threshold: `decision.ts`
 - 診断質問の軸寄与: `preferenceVector.ts`
 
-変更時は既存 golden test を削除せず、Core v1 の domain test を追加・更新して意図を固定します。
+既存Core v0.1 / `recommendSneakers` / golden testを削除せず、Core v1の追加テストで意図を固定します。通常testは実ネットワークを呼ばず、外部通信は`RUN_EXTERNAL_SMOKE=1`の明示opt-inだけで実行します。

@@ -1,60 +1,62 @@
-# SOLE//MATRIX Core v1 MVP
+# SOLE//MATRIX Core v1
 
 [![CI](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml/badge.svg)](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml)
 
-SOLE//MATRIX は、スニーカーの好みを診断し、一般的な勧めやすさと個人らしい納得感を分けて表示する判断支援プロトタイプです。
+SOLE//MATRIX は、スニーカーを買う前の「似合う」「使いやすい」「自分らしい」を分けて考える判断支援プロトタイプです。8問の好み診断から推薦候補を比較し、二つのスコア、最終Decision、理由と注意点まで一つの画面で確認できます。
 
-Core v1 MVP では、診断から推薦結果・説明・feedback skeleton までを Web UI と API Route で一貫して実行できます。score と Decision は TypeScript の決定論的なロジックが確定し、Gemini は説明文の生成だけを補助します。
+Core v1ではscoreとDecisionをTypeScriptの決定論的なロジックが確定します。Geminiは確定結果の説明だけを担当し、楽天市場の商品データはserver-side providerで検証・正規化できた場合だけ候補として使います。どちらの外部APIが利用できなくても、ローカル候補とrule-based explanationで最後まで動作します。
+
+## できること
+
+- 診断回答と対応タグを8軸の`PreferenceVector`へ変換
+- 一般的な勧めやすさを表すBalanced Scoreを計算
+- カルチャーや個人の好みを重視するRyo Scoreを計算
+- 予算適合度、リスク、情報量を加味してDecisionを決定
+- Gemini structured outputまたはrule-based fallbackで理由を説明
+- 楽天APIがHTTP 200かつshape-validの場合だけ商品候補を利用
+- `403`、`429`、設定不足、通信失敗、不正レスポンスをreadinessとして表示
+- Feedbackをmock repositoryへ保存（永続化前のskeleton）
+
+## 画面の流れ
+
+```text
+8問の好み診断
+  → PreferenceVector（0〜100の8軸）
+  → ローカル候補 + 検証済み楽天候補
+  → Balanced Score / Ryo Score
+  → TypeScript CoreがDecisionを確定
+  → Gemini explanation または rule-based fallback
+  → Recommendation UI
+  → Feedback API skeleton
+```
+
+PreferenceVectorは`culture / styleFit / simplicity / street / volume / comfort / durability / priceLevel`の8軸です。Decisionは`strong_buy / consider / wait / avoid / unknown`のいずれかです。
 
 ## セットアップ
 
-必要環境は Node.js、pnpm、Git です。
+Node.js、pnpm、Gitが必要です。
 
 ```bash
 pnpm install
 pnpm web:dev
 ```
 
-開発サーバーは通常 `http://localhost:3000` で起動します。
+開発サーバーは通常[http://localhost:3000](http://localhost:3000)で起動します。外部APIなしでも診断、推薦、説明、Feedback skeletonを確認できます。
 
-## 検証
+## 環境変数
 
-```bash
-pnpm test
-pnpm typecheck
-pnpm web:build
+`.env.example`を`.env.local`の雛形として使います。本物の値はcommitしません。すべてserver sideで読み込み、`NEXT_PUBLIC_*`にはしません。
+
+```env
+GEMINI_API_KEY=
+RAKUTEN_APPLICATION_ID=
+RAKUTEN_ACCESS_KEY=
+RUN_EXTERNAL_SMOKE=
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
 ```
 
-現時点の `package.json` に lint script はありません。テストは Vitest、型チェックは `tsc --noEmit`、production build は Next.js で行います。
-
-## Core v1 MVP の流れ
-
-```txt
-8問の診断 / 対応タグ
-→ PreferenceVector（0〜100の8軸）
-→ local/mock候補
-→ Balanced Score
-→ Ryo Score
-→ Decision
-→ Gemini structured explanation または rule-based fallback
-→ Recommendation UI
-→ Feedback API skeleton / mock repository
-```
-
-PreferenceVector の軸:
-
-```txt
-culture / styleFit / simplicity / street
-volume / comfort / durability / priceLevel
-```
-
-Decision:
-
-```txt
-strong_buy / consider / wait / avoid / unknown
-```
-
-Balanced Score は、既存の `recommendSneakers` と Core score breakdown を薄い adapter から再利用します。Ryo Score は文化背景、クラシック／レトロ、ストリート、落ち着いた合わせやすさ、趣味としての納得感を別の純粋関数で評価します。
+`SUPABASE_*`は将来のFeedback永続化用で、現時点の動作には不要です。
 
 ## API
 
@@ -73,7 +75,7 @@ Balanced Score は、既存の `recommendSneakers` と Core score breakdown を�
 }
 ```
 
-診断回答または対応タグが少なくとも1つ必要です。予算は任意です。候補は外部商品ではなく、`app/_lib/core-v1/repository.ts` のローカル仮候補を使います。
+診断回答または対応タグが1つ以上必要です。予算は任意です。Route Handlerからserver-side providerを呼び、外部候補をraw responseのままUIやscoringへ渡しません。
 
 ### Feedback skeleton
 
@@ -87,20 +89,13 @@ Balanced Score は、既存の `recommendSneakers` と Core score breakdown を�
 }
 ```
 
-`sentiment` は `helpful`、`not_helpful`、`unsure` のいずれかです。現在は process 内の mock repository へ保存し、Supabase 未設定でも落ちません。永続化・認証・本番DB接続はまだ行いません。
+`sentiment`は`helpful`、`not_helpful`、`unsure`のいずれかです。現在はprocess内のmock repositoryへ保存するため、再起動すると消えます。認証、Supabase本番接続、feedback学習はまだ行いません。
 
-## Gemini の役割と fallback
+## Geminiの役割
 
-Gemini に渡すのは、Core が確定した Decision、Balanced/Ryo Score、安全な候補要約、タグ、予算、rule-based explanation です。
+Geminiへ渡すのは、Coreが計算済みのDecision、Balanced/Ryo Score、理由、warning、readiness、タグ、予算、安全な候補要約だけです。Geminiはscore、Decision、budgetFit、risk、楽天候補の採否を決めません。
 
-Gemini は以下を行いません。
-
-- score の計算・変更
-- Decision の決定・変更
-- 実在価格、在庫、URL、真贋の判断
-- Rakuten response や個人情報の処理
-
-出力は次の structured JSON schema を検証します。
+返却値は次のstructured JSONとして検証します。
 
 ```ts
 type GeminiExplanationJson = {
@@ -113,61 +108,88 @@ type GeminiExplanationJson = {
 };
 ```
 
-APIキー未設定、通信失敗、HTTPエラー、JSON不正、schema不一致、安全でない表現のいずれでも rule-based explanation へ fallback します。Gemini の API キーは URL へ含めず、request header から送信します。
+APIキー未設定、HTTP/通信エラー、JSON不正、schema不一致、安全でない表現はすべてrule-based explanationへfallbackします。APIキーはURLへ含めずrequest headerで送ります。raw response、prompt全文、request URLは表示・保存・ログ出力しません。
 
-## Rakuten readiness
+## 楽天候補とfallback
 
-Rakuten API は Core v1 の商品候補、価格、budgetFit、URL に接続していません。現在の既知状態は `blocked_forbidden` で、UI には外部商品データを使っていないことを表示します。
+楽天市場商品検索APIは`app/_lib/core-v1/rakutenProvider.ts`だけから呼びます。`formatVersion=2`の応答を純粋関数のnormalizerで検証し、名前・正の価格・HTTPS URLが安全に揃った候補だけを`source: "rakuten"`として利用します。正規化済み価格がある場合だけ予算適合度の補助に使います。
 
-`RUN_EXTERNAL_SMOKE=1` のときだけ隔離 smoke を明示実行できます。HTTP 200 と response shape が確認できても、normalizer を実装して明示接続するまでは本線へ混ぜません。
+| 状態 | Core v1の動作 |
+| --- | --- |
+| HTTP 200 + shape valid | 正規化済み楽天候補をローカル候補と比較 |
+| 設定不足 | `missing_config`、ローカル候補で継続 |
+| HTTP 403 | `blocked_forbidden`、ローカル候補で継続 |
+| HTTP 429 | `blocked_rate_limit`、ローカル候補で継続 |
+| その他HTTP/通信失敗 | `network_or_http_error`、ローカル候補で継続 |
+| HTTP 200 + invalid shape | `invalid_response`、ローカル候補で継続 |
 
-## 環境変数
+## 検証
 
-`.env.example` を参照してください。本物の値は commit しません。
+通常検証は実ネットワークを呼びません。
 
-```env
-GEMINI_API_KEY=
-RAKUTEN_APPLICATION_ID=
-RAKUTEN_ACCESS_KEY=
-RUN_EXTERNAL_SMOKE=
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
+```bash
+pnpm exec vitest run
+pnpm test
+pnpm exec tsc --noEmit
+pnpm web:build
 ```
 
-Gemini と Supabase は未設定でもアプリが動きます。Rakuten は設定の有無に関係なく Core v1 の推薦候補へは使いません。
+ESLintは未導入のため、現在の`package.json`にlint scriptはありません。大きな依存追加は行わず、Vitest、TypeScript、Next.js production buildを必須ゲートにしています。
+
+### Gemini actual-generation smoke
+
+外部smokeは明示的に`RUN_EXTERNAL_SMOKE=1`を設定したときだけ実APIへ接続します。PowerShellでは値を表示せず`.env.local`をprocess envへ読み込んでから実行します。
+
+```powershell
+Get-Content .env.local | ForEach-Object {
+  if ($_ -notmatch '^\s*(#|$)') {
+    $name, $value = $_ -split '=', 2
+    if ($name -and $value) { [Environment]::SetEnvironmentVariable($name.Trim(), $value.Trim(), 'Process') }
+  }
+}
+$env:RUN_EXTERNAL_SMOKE = '1'
+pnpm exec vitest run app/_lib/core-v1/geminiActualSmoke.test.ts --disableConsoleIntercept --reporter=verbose
+```
+
+成功時は本文ではなく`shapeValid`、`summaryNonEmpty`、`reasonsCount`、`cautionsIsArray`、`source`、`decisionSource`だけを出力します。`GEMINI_API_KEY`がなければ`missing_env`としてネットワークを呼びません。
+
+楽天の隔離readiness smokeは次で実行します。
+
+```powershell
+pnpm exec vitest run app/_lib/external-smoke --disableConsoleIntercept --reporter=verbose
+```
+
+smoke後は必要に応じてprocess envから`RUN_EXTERNAL_SMOKE`、`GEMINI_API_KEY`、`RAKUTEN_APPLICATION_ID`、`RAKUTEN_ACCESS_KEY`を削除してください。
 
 ## 主なディレクトリ
 
-```txt
+```text
 app/_lib/core-v1/
-  diagnosis / PreferenceVector / scoring / Decision
-  explanation / Gemini provider / readiness
+  diagnosis / preferenceVector / scoring / decision
+  explanation / geminiExplanation / geminiActualSmoke
+  rakutenProvider / rakutenNormalizer / rakutenReadiness
   service / repository / validation
 
 app/api/core-v1/
   recommend / feedback Route Handlers
 
 app/_components/CoreV1RecommendationPanel.tsx
-  Recommendation UI / readiness / feedback skeleton
+  Recommendation UI / source / readiness / feedback skeleton
 
 src/core/
-  既存 recommendSneakers 公開API（Core v1からadapter経由で再利用）
+  既存recommendSneakers公開API（維持）
 ```
 
-設計境界、provider追加、Supabase移行案は [docs/core-v1-architecture.md](docs/core-v1-architecture.md) を参照してください。
+詳しい境界と画面確認手順は[docs/core-v1-architecture.md](docs/core-v1-architecture.md)を参照してください。
 
-## 現在の制限
+## 現在の制限と今後
 
-- 候補は商品カタログではなくローカルの仮候補
-- 実在価格、在庫、市場価格、真贋は扱わない
-- Rakuten 商品検索は本線へ未接続
-- Feedback は process 内 mock のため再起動で消える
-- Supabase 本番接続、認証、RLS 運用は未実装
-- 検索入力型 UI は補助レーンで、Core v1 の別 Decision ロジックは持たない
+- 楽天候補は検索結果であり、在庫・真贋・市場価格の保証はしない
+- Feedbackはprocess内mockで、永続化・認証・学習は未実装
+- Supabase本番接続、RLS運用、市場価格監視は今後の拡張
+- 検索入力型UIは補助レーンで、別のDecisionロジックを持たない
 
-## Legacy / CLI
-
-既存の `recommendSneakers`、サンプルデータ、CLI demo、v0.2テストは維持しています。
+既存Core v0.1の`recommendSneakers`、サンプルデータ、CLI demo、golden testは維持しています。
 
 ```bash
 pnpm demo

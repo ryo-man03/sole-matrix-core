@@ -18,9 +18,9 @@ const entryCards = [
   },
   {
     eyebrow: "Current boundary",
-    title: "外部商品データに依存しないCore v1",
+    title: "外部サービスが止まっても判定できる",
     description:
-      "楽天商品データは本線に混ぜず、ローカルの仮候補で安全に推薦フローを確認できます。",
+      "外部商品データとAI説明は安全な境界から利用し、失敗時はローカル候補とルールベース説明へ戻ります。",
     items: [
       "Geminiは説明文だけを補助する",
       "score / DecisionはTypeScript純粋関数で確定する",
@@ -46,7 +46,7 @@ export default function Page() {
             <span aria-hidden="true">→</span>
           </a>
           <p className="home-cta-note">
-            Gemini未設定でも、ルールベースの説明まで完了します。
+            予算入力は任意です。外部APIが未設定でも、判定と説明まで完了します。
           </p>
         </section>
 

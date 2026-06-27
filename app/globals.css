@@ -520,6 +520,18 @@ h1 {
   font-weight: 700;
 }
 
+.core-v1-status,
+.core-v1-empty,
+.core-v1-decision-note {
+  margin: 0;
+  border-left: 3px solid #40546c;
+  background: #f4f3ee;
+  padding: 12px 14px;
+  color: #3b4654;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
 .core-v1-result {
   display: grid;
   gap: 18px;
@@ -585,6 +597,12 @@ h1 {
 .core-v1-score-card strong {
   color: #11151b;
   font-size: 2rem;
+}
+
+.core-v1-score-card small {
+  color: #566070;
+  font-size: 0.8rem;
+  line-height: 1.6;
 }
 
 .core-v1-score-card meter {
