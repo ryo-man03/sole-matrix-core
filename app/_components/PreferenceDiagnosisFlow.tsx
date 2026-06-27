@@ -7,6 +7,7 @@ import { preferenceDiagnosisQuestions } from "../_data/preferenceDiagnosisQuesti
 
 import { DiagnosisProgress } from "./DiagnosisProgress";
 import { DiagnosisQuestionCard } from "./DiagnosisQuestionCard";
+import { CoreV1RecommendationPanel } from "./CoreV1RecommendationPanel";
 import { PreferenceDiagnosisSummary } from "./PreferenceDiagnosisSummary";
 
 export function PreferenceDiagnosisFlow() {
@@ -56,6 +57,7 @@ export function PreferenceDiagnosisFlow() {
 
   return (
     <section
+      id="core-v1"
       className="preference-diagnosis-section"
       aria-labelledby="preference-diagnosis-title"
     >
@@ -63,7 +65,7 @@ export function PreferenceDiagnosisFlow() {
         <p className="diagnosis-kicker">好み診断</p>
         <h2 id="preference-diagnosis-title">好みを8つの質問で整理する</h2>
         <p>
-          ここでは好みの方向だけを軽く確認します。おすすめ判定や候補スニーカーとの接続はまだ行いません。
+          好みの方向を確認したあと、Core v1が診断ベクトル・二つのスコア・Decisionを計算します。
         </p>
       </div>
 
@@ -108,6 +110,9 @@ export function PreferenceDiagnosisFlow() {
         <>
           <PreferenceDiagnosisSummary
             questions={preferenceDiagnosisQuestions}
+            selectedAnswerByQuestionId={selectedAnswerByQuestionId}
+          />
+          <CoreV1RecommendationPanel
             selectedAnswerByQuestionId={selectedAnswerByQuestionId}
           />
           <div className="diagnosis-actions">

@@ -7,24 +7,24 @@ import { PreferenceDiagnosisFlow } from "./_components/PreferenceDiagnosisFlow";
 const entryCards = [
   {
     eyebrow: "What this prototype does",
-    title: "一足について、順番に整理する",
+    title: "診断から、二つの視点で相性を整理する",
     description:
-      "答えを急がず、気になっている理由や好みを言葉にしていきます。",
+      "8つの質問をPreferenceVectorへ変換し、一般的な相性と個人らしさを別々に計算します。",
     items: [
-      "気になる一足の情報を整理する",
-      "好みや理由を言葉にする",
-      "推薦準備チェックへ進む",
+      "Balanced Score / Ryo Scoreを表示する",
+      "CoreがDecisionを決める",
+      "理由・注意点・外部API readinessを表示する",
     ],
   },
   {
     eyebrow: "Current boundary",
-    title: "今は、情報整理に集中します",
+    title: "外部商品データに依存しないCore v1",
     description:
-      "この画面で購入の答えを出すのではなく、次に確認したいことを見つけるための入口です。",
+      "楽天商品データは本線に混ぜず、ローカルの仮候補で安全に推薦フローを確認できます。",
     items: [
-      "購入判断を確定しない",
-      "推薦結果・スコア・ランキングを表示しない",
-      "入力した内容の整理状態を確認する",
+      "Geminiは説明文だけを補助する",
+      "score / DecisionはTypeScript純粋関数で確定する",
+      "Feedbackはmock repositoryへ安全に保存する",
     ],
   },
 ];
@@ -39,14 +39,14 @@ export default function Page() {
             買う前に、気持ちと理由を整える。
           </h1>
           <p className="home-lead">
-            今は購入判断ではなく、気になる一足の情報整理に集中します。
+            好みの診断から二つのスコアとDecisionを作り、理由と注意点まで安全に表示します。
           </p>
-          <a className="home-primary-cta" href="#candidate-flow">
-            <span>気になる一足を整理する</span>
+          <a className="home-primary-cta" href="#core-v1">
+            <span>Core v1診断を始める</span>
             <span aria-hidden="true">→</span>
           </a>
           <p className="home-cta-note">
-            入力後は、推薦に進む前の準備状態を確認できます。
+            Gemini未設定でも、ルールベースの説明まで完了します。
           </p>
         </section>
 

@@ -458,6 +458,207 @@ h1 {
   font-weight: 700;
 }
 
+.core-v1-panel {
+  display: grid;
+  gap: 18px;
+  margin-top: 20px;
+  border: 1px solid rgba(35, 43, 55, 0.16);
+  border-radius: 12px;
+  background: #fffefa;
+  padding: 22px;
+}
+
+.core-v1-panel-heading h3,
+.core-v1-result h4,
+.core-v1-result h5 {
+  margin: 8px 0 0;
+  color: #151a21;
+  line-height: 1.45;
+}
+
+.core-v1-panel-heading p:not(.diagnosis-summary-kicker),
+.core-v1-result p {
+  margin: 10px 0 0;
+  color: #3f4854;
+  line-height: 1.75;
+}
+
+.core-v1-budget-field {
+  display: grid;
+  gap: 8px;
+  color: #252d38;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.core-v1-budget-field input,
+.core-v1-feedback textarea {
+  width: 100%;
+  border: 1px solid rgba(35, 43, 55, 0.16);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px 14px;
+  color: #17202b;
+  font: inherit;
+}
+
+.core-v1-budget-field small {
+  color: #66717f;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.core-v1-submit {
+  width: fit-content;
+}
+
+.core-v1-error {
+  margin: 0;
+  border-left: 3px solid #8a3b2e;
+  padding-left: 12px;
+  color: #8a3b2e;
+  font-weight: 700;
+}
+
+.core-v1-result {
+  display: grid;
+  gap: 18px;
+  border-top: 1px solid rgba(35, 43, 55, 0.12);
+  padding-top: 22px;
+}
+
+.core-v1-result-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.core-v1-result-header > strong {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #17202b;
+  padding: 8px 11px;
+  color: #ffffff;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+.core-v1-result .core-v1-local-notice,
+.core-v1-result .core-v1-provider-note {
+  margin: 0;
+  border-radius: 8px;
+  background: #f2f0ea;
+  padding: 12px 14px;
+  color: #40546c;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.core-v1-score-grid,
+.core-v1-explanation-columns {
+  display: grid;
+  gap: 12px;
+}
+
+.core-v1-score-card,
+.core-v1-explanation,
+.core-v1-vector,
+.core-v1-readiness,
+.core-v1-feedback {
+  border: 1px solid rgba(35, 43, 55, 0.12);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.core-v1-score-card {
+  display: grid;
+  gap: 8px;
+}
+
+.core-v1-score-card span {
+  color: #566070;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.core-v1-score-card strong {
+  color: #11151b;
+  font-size: 2rem;
+}
+
+.core-v1-score-card meter {
+  width: 100%;
+}
+
+.core-v1-explanation-columns ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: #3f4854;
+  line-height: 1.65;
+}
+
+.core-v1-vector dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.core-v1-vector dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid rgba(35, 43, 55, 0.1);
+  padding-top: 8px;
+}
+
+.core-v1-vector dt,
+.core-v1-vector dd {
+  margin: 0;
+}
+
+.core-v1-vector dt {
+  color: #566070;
+  font-size: 0.82rem;
+}
+
+.core-v1-vector dd {
+  color: #17202b;
+  font-weight: 700;
+}
+
+.core-v1-readiness > div {
+  margin-top: 12px;
+  border-top: 1px solid rgba(35, 43, 55, 0.1);
+  padding-top: 12px;
+}
+
+.core-v1-feedback textarea {
+  min-height: 88px;
+  margin-top: 14px;
+  resize: vertical;
+}
+
+.core-v1-feedback > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.core-v1-feedback button {
+  border: 1px solid rgba(35, 43, 55, 0.18);
+  border-radius: 999px;
+  background: #ffffff;
+  padding: 8px 12px;
+  color: #1d2530;
+  cursor: pointer;
+  font-weight: 700;
+}
+
 .candidate-check-section {
   margin-top: 72px;
 }
@@ -994,6 +1195,15 @@ h1 {
   .diagnosis-summary-item {
     grid-template-columns: minmax(0, 1fr) minmax(90px, auto);
     align-items: start;
+  }
+
+  .core-v1-panel {
+    padding: 28px;
+  }
+
+  .core-v1-score-grid,
+  .core-v1-explanation-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .candidate-step-indicator {

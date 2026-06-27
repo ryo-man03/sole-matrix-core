@@ -26,7 +26,7 @@ export function PreferenceDiagnosisSummary({
       <p className="diagnosis-summary-kicker">回答サマリー</p>
       <h3 id="diagnosis-summary-title">診断内容の確認</h3>
       <p className="diagnosis-summary-lead">
-        ここでは、質問ごとの回答だけを確認します。この結果はまだ購入判断には使われません。
+        質問ごとの回答を確認し、Core v1の判定へ進めます。未回答は中立値として扱います。
       </p>
       <dl className="diagnosis-summary-list">
         {questions.map((question, index) => {
@@ -44,7 +44,7 @@ export function PreferenceDiagnosisSummary({
         })}
       </dl>
       <p className="diagnosis-summary-note">
-        個別スニーカー入力やCore推薦への接続は後続工程で行います。
+        下のボタンから、ローカル仮候補に対する推薦結果を作成できます。
       </p>
     </section>
   );
