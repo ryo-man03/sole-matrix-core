@@ -221,6 +221,7 @@ function parseGeminiExplanation(
   if (
     !summary ||
     !reasons ||
+    reasons.length === 0 ||
     !cautions ||
     !balancedView ||
     !ryoView ||
