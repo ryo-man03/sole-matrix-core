@@ -11,12 +11,17 @@ export type DiagnosisAnswer = {
 export type PreferenceVector = SneakerVector;
 
 export type CandidateRisk = "low" | "medium" | "high";
-export type CandidateReadiness = "ready_local" | "degraded" | "not_ready";
+export type CandidateReadiness =
+  | "ready_local"
+  | "ready_external"
+  | "degraded"
+  | "not_ready";
+export type CandidateSource = "mock" | "local" | "fallback" | "rakuten";
 
 export type CandidateProfile = {
   id: string;
   name: string;
-  source: "local" | "mock";
+  source: CandidateSource;
   description: string;
   tags: SneakerTag[];
   vector: SneakerVector;
@@ -24,6 +29,11 @@ export type CandidateProfile = {
   risk: CandidateRisk;
   informationCompleteness: number;
   readiness: CandidateReadiness;
+  priceYen?: number;
+  url?: string;
+  imageUrl?: string;
+  shopName?: string;
+  note?: string;
 };
 
 export type BalancedScore = {
@@ -74,6 +84,9 @@ export type ProviderReadinessStatus =
   | "fallback"
   | "missing_config"
   | "blocked_forbidden"
+  | "blocked_rate_limit"
+  | "network_or_http_error"
+  | "invalid_response"
   | "not_checked"
   | "ready_not_connected";
 
