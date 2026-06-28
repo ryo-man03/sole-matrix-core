@@ -18,6 +18,7 @@ import type {
   RecommendationExplanation,
   RecommendationResult,
 } from "./types";
+import type { UntrustedUserMemoryContext } from "../user-memory/types";
 import type { RecommendRequestInput } from "./validation";
 
 export type ExplanationProvider = (
@@ -30,6 +31,7 @@ export type RecommendCoreV1Dependencies = {
   rakutenCandidateProvider?: RakutenCandidateProvider;
   geminiFetcher?: typeof fetch;
   env?: Record<string, string | undefined>;
+  userMemoryContext?: UntrustedUserMemoryContext;
 };
 
 export async function recommendCoreV1(
@@ -57,6 +59,10 @@ export async function recommendCoreV1(
     loadRakutenCandidatesSafely(rakutenCandidateProvider, {
       ...candidateInput,
       preferenceTags: input.preferenceTags,
+      ...(input.sneakerName ? { sneakerName: input.sneakerName } : {}),
+      ...(input.brand ? { brand: input.brand } : {}),
+      ...(input.color ? { color: input.color } : {}),
+      ...(input.urlNameHint ? { urlNameHint: input.urlNameHint } : {}),
     }),
   ]);
   const candidates = [...localCandidates, ...rakutenResult.candidates];
@@ -79,11 +85,19 @@ export async function recommendCoreV1(
 
     return { candidate, balancedScore, ryoScore, decision };
   });
-  const best = scoredCandidates.sort(
-    (left, right) =>
-      right.balancedScore.total + right.ryoScore.total -
-      (left.balancedScore.total + left.ryoScore.total),
-  )[0];
+  const best = scoredCandidates.sort((left, right) => {
+    if (input.mode === "ryo") {
+      return right.ryoScore.total - left.ryoScore.total;
+    }
+    if (input.mode === "balanced") {
+      return right.balancedScore.total - left.balancedScore.total;
+    }
+    return (
+      right.balancedScore.total +
+      right.ryoScore.total -
+      (left.balancedScore.total + left.ryoScore.total)
+    );
+  })[0];
 
   if (!best) {
     throw new Error("CANDIDATE_UNAVAILABLE");
@@ -94,6 +108,9 @@ export async function recommendCoreV1(
     preferenceVector,
     inputTags: [...input.preferenceTags],
     ...(input.budgetYen === undefined ? {} : { budgetYen: input.budgetYen }),
+    ...(dependencies.userMemoryContext
+      ? { userMemoryContext: dependencies.userMemoryContext }
+      : {}),
   };
   const explanation = dependencies.explanationProvider
     ? await dependencies.explanationProvider(explanationInput)

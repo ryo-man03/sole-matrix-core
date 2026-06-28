@@ -6,6 +6,7 @@ import type {
   RecommendationExplanation,
   RyoScore,
 } from "./types";
+import type { UntrustedUserMemoryContext } from "../user-memory/types";
 
 export type ExplanationInput = {
   decision: Decision;
@@ -15,6 +16,7 @@ export type ExplanationInput = {
   preferenceVector: PreferenceVector;
   inputTags: string[];
   budgetYen?: number;
+  userMemoryContext?: UntrustedUserMemoryContext;
 };
 
 const decisionSummaries: Record<Decision, string> = {

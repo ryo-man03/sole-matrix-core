@@ -1,4 +1,7 @@
-import type { RecommendationResult } from "./core-v1/types";
+import type {
+  IntegratedRecommendationRequest,
+  IntegratedRecommendationResult,
+} from "./integrated-recommendation/types";
 import type { SneakerVisualAnalysis } from "./image-analysis/types";
 import type { SneakerUrlAnalysis } from "./url-analysis/types";
 import type {
@@ -57,8 +60,8 @@ export async function analyzeSneaker(input: {
 }
 
 export async function searchRecommendations(
-  input: Record<string, unknown>,
-): Promise<ApiResult<RecommendationResult>> {
+  input: IntegratedRecommendationRequest,
+): Promise<ApiResult<IntegratedRecommendationResult>> {
   return requestJson("/api/recommendations/search", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

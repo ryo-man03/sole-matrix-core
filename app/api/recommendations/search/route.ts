@@ -1,3 +1,3 @@
-import { createRecommendationHandler } from "../../../../server/routes/recommendations";
+import { createIntegratedRecommendationHandler } from "../../../../server/routes/integratedRecommendation";
 
-export const POST = createRecommendationHandler();
+export const POST = createIntegratedRecommendationHandler();
