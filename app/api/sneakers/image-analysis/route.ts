@@ -5,7 +5,7 @@ import {
   MAX_SNEAKER_IMAGE_BYTES,
   SneakerImageValidationError,
   validateSneakerImage,
-} from "../../../_lib/image-analysis/sneakerVisionService";
+} from "../../../../server/services/sneakerVisionService";
 
 export async function POST(request: Request) {
   try {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { registerUser as registerUserApi } from "../_lib/apiClient";
 import type { UserMemorySummary } from "../_lib/user-memory/types";
 
 const workspaceModes = [
@@ -58,22 +59,13 @@ export function RecommendationWorkspace() {
 
     setIsRegistering(true);
     try {
-      const response = await fetch("/api/users/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: normalizedUserId,
-          displayName: normalizedDisplayName,
-        }),
+      const payload = await registerUserApi({
+        userId: normalizedUserId,
+        displayName: normalizedDisplayName,
       });
-      const payload = (await response.json()) as
-        | { ok: true; data: UserMemorySummary }
-        | { ok: false; error: { message: string } };
 
-      if (!response.ok || !payload.ok) {
-        setWorkspaceStatus(
-          payload.ok ? "ユーザーを登録できませんでした。" : payload.error.message,
-        );
+      if (!payload.ok) {
+        setWorkspaceStatus(payload.error.message);
         return;
       }
 

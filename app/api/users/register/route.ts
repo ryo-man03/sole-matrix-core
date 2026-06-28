@@ -1,37 +1,5 @@
-import { NextResponse } from "next/server";
-
-import {
-  createUserMemoryService,
-  UserMemoryValidationError,
-} from "../../../_lib/user-memory/userMemoryService";
-
-const userMemoryService = createUserMemoryService();
+import { registerUserRequest } from "../../../../server/routes/users";
 
 export async function POST(request: Request) {
-  try {
-    const body = (await request.json()) as Record<string, unknown>;
-    const data = await userMemoryService.registerUser({
-      userId: String(body["userId"] ?? ""),
-      displayName: String(body["displayName"] ?? ""),
-    });
-    return NextResponse.json({ ok: true, data });
-  } catch (error) {
-    return userApiError(error);
-  }
-}
-
-function userApiError(error: unknown) {
-  if (error instanceof UserMemoryValidationError) {
-    return NextResponse.json(
-      { ok: false, error: { code: error.code, message: error.message } },
-      { status: error.code === "USER_NOT_FOUND" ? 404 : 400 },
-    );
-  }
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code: "USER_MEMORY_ERROR", message: "ユーザーデータを保存できませんでした。" },
-    },
-    { status: 500 },
-  );
+  return registerUserRequest(request);
 }

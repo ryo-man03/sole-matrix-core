@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { analyzeSneakerUrlSafely } from "../../../_lib/url-analysis/sneakerUrlService";
+import { analyzeSneakerUrlSafely } from "../../../../server/services/sneakerUrlService";
 
 export async function POST(request: Request) {
   try {
