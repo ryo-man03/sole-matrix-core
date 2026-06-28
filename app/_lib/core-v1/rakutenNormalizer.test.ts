@@ -91,7 +91,31 @@ describe("Rakuten formatVersion=2 normalizer", () => {
     ).toEqual({ ok: false, reason: "invalid_response" });
   });
 
-  it.each(["javascript:alert(1)", "http://example.com/item", "not-a-url"])(
+  it("keeps valid candidates when another item is invalid", () => {
+    expect(
+      normalizeRakutenItemSearchResponse({
+        items: [
+          { itemName: "broken", itemPrice: -1, itemUrl: "javascript:bad" },
+          {
+            itemName: "Puma Clyde MIJ",
+            itemPrice: 22_000,
+            itemUrl: "https://item.rakuten.co.jp/example/clyde/",
+          },
+        ],
+      }),
+    ).toMatchObject({
+      ok: true,
+      candidates: [{ name: "Puma Clyde MIJ", priceYen: 22_000 }],
+    });
+  });
+
+  it.each([
+    "javascript:alert(1)",
+    "http://example.com/item",
+    "https://127.0.0.1/item",
+    "https://shop.internal/item",
+    "not-a-url",
+  ])(
     "rejects unsafe URL %s",
     (itemUrl) => {
       expect(

@@ -10,6 +10,21 @@ export type DiagnosisAnswer = {
 
 export type PreferenceVector = SneakerVector;
 
+export type RecommendationMode = "ryo" | "balanced";
+
+export type ModeDecision = "strong_buy" | "buy" | "wait" | "skip";
+
+export type ModeAwareRecommendation = {
+  mode: RecommendationMode;
+  decision: ModeDecision;
+  balancedScore: number;
+  ryoScore: number;
+  modeReason: string;
+  overlapWithOwned: string[];
+  relatedWishlistModels: string[];
+  cautions: string[];
+};
+
 export type CandidateRisk = "low" | "medium" | "high";
 export type CandidateReadiness =
   | "ready_local"
