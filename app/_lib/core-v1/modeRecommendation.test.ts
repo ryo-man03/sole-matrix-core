@@ -46,7 +46,7 @@ function candidate(overrides: Partial<CandidateProfile> = {}): CandidateProfile 
 }
 
 describe("mode-aware recommendation", () => {
-  it("uses the Ryo seed wishlist without delegating score or decision", () => {
+  it("uses the real Ryo collection and wishlist without delegating score or decision", () => {
     const result = createModeAwareRecommendation({
       mode: "ryo",
       candidate: candidate(),
@@ -55,8 +55,12 @@ describe("mode-aware recommendation", () => {
     });
 
     expect(result.mode).toBe("ryo");
-    expect(result.relatedWishlistModels).toContain("adidas Tobacco");
-    expect(result.overlapWithOwned).toEqual([]);
+    expect(result.relatedWishlistModels).toContain(
+      'adidas Tobacco "Pantone/Mesa/Gum"',
+    );
+    expect(result.overlapWithOwned).toContain(
+      'adidas Tobacco "Core Black/Dark Brown/Gum"',
+    );
     expect(result.ryoScore).toBeGreaterThan(result.balancedScore);
     expect(result.decision).toBe("strong_buy");
   });
@@ -64,7 +68,9 @@ describe("mode-aware recommendation", () => {
   it("penalizes an owned model overlap in Ryo Mode", () => {
     const freshCandidate = createModeAwareRecommendation({
       mode: "ryo",
-      candidate: candidate(),
+      candidate: candidate({
+        name: 'Wales Bonner × adidas Karintha "Core Black/Wonder White/Lush Blue"',
+      }),
       balancedScore,
       ryoScore,
     });
@@ -75,7 +81,9 @@ describe("mode-aware recommendation", () => {
       ryoScore,
     });
 
-    expect(overlapCandidate.overlapWithOwned).toContain("adidas Samba");
+    expect(overlapCandidate.overlapWithOwned).toContain(
+      'JJJJound × adidas Samba Tobacco "Mesa/Gum"',
+    );
     expect(overlapCandidate.ryoScore).toBeLessThan(freshCandidate.ryoScore);
     expect(overlapCandidate.cautions[0]).toContain("所有済み");
   });

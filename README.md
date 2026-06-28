@@ -33,7 +33,7 @@ SOLE//MATRIX は、気になるスニーカーの好み・商品URL・画像・�
   → feedbackをmemory.mdへ保存
 ```
 
-Ryo Modeは文化的背景、ブランド史、素材、wishlistとの関係、所有済みモデルとの重複を重視します。Balanced Modeは価格、汎用性、情報の確かさ、サイズ・プレ値などの購入リスクを重視します。
+Ryo Modeは林諒馬の実所有41足と、重複行を統合したwishlist 40候補のseed v2を参照し、colorway、collaboration、製造背景、同一familyの重複を評価します。Balanced Modeは価格、汎用性、情報の確かさ、サイズ・プレ値などの購入リスクを重視します。
 
 ## セットアップ
 

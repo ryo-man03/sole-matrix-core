@@ -175,22 +175,26 @@ function findRelatedModels(
   return seedModels
     .filter((seedModel) => {
       const brand = normalizeText(seedModel.brand);
-      const names = [seedModel.model, ...seedModel.aliases]
+      const model = normalizeText(seedModel.model);
+      const family = normalizeText(seedModel.family);
+      const aliases = seedModel.aliases
         .map(normalizeText)
         .filter((name) => name.length >= 3);
-      const hasModelMatch = names.some((name) => candidateText.includes(name));
+      const hasModelMatch =
+        candidateText.includes(model) ||
+        (candidateText.length >= 8 && model.includes(candidateText));
       const hasBrandAndFamilyMatch =
         candidateText.includes(brand) &&
-        names.some((name) =>
-          name
-            .split(" ")
-            .filter((token) => token.length >= 3)
-            .some((token) => candidateText.includes(token)),
-        );
+        family.length >= 4 &&
+        candidateText.includes(family);
+      const hasSpecificAliasMatch = aliases.some(
+        (alias) => candidateText.includes(alias),
+      );
 
-      return hasModelMatch || hasBrandAndFamilyMatch;
+      return hasModelMatch || hasBrandAndFamilyMatch || hasSpecificAliasMatch;
     })
-    .map((seedModel) => `${seedModel.brand} ${seedModel.model}`);
+    .map((seedModel) => seedModel.model)
+    .slice(0, 6);
 }
 
 function normalizeText(value: string): string {

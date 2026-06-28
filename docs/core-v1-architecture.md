@@ -38,7 +38,7 @@ Gemini出力から最終scoreまたはDecisionを読む経路はありません�
 
 `RecommendationMode`は`ryo | balanced`です。Core v1の既存score関数を変更せず、`modeRecommendation.ts`が最終評価層を提供します。
 
-- Ryo: `ryoModeSeed.ts`の所有モデル、wishlist、brand史、文化、素材と重複を評価
+- Ryo: `ryoModeSeed.ts`の実所有41足、wishlist 40候補、colorway、collaboration、brand史、製造背景、素材とfamily重複を評価
 - Balanced: 価格、汎用性、情報量、risk、readinessを評価
 
 既存Core Decision (`strong_buy / consider / wait / avoid / unknown`)も互換APIに残し、PC統合UIはmode Decision (`strong_buy / buy / wait / skip`)を表示します。
