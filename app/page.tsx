@@ -25,7 +25,7 @@ const entryCards = [
     items: [
       "Geminiは説明文だけを補助する",
       "score / DecisionはTypeScript純粋関数で確定する",
-      "Feedbackはmock repositoryへ安全に保存する",
+      "PC workspaceのFeedbackはユーザー別memory.mdへ保存する",
     ],
   },
 ];
