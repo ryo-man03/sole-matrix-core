@@ -165,6 +165,7 @@ Phase 9 / 10で更新するPC版証跡:
 - `docs/screenshots/all-in-one-inputs.png`
 - `docs/screenshots/all-in-one-recommendation.png`
 - `docs/screenshots/all-in-one-user-memory.png`
+- `docs/screenshots/all-in-one-ryo-image.png`
 
 既存Core v1の証跡も`docs/screenshots/`に残しています。
 

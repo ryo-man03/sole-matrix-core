@@ -416,6 +416,23 @@ h1 {
   line-height: 1.5;
 }
 
+.workspace-image-field {
+  display: grid;
+  gap: 8px;
+}
+
+.workspace-image-field > button {
+  min-height: 36px;
+  border: 1px dashed rgba(107, 79, 50, 0.48);
+  border-radius: 8px;
+  background: #f7f1e7;
+  color: #6b4f32;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
 .workspace-primary-button,
 .workspace-secondary-button {
   width: 100%;
@@ -664,6 +681,14 @@ h1 {
   color: #d7dde5;
   font-size: 0.75rem;
   line-height: 1.55;
+}
+
+.workspace-mode-note small {
+  display: block;
+  margin-top: 7px;
+  color: #f0d7b8;
+  font-size: 0.7rem;
+  line-height: 1.5;
 }
 
 .workspace-feedback-form {

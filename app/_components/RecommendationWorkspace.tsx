@@ -158,6 +158,18 @@ export function RecommendationWorkspace() {
     }
   }
 
+  async function handleUseDemoImage() {
+    try {
+      const demoImage = await createDemoSneakerFile();
+      setImageFile(demoImage);
+      setWorkspaceStatus(
+        "サンプル画像をセットしました。実画像と同じupload・Gemini分析経路で確認できます。",
+      );
+    } catch {
+      setWorkspaceStatus("サンプル画像を作成できませんでした。");
+    }
+  }
+
   async function handleSaveFeedback() {
     if (!currentUser || !result) {
       setWorkspaceStatus("feedbackを保存するにはユーザー登録と推薦実行が必要です。");
@@ -264,7 +276,10 @@ export function RecommendationWorkspace() {
           <div className="workspace-fields">
             <label><span>スニーカー名</span><input onChange={(event) => setSneakerName(event.target.value)} placeholder="例: adidas Samba OG" type="text" value={sneakerName} /></label>
             <label><span>商品URL</span><input inputMode="url" onChange={(event) => setProductUrl(event.target.value)} placeholder="https://example.com/item" type="url" value={productUrl} /><small>server-sideでprivate IPと危険schemeを遮断します。</small></label>
-            <label><span>画像アップロード</span><input accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} type="file" /><small>{imageFile ? `${imageFile.name} / ${formatFileSize(imageFile.size)}` : "JPEG / PNG / WebP・5MBまで"}</small></label>
+            <div className="workspace-image-field">
+              <label><span>画像アップロード</span><input accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} type="file" /><small>{imageFile ? `${imageFile.name} / ${formatFileSize(imageFile.size)}` : "JPEG / PNG / WebP・5MBまで"}</small></label>
+              <button onClick={handleUseDemoImage} type="button">サンプル画像を使う</button>
+            </div>
             <label><span>予算</span><input inputMode="numeric" min="1" onChange={(event) => setBudgetText(event.target.value)} placeholder="例: 20000" type="number" value={budgetText} /></label>
           </div>
 
@@ -336,7 +351,7 @@ export function RecommendationWorkspace() {
             </div>
           ) : null}
 
-          <div className="workspace-mode-note" data-mode={mode}><span>{selectedMode.label}</span><p>{selectedMode.description}</p></div>
+          <div className="workspace-mode-note" data-mode={mode}><span>{selectedMode.label}</span><p>{selectedMode.description}</p>{mode === "ryo" ? <small>実所有41足 / wishlist 40候補のseed v2を参照</small> : null}</div>
         </aside>
       </div>
     </section>
@@ -349,4 +364,69 @@ function formatFileSize(bytes: number): string {
 
 function formatYen(value: number): string {
   return new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(value);
+}
+
+async function createDemoSneakerFile(): Promise<File> {
+  const canvas = document.createElement("canvas");
+  canvas.width = 640;
+  canvas.height = 400;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("CANVAS_UNAVAILABLE");
+  }
+
+  context.fillStyle = "#f5f1e9";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#d8d0c4";
+  context.fillRect(70, 315, 500, 18);
+
+  context.beginPath();
+  context.moveTo(105, 275);
+  context.lineTo(172, 245);
+  context.lineTo(238, 145);
+  context.lineTo(350, 165);
+  context.lineTo(410, 235);
+  context.lineTo(535, 270);
+  context.lineTo(555, 305);
+  context.lineTo(110, 305);
+  context.closePath();
+  context.fillStyle = "#5b2b2b";
+  context.fill();
+  context.lineWidth = 7;
+  context.strokeStyle = "#1f242b";
+  context.stroke();
+
+  context.fillStyle = "#f3e4ca";
+  context.fillRect(112, 286, 438, 31);
+  context.strokeRect(112, 286, 438, 31);
+  context.fillStyle = "#1f242b";
+  context.fillRect(132, 317, 390, 10);
+
+  context.strokeStyle = "#f3e4ca";
+  context.lineWidth = 9;
+  for (let index = 0; index < 4; index += 1) {
+    context.beginPath();
+    context.moveTo(255 + index * 33, 185 + index * 9);
+    context.lineTo(225 + index * 30, 245 + index * 4);
+    context.stroke();
+  }
+
+  context.strokeStyle = "#f8f6f1";
+  context.lineWidth = 5;
+  for (let index = 0; index < 4; index += 1) {
+    context.beginPath();
+    context.moveTo(268, 205 + index * 17);
+    context.lineTo(365, 216 + index * 12);
+    context.stroke();
+  }
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => {
+      if (value) resolve(value);
+      else reject(new Error("PNG_ENCODE_FAILED"));
+    }, "image/png");
+  });
+  return new File([blob], "sole-matrix-demo-sneaker.png", {
+    type: "image/png",
+  });
 }
