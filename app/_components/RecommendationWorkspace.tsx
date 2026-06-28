@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import type { UserMemorySummary } from "../_lib/user-memory/types";
+
 const workspaceModes = [
   {
     id: "ryo",
@@ -25,7 +27,8 @@ export function RecommendationWorkspace() {
   const [imageName, setImageName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [userId, setUserId] = useState("");
-  const [currentUser, setCurrentUser] = useState("");
+  const [currentUser, setCurrentUser] = useState<UserMemorySummary | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [workspaceStatus, setWorkspaceStatus] = useState(
     "入力を整えて、8問診断へ進んでください。",
   );
@@ -44,7 +47,7 @@ export function RecommendationWorkspace() {
     });
   }
 
-  function handlePreviewUser() {
+  async function handlePreviewUser() {
     const normalizedUserId = userId.trim();
     const normalizedDisplayName = displayName.trim();
 
@@ -53,10 +56,34 @@ export function RecommendationWorkspace() {
       return;
     }
 
-    setCurrentUser(`${normalizedDisplayName} / ${normalizedUserId}`);
-    setWorkspaceStatus(
-      "ユーザー情報をこの画面に反映しました。永続保存は次の実装段階で接続します。",
-    );
+    setIsRegistering(true);
+    try {
+      const response = await fetch("/api/users/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: normalizedUserId,
+          displayName: normalizedDisplayName,
+        }),
+      });
+      const payload = (await response.json()) as
+        | { ok: true; data: UserMemorySummary }
+        | { ok: false; error: { message: string } };
+
+      if (!response.ok || !payload.ok) {
+        setWorkspaceStatus(
+          payload.ok ? "ユーザーを登録できませんでした。" : payload.error.message,
+        );
+        return;
+      }
+
+      setCurrentUser(payload.data);
+      setWorkspaceStatus("ユーザーを登録し、memory.mdを読み込みました。");
+    } catch {
+      setWorkspaceStatus("ユーザーAPIへ接続できませんでした。");
+    } finally {
+      setIsRegistering(false);
+    }
   }
 
   return (
@@ -244,25 +271,34 @@ export function RecommendationWorkspace() {
 
           <button
             className="workspace-secondary-button"
+            disabled={isRegistering}
             onClick={handlePreviewUser}
             type="button"
           >
-            この画面に反映する
+            {isRegistering ? "登録中…" : "ユーザーを登録する"}
           </button>
 
           <div className="workspace-user-summary">
             <span>現在のユーザー</span>
-            <strong>{currentUser || "未登録"}</strong>
+            <strong>
+              {currentUser
+                ? `${currentUser.profile.displayName} / ${currentUser.profile.userId}`
+                : "未登録"}
+            </strong>
           </div>
 
           <div className="workspace-memory-preview">
             <div>
               <span>Memory summary</span>
-              <strong>0 notes</strong>
+              <strong>
+                {currentUser ? currentUser.diagnosisHistoryCount : 0} notes
+              </strong>
             </div>
             <div>
               <span>Feedback history</span>
-              <strong>0 items</strong>
+              <strong>
+                {currentUser ? currentUser.feedbackHistory.length : 0} items
+              </strong>
             </div>
           </div>
 

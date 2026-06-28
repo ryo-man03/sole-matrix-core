@@ -14,3 +14,7 @@ out
 .env.local
 .env
 .env.*.local
+
+# Local user memory is runtime data and must never be committed.
+data/users/*
+!data/users/.gitkeep
