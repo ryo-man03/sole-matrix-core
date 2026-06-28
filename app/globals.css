@@ -440,6 +440,38 @@ h1 {
   margin: 0;
 }
 
+.workspace-provider-readiness {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  border-top: 1px solid rgba(35, 43, 55, 0.11);
+  padding-top: 14px;
+}
+
+.workspace-provider-readiness > span {
+  color: #6b4f32;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.workspace-provider-readiness > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 9px 10px;
+  font-size: 0.76rem;
+}
+
+.workspace-provider-readiness em {
+  color: #66717f;
+  font-style: normal;
+}
+
 .workspace-result-list dt {
   color: #6b4f32;
   font-size: 0.72rem;

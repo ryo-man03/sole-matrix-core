@@ -226,6 +226,18 @@ export function RecommendationWorkspace() {
               <dd>URL・画像・価格の確認後に表示します。</dd>
             </div>
           </dl>
+
+          <div className="workspace-provider-readiness">
+            <span>Provider readiness</span>
+            <div>
+              <strong>Rakuten</strong>
+              <em data-status="not_checked">診断実行後に確認</em>
+            </div>
+            <div>
+              <strong>Gemini</strong>
+              <em data-status="not_checked">補助分析のみ</em>
+            </div>
+          </div>
         </section>
 
         <aside

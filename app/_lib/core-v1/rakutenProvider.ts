@@ -15,6 +15,10 @@ type SafeEnvironment = Record<string, string | undefined>;
 export type RakutenCandidateProviderInput = {
   budgetYen?: number;
   preferenceTags?: readonly SneakerTag[];
+  sneakerName?: string;
+  brand?: string;
+  color?: string;
+  urlNameHint?: string;
 };
 
 export type RakutenCandidateProviderResult = {
@@ -61,7 +65,7 @@ export async function fetchRakutenCandidates(
   try {
     url = new URL(options.endpoint ?? itemSearchEndpoint);
     url.searchParams.set("applicationId", applicationId);
-    url.searchParams.set("keyword", createSearchKeyword(input.preferenceTags));
+    url.searchParams.set("keyword", buildRakutenSearchKeyword(input));
     url.searchParams.set("hits", "3");
     url.searchParams.set("format", "json");
     url.searchParams.set("formatVersion", "2");
@@ -149,7 +153,9 @@ function toCandidateProfile(
   };
 }
 
-function createSearchKeyword(tags: readonly SneakerTag[] | undefined): string {
+export function buildRakutenSearchKeyword(
+  input: RakutenCandidateProviderInput,
+): string {
   const tagKeywords: Partial<Record<SneakerTag, string>> = {
     classic: "クラシック",
     minimal: "シンプル",
@@ -161,11 +167,45 @@ function createSearchKeyword(tags: readonly SneakerTag[] | undefined): string {
     trail: "トレイル",
     outdoor: "アウトドア",
   };
-  const firstKeyword = tags
+  const firstTagKeyword = input.preferenceTags
     ?.map((tag) => tagKeywords[tag])
     .find((value): value is string => Boolean(value));
+  const parts = [
+    input.sneakerName,
+    input.brand,
+    input.color,
+    input.urlNameHint,
+    firstTagKeyword,
+  ]
+    .map(normalizeSearchPart)
+    .filter((value): value is string => Boolean(value));
+  const uniqueParts = parts.filter((part, index) => {
+    const normalizedPart = part.toLocaleLowerCase("ja-JP");
+    return !parts.slice(0, index).some((candidate) => {
+      const normalizedCandidate = candidate.toLocaleLowerCase("ja-JP");
+      return (
+        normalizedCandidate === normalizedPart ||
+        normalizedCandidate.split(/\s+/).includes(normalizedPart)
+      );
+    });
+  });
+  const keyword = uniqueParts.join(" ").slice(0, 100).trim();
 
-  return firstKeyword ? `スニーカー ${firstKeyword}` : "スニーカー";
+  return keyword ? `${keyword} スニーカー`.slice(0, 100).trim() : "スニーカー";
+}
+
+function normalizeSearchPart(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const normalized = value
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001F\u007F]+/g, " ")
+    .replace(/[<>"'`\\/{}[\]|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 50);
+  return normalized || undefined;
 }
 
 function createCandidateVector(

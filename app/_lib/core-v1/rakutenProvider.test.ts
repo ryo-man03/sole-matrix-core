@@ -1,4 +1,7 @@
-import { fetchRakutenCandidates } from "./rakutenProvider";
+import {
+  buildRakutenSearchKeyword,
+  fetchRakutenCandidates,
+} from "./rakutenProvider";
 
 describe("Rakuten server-side candidate provider", () => {
   it("returns missing_config without attempting a request", async () => {
@@ -41,6 +44,9 @@ describe("Rakuten server-side candidate provider", () => {
 
       expect(url.searchParams.get("formatVersion")).toBe("2");
       expect(url.searchParams.get("accessKey")).toBeNull();
+      expect(url.searchParams.get("keyword")).toBe(
+        "adidas Tobacco brown クラシック スニーカー",
+      );
       expect(headers.get("accessKey")).toBe("access-key");
 
       return jsonResponse({
@@ -55,7 +61,14 @@ describe("Rakuten server-side candidate provider", () => {
       });
     });
     const result = await fetchRakutenCandidates(
-      { budgetYen: 20_000, preferenceTags: ["classic"] },
+      {
+        budgetYen: 20_000,
+        preferenceTags: ["classic"],
+        sneakerName: "adidas Tobacco",
+        brand: "adidas",
+        color: "brown",
+        urlNameHint: "adidas Tobacco",
+      },
       { env: configuredEnv(), fetcher },
     );
 
@@ -78,6 +91,19 @@ describe("Rakuten server-side candidate provider", () => {
       ],
     });
     expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it("builds a compact query from practical sneaker inputs", () => {
+    expect(
+      buildRakutenSearchKeyword({
+        sneakerName: "  Puma   Clyde MIJ  ",
+        brand: "Puma",
+        color: "navy",
+        urlNameHint: "Puma Clyde MIJ",
+        preferenceTags: ["heritage"],
+      }),
+    ).toBe("Puma Clyde MIJ navy スニーカー");
+    expect(buildRakutenSearchKeyword({})).toBe("スニーカー");
   });
 
   it("rejects HTTP 200 when response shape is invalid", async () => {

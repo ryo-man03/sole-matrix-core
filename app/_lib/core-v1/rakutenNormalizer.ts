@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 import type { SneakerTag } from "../../../src/domain/sneaker/sneakerTag";
 
 export type ExternalCandidate = {
@@ -41,10 +43,13 @@ export function normalizeRakutenItemSearchResponse(
   }
 
   const candidates: ExternalCandidate[] = [];
+  let sawMissingRequiredField = false;
+  let sawInvalidItem = false;
 
   for (const [index, item] of items.entries()) {
     if (!isRecord(item)) {
-      return { ok: false, reason: "invalid_response" };
+      sawInvalidItem = true;
+      continue;
     }
 
     if (
@@ -52,7 +57,8 @@ export function normalizeRakutenItemSearchResponse(
       item["itemPrice"] === undefined ||
       item["itemUrl"] === undefined
     ) {
-      return { ok: false, reason: "missing_required_field" };
+      sawMissingRequiredField = true;
+      continue;
     }
 
     const name = normalizeText(item["itemName"], maxNameLength);
@@ -60,7 +66,8 @@ export function normalizeRakutenItemSearchResponse(
     const url = normalizeHttpsUrl(item["itemUrl"]);
 
     if (!name || priceYen === undefined || !url) {
-      return { ok: false, reason: "invalid_response" };
+      sawInvalidItem = true;
+      continue;
     }
 
     const shopName = normalizeText(item["shopName"], maxShopNameLength);
@@ -78,6 +85,17 @@ export function normalizeRakutenItemSearchResponse(
       ...(note ? { note } : {}),
       ...(imageUrl ? { imageUrl } : {}),
     });
+  }
+
+  if (candidates.length === 0) {
+    return {
+      ok: false,
+      reason: sawMissingRequiredField
+        ? "missing_required_field"
+        : sawInvalidItem
+          ? "invalid_response"
+          : "empty",
+    };
   }
 
   return { ok: true, candidates };
@@ -139,7 +157,8 @@ function normalizeHttpsUrl(value: unknown): string | undefined {
       url.protocol !== "https:" ||
       url.username ||
       url.password ||
-      !url.hostname
+      !url.hostname ||
+      isBlockedHostname(url.hostname)
     ) {
       return undefined;
     }
@@ -148,6 +167,47 @@ function normalizeHttpsUrl(value: unknown): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function isBlockedHostname(hostnameInput: string): boolean {
+  const hostname = hostnameInput
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.$/, "");
+  if (
+    !hostname ||
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal")
+  ) {
+    return true;
+  }
+  if (isIP(hostname) === 4) {
+    const octets = hostname.split(".").map(Number);
+    const [a, b] = octets as [number, number, number, number];
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a >= 224
+    );
+  }
+  if (isIP(hostname) === 6) {
+    return (
+      hostname === "::" ||
+      hostname === "::1" ||
+      hostname.startsWith("fc") ||
+      hostname.startsWith("fd") ||
+      /^fe[89ab]/.test(hostname) ||
+      hostname.startsWith("ff")
+    );
+  }
+  return false;
 }
 
 function normalizeFirstImageUrl(value: unknown): string | undefined {
