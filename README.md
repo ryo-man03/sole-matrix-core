@@ -2,9 +2,38 @@
 
 [![CI](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml/badge.svg)](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml)
 
+> **AI-powered sneaker recommendation platform.** Diagnosis, rule-based scoring, Gemini explanation, Rakuten readiness, and reproducible TypeScript Core.
+
+[Release Notes v1.0.0](docs/releases/v1.0.0.md) · [Architecture](docs/core-v1-architecture.md) · [Security](docs/security/all-in-one-security.md)
+
 SOLE//MATRIX は、気になるスニーカーの好み・商品URL・画像・予算・購入リスクを一画面で整理する判断支援プロトタイプです。PC版workspaceでは8問診断、Ryo Mode / Balanced Mode、URL・画像分析、楽天候補、ユーザーmemory、feedbackを一つの流れで扱います。
 
 最終的なscoreとDecisionはTypeScriptが決定します。Geminiは説明と画像特徴抽出の補助、楽天APIは商品候補取得だけを担当します。外部APIが失敗してもlocal候補とrule-based explanationへfallbackします。
+
+## Product Preview
+
+### Top Screen
+
+![SOLE//MATRIX all-in-one PC workspace](docs/screenshots/all-in-one-top.png)
+
+<table>
+  <tr>
+    <th>Diagnosis</th>
+    <th>Recommendation Result</th>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/all-in-one-inputs.png" alt="Eight-question diagnosis and sneaker inputs" width="100%"></td>
+    <td><img src="docs/screenshots/all-in-one-recommendation.png" alt="TypeScript-controlled recommendation result" width="100%"></td>
+  </tr>
+  <tr>
+    <th>Gemini Explanation</th>
+    <th>Rakuten Readiness</th>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/core-v1-recommendation-result.png" alt="Structured Gemini explanation after Core scoring" width="100%"></td>
+    <td><img src="docs/screenshots/core-v1-readiness-feedback.png" alt="Gemini and Rakuten provider readiness" width="100%"></td>
+  </tr>
+</table>
 
 ## 主な機能
 
