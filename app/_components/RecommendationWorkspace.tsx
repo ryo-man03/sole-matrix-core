@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   type DiagnosisAnswerId,
@@ -15,6 +15,7 @@ import {
 } from "../_lib/apiClient";
 import type { AuthState, UserSession } from "../_lib/auth-session/types";
 import type { IntegratedRecommendationResult } from "../_lib/integrated-recommendation/types";
+import type { OnboardingPreferenceHint } from "../_lib/onboarding/types";
 import type { UserMemorySummary } from "../_lib/user-memory/types";
 
 const workspaceModes = [
@@ -44,6 +45,7 @@ type RecommendationWorkspaceProps = {
   authState?: AuthState;
   onGuestDiagnosisCompleted?: () => void;
   onUserSession?: (session: UserSession) => void;
+  onboardingHint?: OnboardingPreferenceHint | null;
   requireSessionSelection?: boolean;
 };
 
@@ -51,6 +53,7 @@ export function RecommendationWorkspace({
   authState = { status: "signed_out" },
   onGuestDiagnosisCompleted,
   onUserSession,
+  onboardingHint = null,
   requireSessionSelection = false,
 }: RecommendationWorkspaceProps = {}) {
   const [mode, setMode] = useState<(typeof workspaceModes)[number]["id"]>("ryo");
@@ -87,6 +90,14 @@ export function RecommendationWorkspace({
         : [],
     [result],
   );
+
+  useEffect(() => {
+    if (onboardingHint?.preferredBudgetYen) {
+      setBudgetText((current) =>
+        current.trim() ? current : String(onboardingHint.preferredBudgetYen),
+      );
+    }
+  }, [onboardingHint]);
 
   async function handleRecommend() {
     if (
@@ -141,7 +152,7 @@ export function RecommendationWorkspace({
           questionId: question.id,
           value: answers[question.id]!,
         })),
-        preferenceTags: [],
+        preferenceTags: onboardingHint?.preferenceTags ?? [],
         mode,
         ...(budgetYen === undefined ? {} : { budgetYen }),
         ...(currentUser ? { userId: currentUser.profile.userId } : {}),
@@ -443,6 +454,11 @@ export function RecommendationWorkspace({
           ) : null}
 
           <div className="workspace-mode-note" data-mode={mode}><span>{selectedMode.label}</span><p>{selectedMode.description}</p>{mode === "ryo" ? <small>実所有41足 / wishlist 40候補のseed v2を参照</small> : null}</div>
+          {onboardingHint ? (
+            <p className="workspace-onboarding-hint">
+              初回設定の補助タグ: {onboardingHint.preferenceTags.join(" / ") || "なし"}
+            </p>
+          ) : null}
         </aside>
       </div>
     </section>

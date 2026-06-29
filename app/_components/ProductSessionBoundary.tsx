@@ -9,12 +9,17 @@ import {
   isSupabaseBrowserConfigured,
 } from "../_lib/auth-session/guestSession";
 import type { AuthState, SessionStorage, UserSession } from "../_lib/auth-session/types";
+import { readTemporaryOnboardingHint } from "../_lib/onboarding/onboardingProfile";
+import type { OnboardingPreferenceHint } from "../_lib/onboarding/types";
 import { RecommendationWorkspace } from "./RecommendationWorkspace";
 
 export function ProductSessionBoundary() {
   const [authState, setAuthState] = useState<AuthState>({ status: "loading" });
+  const [onboardingHint, setOnboardingHint] =
+    useState<OnboardingPreferenceHint | null>(null);
 
   useEffect(() => {
+    setOnboardingHint(readTemporaryOnboardingHint(getBrowserSessionStorage()));
     const query = new URLSearchParams(window.location.search);
     if (query.get("session") === "guest") {
       setAuthState({
@@ -52,6 +57,7 @@ export function ProductSessionBoundary() {
         authState={authState}
         onGuestDiagnosisCompleted={handleGuestDiagnosisCompleted}
         onUserSession={handleUserSession}
+        onboardingHint={onboardingHint}
         requireSessionSelection
       />
     </>
@@ -100,6 +106,7 @@ function SessionStatus({
           : "認証providerは未設定です。ゲストモードは引き続き利用できます。"}
       </span>
       <a href="/login">利用方法を選ぶ</a>
+      <a href="/onboarding">初回設定</a>
     </div>
   );
 }
@@ -107,6 +114,14 @@ function SessionStatus({
 function getBrowserStorage(): SessionStorage | undefined {
   try {
     return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+function getBrowserSessionStorage(): SessionStorage | undefined {
+  try {
+    return window.sessionStorage;
   } catch {
     return undefined;
   }
