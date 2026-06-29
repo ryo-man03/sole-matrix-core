@@ -4,6 +4,7 @@ import type {
   DiagnosisAnswer,
   FeedbackInput,
   FeedbackSentiment,
+  RecommendationMode,
 } from "./types";
 
 const supportedTags = new Set<SneakerTag>([
@@ -40,6 +41,11 @@ export type RecommendRequestInput = {
   diagnosisAnswers: DiagnosisAnswer[];
   preferenceTags: SneakerTag[];
   budgetYen?: number;
+  mode?: RecommendationMode;
+  sneakerName?: string;
+  brand?: string;
+  color?: string;
+  urlNameHint?: string;
 };
 
 export function validateRecommendRequest(
@@ -52,9 +58,24 @@ export function validateRecommendRequest(
   const diagnosisAnswers = normalizeDiagnosisAnswers(value["diagnosisAnswers"]);
   const preferenceTags = normalizeTags(value["preferenceTags"]);
   const budgetResult = normalizeBudget(value["budgetYen"]);
+  const mode = normalizeMode(value["mode"]);
+  const sneakerName = normalizeOptionalString(value["sneakerName"], 160);
+  const brand = normalizeOptionalString(value["brand"], 80);
+  const color = normalizeOptionalString(value["color"], 80);
+  const urlNameHint = normalizeOptionalString(value["urlNameHint"], 160);
 
   if (!budgetResult.ok) {
     return budgetResult;
+  }
+
+  if (
+    mode === null ||
+    sneakerName === null ||
+    brand === null ||
+    color === null ||
+    urlNameHint === null
+  ) {
+    return invalid("recommendationContext");
   }
 
   if (diagnosisAnswers.length === 0 && preferenceTags.length === 0) {
@@ -69,8 +90,20 @@ export function validateRecommendRequest(
       ...(budgetResult.value === undefined
         ? {}
         : { budgetYen: budgetResult.value }),
+      ...(mode ? { mode } : {}),
+      ...(sneakerName ? { sneakerName } : {}),
+      ...(brand ? { brand } : {}),
+      ...(color ? { color } : {}),
+      ...(urlNameHint ? { urlNameHint } : {}),
     },
   };
+}
+
+function normalizeMode(value: unknown): RecommendationMode | null | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  return value === "ryo" || value === "balanced" ? value : null;
 }
 
 export function validateFeedbackRequest(

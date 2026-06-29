@@ -3,6 +3,7 @@ import { CandidateSneakerCheckFlow } from "./_components/CandidateSneakerCheckFl
 import { HomeEntryCard } from "./_components/HomeEntryCard";
 import { MainContainer } from "./_components/MainContainer";
 import { PreferenceDiagnosisFlow } from "./_components/PreferenceDiagnosisFlow";
+import { RecommendationWorkspace } from "./_components/RecommendationWorkspace";
 
 const entryCards = [
   {
@@ -18,13 +19,13 @@ const entryCards = [
   },
   {
     eyebrow: "Current boundary",
-    title: "外部商品データに依存しないCore v1",
+    title: "外部サービスが止まっても判定できる",
     description:
-      "楽天商品データは本線に混ぜず、ローカルの仮候補で安全に推薦フローを確認できます。",
+      "外部商品データとAI説明は安全な境界から利用し、失敗時はローカル候補とルールベース説明へ戻ります。",
     items: [
       "Geminiは説明文だけを補助する",
       "score / DecisionはTypeScript純粋関数で確定する",
-      "Feedbackはmock repositoryへ安全に保存する",
+      "PC workspaceのFeedbackはユーザー別memory.mdへ保存する",
     ],
   },
 ];
@@ -36,19 +37,21 @@ export default function Page() {
         <section className="home-hero">
           <p className="home-kicker">SOLE//MATRIX</p>
           <h1 id="home-title" className="home-title">
-            買う前に、気持ちと理由を整える。
+            スニーカーの好み・画像・URL・購入リスクをまとめて診断する。
           </h1>
           <p className="home-lead">
-            好みの診断から二つのスコアとDecisionを作り、理由と注意点まで安全に表示します。
+            Core v1の判断ロジックを軸に、RyoとBalancedの二つの視点で「買う理由」と「待つ理由」を整理します。
           </p>
-          <a className="home-primary-cta" href="#core-v1">
-            <span>Core v1診断を始める</span>
+          <a className="home-primary-cta" href="#recommendation-workspace">
+            <span>判断ワークスペースを開く</span>
             <span aria-hidden="true">→</span>
           </a>
           <p className="home-cta-note">
-            Gemini未設定でも、ルールベースの説明まで完了します。
+            予算入力は任意です。外部APIが未設定でも、判定と説明まで完了します。
           </p>
         </section>
+
+        <RecommendationWorkspace />
 
         <section className="entry-section" aria-label="このプロトタイプについて">
           <div className="entry-grid">

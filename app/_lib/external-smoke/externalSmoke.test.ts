@@ -166,14 +166,17 @@ describe("Gemini isolated smoke", () => {
   });
 
   it("uses fake fetch only after explicit opt-in", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(
+    const fetcher = vi.fn<typeof fetch>(async (request, init) => {
+      expect(String(request)).not.toContain("key=");
+      expect(new Headers(init?.headers).get("x-goog-api-key")).toBe("secret");
+
+      return new Response(
         JSON.stringify({
           candidates: [{ content: { parts: [{ text: "smoke-ok" }] } }],
         }),
-        { status: 200 }
-      )
-    );
+        { status: 200 },
+      );
+    });
 
     await expect(
       runGeminiIsolatedSmoke({

@@ -44,7 +44,7 @@ export function PreferenceDiagnosisSummary({
         })}
       </dl>
       <p className="diagnosis-summary-note">
-        下のボタンから、ローカル仮候補に対する推薦結果を作成できます。
+        下のボタンから、ローカル候補と安全に正規化できた外部候補を比較して推薦結果を作成できます。
       </p>
     </section>
   );

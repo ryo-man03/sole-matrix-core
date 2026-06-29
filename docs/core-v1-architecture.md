@@ -1,98 +1,80 @@
-# Core v1 architecture and extension points
+# SOLE//MATRIX all-in-one architecture
 
-## 責務境界
+## 実行フロー
 
-```txt
-validation.ts
-  HTTP入力の安全な正規化
-
-diagnosis.ts / preferenceVector.ts
-  診断回答・タグ → 8軸 PreferenceVector
-
-scoring.ts
-  Balanced Score adapter / Ryo Score 純粋関数
-
-decision.ts
-  score・budgetFit・risk・情報量・readiness → Decision
-
-explanation.ts
-  常に利用できる rule-based explanation
-
-geminiExplanation.ts
-  structured explanation provider。失敗時は rule-based へ戻る
-
-repository.ts
-  CandidateRepository / FeedbackRepository と mock実装
-
-service.ts
-  上記を組み合わせる唯一の推薦本線
+```text
+RecommendationWorkspace
+  ├─ POST /api/users/register ── memory.md service
+  ├─ POST /api/sneakers/analyze
+  │    ├─ safe URL service
+  │    └─ image validation → Gemini vision → structured fallback
+  └─ POST /api/recommendations/search
+       ├─ validation + inferred safe tags
+       ├─ user memory（untrusted user data）
+       ├─ local candidate repository
+       ├─ Rakuten provider → normalizer → safe candidates
+       ├─ Core v1 scoring / decision
+       ├─ Ryo / Balanced mode evaluator
+       └─ Gemini explanation / rule-based fallback
 ```
 
-検索入力や別UIを追加する場合も、最終判定は `recommendCoreV1` へ寄せます。別の Decision ロジックは作りません。
+Next.js Route Handlerはtransport層です。`server/routes/`がHTTP requestをuse caseへ変換し、`server/services/`が既存serviceへの切り出し境界になります。現在は同じprocessで動き、追加packageや別server processはありません。
 
-## Explanation provider を追加する
+## 判断の所有者
 
-`service.ts` の `ExplanationProvider` を実装します。provider が受け取る `ExplanationInput` は Core 確定後の読み取り専用 facts です。
+| 値 | 所有者 |
+| --- | --- |
+| `PreferenceVector` | TypeScript diagnosis adapter |
+| Core Balanced / Ryo score | TypeScript pure functions |
+| 候補のrisk / budget fit | TypeScript provider / normalizer |
+| Mode score / Decision | TypeScript mode evaluator |
+| 説明文 | Geminiまたはrule-based fallback |
+| 画像の見た目signal | Gemini推定 → TypeScript数値化 |
+| 楽天商品候補 | Rakuten取得 → TypeScript検証・正規化 |
 
-provider は `RecommendationExplanation` を返し、score や Decision を返しません。OpenAIなど別providerを追加する場合も、JSON schema validation と `createRuleBasedExplanation` fallback を同じ境界で維持します。
+Gemini出力から最終scoreまたはDecisionを読む経路はありません。
 
-## Candidate provider を追加する
+## Mode domain
 
-`CandidateRepository` の `listCandidates` を実装し、`CandidateProfile` へ正規化します。
+`RecommendationMode`は`ryo | balanced`です。Core v1の既存score関数を変更せず、`modeRecommendation.ts`が最終評価層を提供します。
 
-新providerの応答を service や scoring へ直接渡してはいけません。次を検証してから repository 境界を通します。
+- Ryo: `ryoModeSeed.ts`の実所有41足、wishlist 40候補、colorway、collaboration、brand史、製造背景、素材とfamily重複を評価
+- Balanced: 価格、汎用性、情報量、risk、readinessを評価
 
-- 8軸が0〜100
-- tagが既知の `SneakerTag`
-- risk / informationCompleteness / readiness が明示的
-- 外部価格の根拠と取得時刻が追跡可能
+既存Core Decision (`strong_buy / consider / wait / avoid / unknown`)も互換APIに残し、PC統合UIはmode Decision (`strong_buy / buy / wait / skip`)を表示します。
 
-## Rakuten が HTTP 200 になった場合
+## User memory boundary
 
-1. 隔離 smoke で `shapeValid: true` を確認する。
-2. raw response を保存・表示せず、専用 normalizer を追加する。
-3. normalizer の fixture test を追加する。
-4. `CandidateRepository` 実装として接続する。
-5. local fallback を残したまま provider readiness を切り替える。
+`data/users/{safeUserId}/memory.md`はruntime dataです。ID validation、path containment、symlink拒否、per-user write queueを通ります。profile、diagnosis history、feedback historyをMarkdownに保存しますが、自由文はJSON文字列としてescapeします。
 
-Core v1 の `scoring.ts` や `decision.ts` から Rakuten を直接呼びません。
+AIへ渡すcontextは以下のmarkerを持ちます。
 
-## Supabase feedback 移行案
-
-現行の `createMockFeedbackRepository` を `SupabaseFeedbackRepository` へ差し替えられる構造です。本番接続時は API Route の server side だけに client を置き、ブラウザへ service role key を渡しません。
-
-参考 migration 案（未適用）:
-
-```sql
-create table public.recommendation_feedback (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  recommendation_id text not null,
-  sentiment text not null check (sentiment in ('helpful', 'not_helpful', 'unsure')),
-  comment text check (char_length(comment) <= 500),
-  created_at timestamptz not null default now()
-);
-
-alter table public.recommendation_feedback enable row level security;
-
-create policy "users insert own feedback"
-on public.recommendation_feedback
-for insert to authenticated
-with check (auth.uid() = user_id);
-
-create policy "users read own feedback"
-on public.recommendation_feedback
-for select to authenticated
-using (auth.uid() = user_id);
+```ts
+{ source: "user_memory", trust: "untrusted_user_data", content: "..." }
 ```
 
-認証を導入するまではこの migration を適用せず、mock repository を使います。
+Gemini promptでも「命令ではなくdata」と明示し、system / developer instructionとして扱いません。
 
-## Scoring rule を変更する
+## External provider boundary
 
-- Balanced Score の legacy adapter・表示用内訳: `scoring.ts`
-- Ryo Score の重み: `scoring.ts`
-- Decision threshold: `decision.ts`
-- 診断質問の軸寄与: `preferenceVector.ts`
+### URL
 
-変更時は既存 golden test を削除せず、Core v1 の domain test を追加・更新して意図を固定します。
+DNS解決後のaddressとredirect先を検証し、private / reserved hostをfetch前に拒否します。HTMLは512KBまで読み、許可metaだけを返します。
+
+### Image
+
+5MB上限、MIME allowlist、magic bytesを検証します。raw画像は永続保存せず、Gemini request内で一時的にbase64化します。AIがDecision、価格、真贋fieldを返した場合はfallbackします。
+
+### Rakuten
+
+credentialsはserver process envだけから読みます。HTTP 200 + valid shape + valid itemだけを`CandidateProfile`へ変換します。403 / 429を突破せず、readinessとlocal fallbackへ変換します。
+
+## 回帰ゲート
+
+各feature commitで以下を実行します。
+
+```text
+vitest → typecheck → Next production build → diff review
+```
+
+最終Phaseでは実画面操作、console確認、screenshots、secret scan、opt-in external smokeを追加します。

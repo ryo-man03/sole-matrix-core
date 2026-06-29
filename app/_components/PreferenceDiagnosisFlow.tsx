@@ -65,7 +65,8 @@ export function PreferenceDiagnosisFlow() {
         <p className="diagnosis-kicker">好み診断</p>
         <h2 id="preference-diagnosis-title">好みを8つの質問で整理する</h2>
         <p>
-          好みの方向を確認したあと、Core v1が診断ベクトル・二つのスコア・Decisionを計算します。
+          正解を当てるテストではありません。直感に近い回答を選ぶと、Core
+          v1が診断ベクトル・二つのスコア・Decisionへ整理します。
         </p>
       </div>
 

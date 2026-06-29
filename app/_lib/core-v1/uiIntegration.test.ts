@@ -20,7 +20,15 @@ describe("Core v1 UI integration", () => {
     expect(componentSource).toContain("Balanced Score");
     expect(componentSource).toContain("Ryo Score");
     expect(componentSource).toContain("ルールベースで説明しています");
-    expect(componentSource).toContain("楽天APIは現在利用できないため");
+    expect(componentSource).toContain("result.readiness.rakuten.detail");
     expect(componentSource).toContain("/api/core-v1/feedback");
+  });
+
+  it("labels local, fallback, and normalized Rakuten candidate sources", () => {
+    expect(componentSource).toContain("診断 / ローカル候補");
+    expect(componentSource).toContain("fallback候補");
+    expect(componentSource).toContain("楽天取得データ");
+    expect(componentSource).toContain("楽天の商品ページで確認する");
+    expect(componentSource).toContain("shape検証を通過した説明");
   });
 });
