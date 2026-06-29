@@ -31,13 +31,14 @@ export function validateIntegratedRecommendationRequest(
   if (analysis === null) {
     return invalid("analysis");
   }
-  const inferredTags = inferTags(analysis);
   const suppliedTags = Array.isArray(value["preferenceTags"])
     ? value["preferenceTags"]
     : [];
   const coreValidation = validateRecommendRequest({
     ...value,
-    preferenceTags: [...suppliedTags, ...inferredTags],
+    // Image and URL analysis are external evidence. They can enrich the UI and
+    // Rakuten evidence query, but cannot inject tags into Core scoring.
+    preferenceTags: suppliedTags,
     sneakerName: analysis?.sneakerName ?? value["sneakerName"],
     brand:
       analysis?.visualAnalysis?.detectedBrand ??
@@ -152,33 +153,6 @@ function normalizeVisualAnalysis(value: unknown): SneakerVisualAnalysis | null |
     confidence,
     cautions,
   };
-}
-
-function inferTags(analysis: RecommendationAnalysisContext | undefined): SneakerTag[] {
-  if (!analysis) return [];
-  const tags = new Set<SneakerTag>();
-  const category = analysis.visualAnalysis?.category;
-  const categoryTags: Partial<Record<NonNullable<typeof category>, SneakerTag>> = {
-    basketball: "basketball", running: "running", skate: "street",
-    terrace: "low_tech", canvas: "canvas", lifestyle: "classic",
-  };
-  if (category && categoryTags[category]) tags.add(categoryTags[category]!);
-  const text = [
-    analysis.sneakerName,
-    analysis.urlAnalysis?.title,
-    analysis.urlAnalysis?.description,
-    analysis.visualAnalysis?.detectedModelName,
-    ...(analysis.visualAnalysis?.materialHints ?? []),
-    ...(analysis.visualAnalysis?.culturalContext ?? []),
-  ].filter(Boolean).join(" ").toLowerCase();
-  const rules: Array<[SneakerTag, RegExp]> = [
-    ["classic", /classic|定番/], ["retro", /retro|vintage|復刻|レトロ/],
-    ["heritage", /heritage|history|歴史|文化/], ["low_tech", /terrace|gum sole|ガムソール/],
-    ["premium", /made in japan|mij|日本製|ドイツ製|leather|レザー/],
-    ["street", /street|skate|ストリート|スケート/],
-  ];
-  for (const [tag, pattern] of rules) if (pattern.test(text)) tags.add(tag);
-  return [...tags].slice(0, 5);
 }
 
 function normalizeUserId(value: unknown): string | null | undefined {
