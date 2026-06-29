@@ -2677,3 +2677,131 @@ h1 {
   background: #6b4f32;
   color: #ffffff;
 }
+
+.external-listing-list strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #28303a;
+  font-size: 0.72rem;
+}
+
+.product-links-boundary,
+.product-links-status {
+  margin: 8px 0 0;
+  color: #59616d;
+  font-size: 0.69rem;
+  line-height: 1.6;
+}
+
+.product-links-boundary {
+  border-left: 3px solid #40546c;
+  background: #f3f0e9;
+  padding: 9px 10px;
+}
+
+.product-link-list {
+  display: grid;
+  gap: 9px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.product-link-list li {
+  min-width: 0;
+  border: 1px solid rgba(35, 43, 55, 0.1);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.product-link-list li > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 5px 10px;
+}
+
+.product-link-list strong,
+.product-link-list span,
+.product-link-list small,
+.product-link-list a {
+  overflow-wrap: anywhere;
+}
+
+.product-link-list strong {
+  color: #28303a;
+  font-size: 0.72rem;
+}
+
+.product-link-list span,
+.product-link-list small {
+  display: block;
+  margin-top: 4px;
+  color: #66717f;
+  font-size: 0.65rem;
+  line-height: 1.5;
+}
+
+.product-link-list a {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  margin-top: 8px;
+  border: 1px solid rgba(40, 77, 116, 0.28);
+  border-radius: 7px;
+  padding: 0 10px;
+  color: #284d74;
+  font-size: 0.69rem;
+  font-weight: 800;
+}
+
+.manual-product-link {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  margin-top: 12px;
+  border-top: 1px solid rgba(35, 43, 55, 0.1);
+  padding-top: 11px;
+}
+
+.manual-product-link label,
+.manual-product-link small {
+  color: #59616d;
+  font-size: 0.68rem;
+  line-height: 1.55;
+}
+
+.manual-product-link label {
+  color: #28303a;
+  font-weight: 800;
+}
+
+.manual-product-link input,
+.manual-product-link button {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid rgba(35, 43, 55, 0.16);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #17202b;
+  font: inherit;
+  font-size: 0.72rem;
+}
+
+.manual-product-link input {
+  padding: 0 10px;
+}
+
+.manual-product-link button {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.manual-product-link button:disabled {
+  background: #e8e6df;
+  color: #858b94;
+  cursor: not-allowed;
+}

@@ -56,6 +56,23 @@ export type SneakerUrlServiceDependencies = {
   geminiFetcher?: typeof fetch;
 };
 
+/**
+ * Shared SSRF boundary for server-side URL consumers.
+ *
+ * Product-link verification reuses this check so redirects, localhost,
+ * private IPs, tunnel hosts, credentials, and non-standard ports follow the
+ * same policy as URL analysis.
+ */
+export async function validatePublicHttpUrl(
+  input: string | URL,
+  resolveHostname: ResolveHostname = resolvePublicAddresses,
+): Promise<URL> {
+  const url = typeof input === "string"
+    ? normalizeInputUrl(input)
+    : new URL(input.toString());
+  return validatePublicUrl(url, resolveHostname);
+}
+
 export async function analyzeSneakerUrl(
   inputUrl: string,
   dependencies: SneakerUrlServiceDependencies = {},

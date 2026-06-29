@@ -9,6 +9,7 @@ import type {
   UserMemorySummary,
 } from "./user-memory/types";
 import type { GlobalRecommendationFeedbackInput } from "./recommendation-feedback/globalFeedbackCorpus";
+import type { ProductUrlResolution } from "./product-links/types";
 
 type ApiSuccess<T> = { ok: true; data: T };
 type ApiFailure = { ok: false; error: { code: string; message: string; field?: string } };
@@ -84,6 +85,30 @@ export async function searchRecommendations(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+  });
+}
+
+export async function resolveRecommendationProductLinks(input: {
+  productName: string;
+  directUrls?: {
+    href: string;
+    source: "rakuten" | "official" | "retailer" | "marketplace";
+  }[];
+}): Promise<ApiResult<ProductUrlResolution>> {
+  return requestJson("/api/product-links/resolve", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "recommendation", ...input }),
+  });
+}
+
+export async function resolveManualProductLink(
+  url: string,
+): Promise<ApiResult<ProductUrlResolution>> {
+  return requestJson("/api/product-links/resolve", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "manual", url }),
   });
 }
 

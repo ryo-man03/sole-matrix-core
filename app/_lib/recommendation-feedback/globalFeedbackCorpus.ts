@@ -85,8 +85,8 @@ export function normalizeGlobalFeedbackInput(
     return null;
   }
 
-  const userContextSummary = sanitizeText(value["userContextSummary"], 300);
-  const reasonSummary = sanitizeText(value["reasonSummary"], 500);
+  const userContextSummary = sanitizePersistentText(value["userContextSummary"], 300);
+  const reasonSummary = sanitizePersistentText(value["reasonSummary"], 500);
   const userReason = sanitizeUserReason(value["userReason"]);
   if (!userContextSummary || !reasonSummary) return null;
 
@@ -99,11 +99,11 @@ export function normalizeGlobalFeedbackInput(
     createdAtValue && !Number.isNaN(Date.parse(createdAtValue))
       ? new Date(createdAtValue).toISOString()
       : now().toISOString();
-  const inferredRequirementPattern = sanitizeText(
+  const inferredRequirementPattern = sanitizePersistentText(
     inferRequirementPattern(userEvaluation, importantTags),
     500,
   );
-  const learningNote = sanitizeText(
+  const learningNote = sanitizePersistentText(
     createLearningNote(userEvaluation, userReason),
     500,
   );
@@ -182,7 +182,7 @@ export async function readGlobalFeedbackCorpus(
 }
 
 export function sanitizeUserReason(value: unknown): string {
-  return sanitizeText(value, 500);
+  return sanitizePersistentText(value, 500);
 }
 
 function resolveCorpusPath(options: CorpusOptions): string {
@@ -203,7 +203,7 @@ function resolveCorpusPath(options: CorpusOptions): string {
   return target;
 }
 
-function sanitizeText(value: unknown, maxLength: number): string {
+export function sanitizePersistentText(value: unknown, maxLength: number): string {
   if (typeof value !== "string") return "";
   return value
     .replace(
@@ -233,7 +233,7 @@ function optionalSanitizedText(
 ): string | null | undefined {
   if (value === undefined || value === null || value === "") return undefined;
   if (typeof value !== "string") return null;
-  return sanitizeText(value, maxLength) || undefined;
+  return sanitizePersistentText(value, maxLength) || undefined;
 }
 
 function safeStringArray(
@@ -242,7 +242,7 @@ function safeStringArray(
   maxLength: number,
 ): string[] | null {
   if (!Array.isArray(value) || value.length > maxItems) return null;
-  const values = value.map((item) => sanitizeText(item, maxLength));
+  const values = value.map((item) => sanitizePersistentText(item, maxLength));
   return values.some((item) => !item) ? null : values;
 }
 

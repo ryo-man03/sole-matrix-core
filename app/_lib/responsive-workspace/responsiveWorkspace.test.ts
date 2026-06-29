@@ -33,5 +33,11 @@ describe("responsive product workspace", () => {
     expect(normalizedCss).not.toMatch(
       /\.mobile-workspace-steps\s*\{[^}]*width:\s*\d{4,}px/s,
     );
+    expect(normalizedCss).toMatch(
+      /\.product-link-list li\s*\{[^}]*min-width:\s*0/s,
+    );
+    expect(normalizedCss).toMatch(
+      /\.manual-product-link input,[\s\S]*?min-width:\s*0/s,
+    );
   });
 });
