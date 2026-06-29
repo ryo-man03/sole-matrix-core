@@ -20,7 +20,7 @@ export type RyoCuratedSneakerSeed = {
 
 export type RyoModeSeedProfile = {
   profileId: "ryo-mode-seed-v2";
-  displayName: "林諒馬";
+  displayName: "Ryo Mode";
   ownedModels: RyoSeedSneaker[];
   wishlistModels: RyoSeedSneaker[];
   curatedRecommendationModels: RyoCuratedSneakerSeed[];
@@ -180,7 +180,7 @@ const curatedRecommendationNames = [
 
 export const ryoModeSeed: RyoModeSeedProfile = {
   profileId: "ryo-mode-seed-v2",
-  displayName: "林諒馬",
+  displayName: "Ryo Mode",
   ownedModels: ownedModelNames.map(createSeedSneaker),
   wishlistModels: wishlistModelNames.map(createSeedSneaker),
   curatedRecommendationModels: curatedRecommendationNames.map(
