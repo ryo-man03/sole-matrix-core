@@ -107,9 +107,25 @@ workspaceは390px級のmobile 1カラムから始まり、1024px以上では入�
 
 Rakuten listing、画像visual evidence、URL metadata / Gemini URL Context、匿名feedback patternsを一つのpanelへ集約します。各sourceはreadiness、confidence、warningを持ち、参考情報であることをUI上でも明記します。
 
-### Live product reference links
+### v1.1.1 Draft: Live product reference links
 
-診断後、推薦商品について、その時点で存在を確認できた外部参考リンクだけを表示します。直接商品ページが確認できない場合は、存在確認済みの検索URLを「検索リンク」と明記します。価格・在庫・サイズはリンク先で確認する必要があり、URLの有無や内容はCore score、`budgetFit`、Decisionを変更しません。生成・検証したURLと手動入力URLは画面内だけで扱い、user memoryや共通corpusへraw保存しません。
+PR #5 adds live product reference links after the 8-question recommendation flow.
+
+After a recommendation is generated, SOLE//MATRIX can show external reference links for the recommended model. These links are treated as external evidence only.
+
+- Shows product reference links after the recommendation result
+- Uses the displayed recommended product name for search fallback links
+- Labels fallback links clearly as search links, not direct product pages
+- Supports safe manual URL input after recommendation
+- Removes sensitive or tracking query parameters such as `access_key`, `api_key`, `token`, `utm_*`, and `ref`
+- Blocks unsafe URLs such as `javascript:`, `data:`, `file:`, `ftp:`, localhost, private IPs, and tunnel URLs
+- Keeps product URLs separate from Core Decision, score, and budgetFit
+
+Boundary:
+
+Product reference links do not guarantee price, inventory, size availability, or the cheapest purchase option.
+They do not change the recommendation score or purchase decision.
+If a direct product page cannot be verified, the UI may show a clearly labelled search fallback link instead.
 
 ### Global Recommendation Feedback Corpus
 
