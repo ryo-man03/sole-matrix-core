@@ -16,6 +16,7 @@ import {
 import type { AuthState, UserSession } from "../_lib/auth-session/types";
 import type { IntegratedRecommendationResult } from "../_lib/integrated-recommendation/types";
 import type { OnboardingPreferenceHint } from "../_lib/onboarding/types";
+import type { SatisfactionEvaluation } from "../_lib/satisfaction-feedback/types";
 import type { UserMemorySummary } from "../_lib/user-memory/types";
 
 const workspaceModes = [
@@ -69,8 +70,10 @@ export function RecommendationWorkspace({
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, DiagnosisAnswerId>>({});
   const [result, setResult] = useState<IntegratedRecommendationResult | null>(null);
-  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackEvaluation, setFeedbackEvaluation] =
+    useState<SatisfactionEvaluation>("good");
   const [feedbackComment, setFeedbackComment] = useState("");
+  const [guestFeedbackSaved, setGuestFeedbackSaved] = useState(false);
   const [isSavingFeedback, setIsSavingFeedback] = useState(false);
   const [workspaceStatus, setWorkspaceStatus] = useState(
     "候補情報と8問診断を入力してください。画像とURLは任意です。",
@@ -134,6 +137,7 @@ export function RecommendationWorkspace({
 
     setIsAnalyzing(true);
     setResult(null);
+    setGuestFeedbackSaved(false);
     setWorkspaceStatus("URLと画像を安全に分析しています…");
     try {
       const analysisResponse = await analyzeSneakerApi({
@@ -221,8 +225,18 @@ export function RecommendationWorkspace({
   }
 
   async function handleSaveFeedback() {
-    if (!currentUser || !result) {
-      setWorkspaceStatus("feedbackを保存するにはユーザー登録と推薦実行が必要です。");
+    if (!result) {
+      setWorkspaceStatus("feedbackを保存するには推薦実行が必要です。");
+      return;
+    }
+    if (!currentUser) {
+      setGuestFeedbackSaved(true);
+      setFeedbackComment("");
+      setWorkspaceStatus(
+        authState.status === "guest"
+          ? "ゲストの評価をこの画面の一時状態へ保存しました。個人memoryには保存していません。"
+          : "評価を一時保存しました。ログインすると個人memoryへ保存できます。",
+      );
       return;
     }
     setIsSavingFeedback(true);
@@ -236,7 +250,12 @@ export function RecommendationWorkspace({
         decision: result.modeRecommendation.decision,
         balancedScore: result.modeRecommendation.balancedScore,
         ryoScore: result.modeRecommendation.ryoScore,
-        userRating: feedbackRating,
+        userRating:
+          feedbackEvaluation === "good"
+            ? 5
+            : feedbackEvaluation === "neutral"
+              ? 3
+              : 1,
         userComment: feedbackComment,
       });
       if (!payload.ok) {
@@ -434,11 +453,28 @@ export function RecommendationWorkspace({
 
           {result ? (
             <div className="workspace-feedback-form">
-              <span>この推薦をmemory.mdへ記録</span>
-              <label>評価（1〜5）<input max="5" min="1" onChange={(event) => setFeedbackRating(Number(event.target.value))} type="number" value={feedbackRating} /></label>
-              <label>コメント<textarea maxLength={500} onChange={(event) => setFeedbackComment(event.target.value)} placeholder="履いた場面や迷った理由" value={feedbackComment} /></label>
-              <button disabled={isSavingFeedback || !currentUser} onClick={handleSaveFeedback} type="button">{isSavingFeedback ? "保存中…" : "feedbackを保存する"}</button>
-              {!currentUser ? <small>先にユーザー登録してください。</small> : null}
+              <span>この推薦はどうでしたか？</span>
+              <div className="workspace-feedback-evaluation" role="group" aria-label="推薦への評価">
+                {([
+                  ["good", "納得できた"],
+                  ["neutral", "微妙"],
+                  ["bad", "違う"],
+                ] as const).map(([value, label]) => (
+                  <button
+                    aria-pressed={feedbackEvaluation === value}
+                    data-selected={feedbackEvaluation === value}
+                    key={value}
+                    onClick={() => setFeedbackEvaluation(value)}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <label>理由メモ<textarea maxLength={500} onChange={(event) => setFeedbackComment(event.target.value)} placeholder="なぜそう思いましたか？" value={feedbackComment} /></label>
+              <button disabled={isSavingFeedback} onClick={handleSaveFeedback} type="button">{isSavingFeedback ? "保存中…" : "次回に反映するために保存"}</button>
+              {!currentUser ? <small>ゲスト評価は個人memoryへ永続保存しません。</small> : null}
+              {guestFeedbackSaved ? <small>この画面内に一時保存済みです。</small> : null}
             </div>
           ) : null}
 

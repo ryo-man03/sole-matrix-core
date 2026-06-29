@@ -2388,3 +2388,23 @@ h1 {
     padding-top: 16px;
   }
 }
+
+.workspace-feedback-evaluation {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.workspace-feedback-form .workspace-feedback-evaluation button {
+  min-width: 0;
+  border-color: rgba(35, 43, 55, 0.17);
+  background: #ffffff;
+  color: #3f4854;
+  padding: 7px 5px;
+}
+
+.workspace-feedback-form .workspace-feedback-evaluation button[data-selected="true"] {
+  border-color: #6b4f32;
+  background: #6b4f32;
+  color: #ffffff;
+}
