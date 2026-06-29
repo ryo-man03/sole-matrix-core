@@ -40,6 +40,7 @@ describe("integrated mode-aware recommendation", () => {
     const rakutenProvider = vi.fn(async () => ({
       status: "missing_config" as const,
       candidates: [],
+      evidence: [],
       readiness: createRakutenProviderReadiness("missing_config"),
       networkAttempted: false,
       responseOk: false,
