@@ -273,7 +273,16 @@ export function RecommendationWorkspace({
 
       <p className="workspace-status" aria-live="polite">{workspaceStatus}</p>
 
-      <div className="workspace-grid">
+      <nav className="mobile-workspace-steps" aria-label="スマホ診断ステップ">
+        <a href="#mobile-step-1"><span>1</span>入力</a>
+        <a href="#mobile-step-2"><span>2</span>好み</a>
+        <a href="#mobile-step-3"><span>3</span>画像 / URL</a>
+        <a href="#mobile-step-4"><span>4</span>推薦結果</a>
+        <a href="#mobile-step-5"><span>5</span>理由 / 証拠</a>
+        <a href="#mobile-step-6"><span>6</span>保存 / 評価</a>
+      </nav>
+
+      <div className="workspace-grid desktop-workspace-layout">
         <section aria-labelledby="workspace-input-title" className="workspace-panel workspace-input-panel">
           <div className="workspace-panel-heading">
             <span>01 / INPUT</span>
@@ -281,45 +290,57 @@ export function RecommendationWorkspace({
             <p>診断と候補情報を、無理のない順番で集めます。</p>
           </div>
 
-          <div className="diagnosis-entry-row">
-            <div><strong>8問診断</strong><span>好みをPreferenceVectorへ変換</span></div>
-            <span className="workspace-chip">{answeredCount} / 8</span>
-          </div>
-
-          <div className="workspace-diagnosis-card">
-            <div className="workspace-question-meta">
-              <span>Q{currentQuestionIndex + 1}</span>
-              <strong>{currentQuestionIndex + 1} / 8</strong>
-            </div>
-            <p>{currentQuestion.question}</p>
-            <small>{currentQuestion.helperText}</small>
-            <div className="workspace-answer-buttons" role="group" aria-label={`${currentQuestion.question}への回答`}>
-              {currentQuestion.options.map((option) => (
-                <button
-                  aria-pressed={answers[currentQuestion.id] === option.id}
-                  data-selected={answers[currentQuestion.id] === option.id}
-                  key={option.id}
-                  onClick={() => setAnswers((current) => ({ ...current, [currentQuestion.id]: option.id }))}
-                  type="button"
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <div className="workspace-question-nav">
-              <button disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex((index) => Math.max(0, index - 1))} type="button">前へ</button>
-              <button disabled={currentQuestionIndex === 7} onClick={() => setCurrentQuestionIndex((index) => Math.min(7, index + 1))} type="button">次へ</button>
+          <div className="mobile-step-section" data-mobile-step="1" id="mobile-step-1">
+            <p className="mobile-step-label">Step 1 / 入力</p>
+            <div className="workspace-fields workspace-basic-fields">
+              <label><span>スニーカー名</span><input onChange={(event) => setSneakerName(event.target.value)} placeholder="例: adidas Samba OG" type="text" value={sneakerName} /></label>
+              <label><span>予算</span><input inputMode="numeric" min="1" onChange={(event) => setBudgetText(event.target.value)} placeholder="例: 20000" type="number" value={budgetText} /></label>
             </div>
           </div>
 
-          <div className="workspace-fields">
-            <label><span>スニーカー名</span><input onChange={(event) => setSneakerName(event.target.value)} placeholder="例: adidas Samba OG" type="text" value={sneakerName} /></label>
-            <label><span>商品URL</span><input inputMode="url" onChange={(event) => setProductUrl(event.target.value)} placeholder="https://example.com/item" type="url" value={productUrl} /><small>server-sideでprivate IPと危険schemeを遮断します。</small></label>
-            <div className="workspace-image-field">
-              <label><span>画像アップロード</span><input accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} type="file" /><small>{imageFile ? `${imageFile.name} / ${formatFileSize(imageFile.size)}` : "JPEG / PNG / WebP・5MBまで"}</small></label>
-              <button onClick={handleUseDemoImage} type="button">サンプル画像を使う</button>
+          <div className="mobile-step-section" data-mobile-step="2" id="mobile-step-2">
+            <p className="mobile-step-label">Step 2 / 好みタグ</p>
+            <div className="diagnosis-entry-row">
+              <div><strong>8問診断</strong><span>好みをPreferenceVectorへ変換</span></div>
+              <span className="workspace-chip">{answeredCount} / 8</span>
             </div>
-            <label><span>予算</span><input inputMode="numeric" min="1" onChange={(event) => setBudgetText(event.target.value)} placeholder="例: 20000" type="number" value={budgetText} /></label>
+
+            <div className="workspace-diagnosis-card">
+              <div className="workspace-question-meta">
+                <span>Q{currentQuestionIndex + 1}</span>
+                <strong>{currentQuestionIndex + 1} / 8</strong>
+              </div>
+              <p>{currentQuestion.question}</p>
+              <small>{currentQuestion.helperText}</small>
+              <div className="workspace-answer-buttons" role="group" aria-label={`${currentQuestion.question}への回答`}>
+                {currentQuestion.options.map((option) => (
+                  <button
+                    aria-pressed={answers[currentQuestion.id] === option.id}
+                    data-selected={answers[currentQuestion.id] === option.id}
+                    key={option.id}
+                    onClick={() => setAnswers((current) => ({ ...current, [currentQuestion.id]: option.id }))}
+                    type="button"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <div className="workspace-question-nav">
+                <button disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex((index) => Math.max(0, index - 1))} type="button">前へ</button>
+                <button disabled={currentQuestionIndex === 7} onClick={() => setCurrentQuestionIndex((index) => Math.min(7, index + 1))} type="button">次へ</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mobile-step-section" data-mobile-step="3" id="mobile-step-3">
+            <p className="mobile-step-label">Step 3 / 画像・URL</p>
+            <div className="workspace-fields workspace-evidence-fields">
+              <label><span>商品URL</span><input inputMode="url" onChange={(event) => setProductUrl(event.target.value)} placeholder="https://example.com/item" type="url" value={productUrl} /><small>server-sideでprivate IPと危険schemeを遮断します。</small></label>
+              <div className="workspace-image-field">
+                <label><span>画像アップロード</span><input accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} type="file" /><small>{imageFile ? `${imageFile.name} / ${formatFileSize(imageFile.size)}` : "JPEG / PNG / WebP・5MBまで"}</small></label>
+                <button onClick={handleUseDemoImage} type="button">サンプル画像を使う</button>
+              </div>
+            </div>
           </div>
 
           <button
@@ -344,7 +365,8 @@ export function RecommendationWorkspace({
           </button>
         </section>
 
-        <section aria-labelledby="workspace-result-title" className="workspace-panel workspace-result-panel">
+        <section aria-labelledby="workspace-result-title" className="workspace-panel workspace-result-panel" data-mobile-step="4" id="mobile-step-4">
+          <p className="mobile-step-label">Step 4 / 推薦結果</p>
           <div className="workspace-panel-heading">
             <span>02 / RESULT</span><h3 id="workspace-result-title">解析・推薦結果</h3><p>{selectedMode.label}の観点を選択中です。</p>
           </div>
@@ -376,14 +398,16 @@ export function RecommendationWorkspace({
             {result?.analysis.visualAnalysis ? <div><dt>Image analysis</dt><dd>{[result.analysis.visualAnalysis.detectedBrand, result.analysis.visualAnalysis.detectedModelName, ...result.analysis.visualAnalysis.mainColors].filter(Boolean).join(" / ") || "特徴を特定できませんでした"}</dd></div> : null}
           </dl>
 
-          <div className="workspace-provider-readiness">
+          <div className="workspace-provider-readiness" data-mobile-step="5" id="mobile-step-5">
+            <p className="mobile-step-label">Step 5 / 理由・外部証拠</p>
             <span>Provider readiness</span>
             <div><strong>Rakuten</strong><em data-status={result?.readiness.rakuten.status ?? "not_checked"}>{result?.readiness.rakuten.status ?? "診断実行後に確認"}</em></div>
             <div><strong>Gemini</strong><em data-status={result?.readiness.gemini.status ?? "not_checked"}>{result ? `${result.readiness.gemini.status} / ${result.explanation.source}` : "補助分析のみ"}</em></div>
           </div>
         </section>
 
-        <aside aria-labelledby="workspace-user-title" className="workspace-panel workspace-user-panel">
+        <aside aria-labelledby="workspace-user-title" className="workspace-panel workspace-user-panel" data-mobile-step="6" id="mobile-step-6">
+          <p className="mobile-step-label">Step 6 / 保存・フィードバック</p>
           <div className="workspace-panel-heading"><span>03 / USER</span><h3 id="workspace-user-title">ユーザー情報</h3><p>好みと判断履歴を、ユーザーごとに育てます。</p></div>
           <div className="workspace-fields workspace-user-fields">
             <label><span>ユーザーID</span><input autoComplete="username" onChange={(event) => setUserId(event.target.value)} placeholder="ryo_01" type="text" value={userId} /></label>
