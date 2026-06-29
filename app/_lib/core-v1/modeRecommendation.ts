@@ -1,4 +1,9 @@
-import { ryoModeSeed, type RyoModeSeedProfile, type RyoSeedSneaker } from "./ryoModeSeed";
+import {
+  ryoModeSeed,
+  type RyoCuratedSneakerSeed,
+  type RyoModeSeedProfile,
+  type RyoSeedSneaker,
+} from "./ryoModeSeed";
 import type {
   BalancedScore,
   CandidateProfile,
@@ -28,12 +33,17 @@ export function createModeAwareRecommendation(
     input.candidate,
     seedProfile.wishlistModels,
   );
+  const relatedCuratedModels = findRelatedCuratedModels(
+    input.candidate,
+    seedProfile.curatedRecommendationModels,
+  );
   const cautions = createCautions(input, overlapWithOwned);
   const balancedScore = calculateModeBalancedScore(input);
   const ryoScore = calculateModeRyoScore(
     input,
     overlapWithOwned,
     relatedWishlistModels,
+    relatedCuratedModels,
   );
   const activeScore = input.mode === "ryo" ? ryoScore : balancedScore;
 
@@ -46,9 +56,11 @@ export function createModeAwareRecommendation(
       input.mode,
       overlapWithOwned,
       relatedWishlistModels,
+      relatedCuratedModels,
     ),
     overlapWithOwned,
     relatedWishlistModels,
+    relatedCuratedModels,
     cautions,
   };
 }
@@ -72,11 +84,26 @@ function calculateModeRyoScore(
   input: ModeRecommendationInput,
   overlapWithOwned: readonly string[],
   relatedWishlistModels: readonly string[],
+  relatedCuratedModels: readonly string[],
 ): number {
   const wishlistBonus = Math.min(10, relatedWishlistModels.length * 6);
+  const curatedBonus = Math.min(8, relatedCuratedModels.length * 4);
   const overlapPenalty = Math.min(18, overlapWithOwned.length * 10);
   const contextBonus = input.candidate.tags.some((tag) =>
     ["heritage", "retro", "classic", "basketball", "low_tech"].includes(tag),
+  )
+    ? 5
+    : 0;
+  const affordableClassicBonus =
+    input.candidate.budgetFit >= 70 &&
+    (input.candidate.priceYen === undefined || input.candidate.priceYen <= 20_000) &&
+    input.candidate.tags.some((tag) =>
+      ["heritage", "retro", "classic", "low_tech"].includes(tag),
+    )
+      ? 4
+      : 0;
+  const newBalanceLate990Penalty = /\b990v(?:[5-9]|\d{2,})\b/i.test(
+    `${input.candidate.name} ${input.candidate.description}`,
   )
     ? 5
     : 0;
@@ -85,7 +112,10 @@ function calculateModeRyoScore(
     input.ryoScore.culturalFit * 0.12 +
     input.ryoScore.enthusiastValue * 0.18 +
     wishlistBonus +
+    curatedBonus +
     contextBonus -
+    newBalanceLate990Penalty +
+    affordableClassicBonus -
     overlapPenalty;
 
   return roundScore(total);
@@ -122,6 +152,7 @@ function createModeReason(
   mode: RecommendationMode,
   overlapWithOwned: readonly string[],
   relatedWishlistModels: readonly string[],
+  relatedCuratedModels: readonly string[],
 ): string {
   if (mode === "balanced") {
     return "価格、汎用性、情報の確かさ、サイズや購入リスクを均等に評価しました。";
@@ -135,7 +166,35 @@ function createModeReason(
     return `ブランドの歴史と文化的背景に加え、wishlistの${relatedWishlistModels.join("、")}とのつながりを評価しました。`;
   }
 
+  if (relatedCuratedModels.length > 0) {
+    return `Ryo Modeのcurated recommendation seed（${relatedCuratedModels.join("、")}）を参考候補として評価しました。`;
+  }
+
   return "文化的背景、ブランドの歴史、素材、既存コレクションに加わる新しい役割を評価しました。";
+}
+
+function findRelatedCuratedModels(
+  candidate: CandidateProfile,
+  seedModels: readonly RyoCuratedSneakerSeed[],
+): string[] {
+  const candidateText = normalizeText(
+    `${candidate.name} ${candidate.description} ${candidate.note ?? ""}`,
+  );
+
+  return seedModels
+    .filter((seedModel) => {
+      const brand = normalizeText(seedModel.brand);
+      const rawName = normalizeText(seedModel.rawName);
+      const family = normalizeText(seedModel.modelFamily ?? "");
+      return (
+        candidateText.includes(rawName) ||
+        (candidateText.includes(brand) &&
+          family.length >= 4 &&
+          candidateText.includes(family))
+      );
+    })
+    .map((seedModel) => seedModel.rawName)
+    .slice(0, 6);
 }
 
 function createCautions(

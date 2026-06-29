@@ -22,6 +22,7 @@ export type ModeAwareRecommendation = {
   modeReason: string;
   overlapWithOwned: string[];
   relatedWishlistModels: string[];
+  relatedCuratedModels: string[];
   cautions: string[];
 };
 
