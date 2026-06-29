@@ -23,7 +23,19 @@ export type ExternalVisualEvidence = {
   coreDecisionImpact: "none";
 };
 
+export type ExternalUrlEvidence = {
+  kind: "external_url_analysis";
+  provider: "metadata" | "gemini_url_context" | "fallback";
+  domain: string;
+  summary: string;
+  confidence: number;
+  confidenceLabel: "uncertain" | "moderate" | "high";
+  warnings: string[];
+  coreDecisionImpact: "none";
+};
+
 export type ExternalEvidenceBundle = {
   listings: ExternalListingEvidence[];
   visual?: ExternalVisualEvidence;
+  url?: ExternalUrlEvidence;
 };

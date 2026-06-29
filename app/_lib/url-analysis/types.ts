@@ -1,4 +1,5 @@
 export type SneakerUrlAnalysis = {
+  source?: "metadata" | "gemini_url_context" | "fallback";
   inputUrl: string;
   finalUrl?: string;
   title?: string;

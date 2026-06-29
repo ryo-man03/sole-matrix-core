@@ -146,6 +146,54 @@ describe("integrated mode-aware recommendation", () => {
     expect(visualResult.ryoScore).toEqual(noVisualResult.ryoScore);
     expect(visualResult.decision).toBe(noVisualResult.decision);
   });
+
+  it("keeps Core score and Decision unchanged by URL evidence", async () => {
+    const withUrlInput = validRequest();
+    withUrlInput.userId = "";
+    const withoutUrlBase = validRequest();
+    const { urlAnalysis: _urlAnalysis, ...analysisWithoutUrl } =
+      withoutUrlBase.analysis;
+    const { userId: _userId, ...requestWithoutUser } = withoutUrlBase;
+    const withoutUrlInput = {
+      ...requestWithoutUser,
+      analysis: analysisWithoutUrl,
+    };
+    const withUrl = validateIntegratedRecommendationRequest(withUrlInput);
+    const withoutUrl = validateIntegratedRecommendationRequest(withoutUrlInput);
+    expect(withUrl.ok).toBe(true);
+    expect(withoutUrl.ok).toBe(true);
+    if (!withUrl.ok || !withoutUrl.ok) return;
+
+    const dependencies = {
+      core: {
+        env: {},
+        rakutenCandidateProvider: async () => ({
+          status: "missing_config" as const,
+          candidates: [],
+          evidence: [],
+          readiness: createRakutenProviderReadiness("missing_config"),
+          networkAttempted: false,
+          responseOk: false,
+          shapeValid: false,
+        }),
+        explanationProvider: async () => explanation,
+      },
+    };
+    const urlResult = await recommendIntegratedSneaker(withUrl.value, dependencies);
+    const noUrlResult = await recommendIntegratedSneaker(
+      withoutUrl.value,
+      dependencies,
+    );
+
+    expect(urlResult.externalEvidence.url).toMatchObject({
+      domain: "shop.example",
+      coreDecisionImpact: "none",
+    });
+    expect(urlResult.candidate).toEqual(noUrlResult.candidate);
+    expect(urlResult.balancedScore).toEqual(noUrlResult.balancedScore);
+    expect(urlResult.ryoScore).toEqual(noUrlResult.ryoScore);
+    expect(urlResult.decision).toBe(noUrlResult.decision);
+  });
 });
 
 function validRequest() {

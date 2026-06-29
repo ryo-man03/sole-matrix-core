@@ -10,6 +10,7 @@ import type {
   IntegratedRecommendationResult,
 } from "./types";
 import { createExternalVisualEvidence } from "../external-evidence/visualEvidence";
+import { createExternalUrlEvidence } from "../external-evidence/urlEvidence";
 
 type UserMemoryService = ReturnType<typeof createUserMemoryService>;
 
@@ -103,6 +104,9 @@ export async function recommendIntegratedSneaker(
               input.analysis.visualAnalysis,
             ),
           }
+        : {}),
+      ...(input.analysis?.urlAnalysis
+        ? { url: createExternalUrlEvidence(input.analysis.urlAnalysis) }
         : {}),
     },
     modeRecommendation,

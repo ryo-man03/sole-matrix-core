@@ -107,7 +107,17 @@ function normalizeUrlAnalysis(value: unknown): SneakerUrlAnalysis | null | undef
     extractedNameHint: optionalText(value["extractedNameHint"], 160),
   };
   if (Object.values(optional).some((item) => item === null)) return null;
+  const source = value["source"];
+  if (
+    source !== undefined &&
+    source !== "metadata" &&
+    source !== "gemini_url_context" &&
+    source !== "fallback"
+  ) {
+    return null;
+  }
   return {
+    ...(source ? { source } : {}),
     inputUrl,
     confidence,
     cautions,
