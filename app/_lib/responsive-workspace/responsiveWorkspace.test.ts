@@ -21,10 +21,17 @@ describe("responsive product workspace", () => {
       path.join(process.cwd(), "app", "globals.css"),
       "utf8",
     );
+    const normalizedCss = css.replace(/\r\n/g, "\n");
 
-    expect(css).toContain("@media (min-width: 1024px)");
-    expect(css).toContain("grid-template-columns:\n      minmax(0, 0.92fr)");
-    expect(css).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
-    expect(css).not.toMatch(/\.mobile-workspace-steps\s*\{[^}]*width:\s*\d{4,}px/s);
+    expect(normalizedCss).toContain("@media (min-width: 1024px)");
+    expect(normalizedCss).toContain(
+      "grid-template-columns:\n      minmax(0, 0.92fr)",
+    );
+    expect(normalizedCss).toContain(
+      "grid-template-columns: repeat(3, minmax(0, 1fr))",
+    );
+    expect(normalizedCss).not.toMatch(
+      /\.mobile-workspace-steps\s*\{[^}]*width:\s*\d{4,}px/s,
+    );
   });
 });
