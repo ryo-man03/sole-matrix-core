@@ -10,6 +10,7 @@ import {
   analyzeSneaker as analyzeSneakerApi,
   getUserProfile,
   registerUser as registerUserApi,
+  saveGlobalRecommendationFeedback,
   saveUserFeedback,
   searchRecommendations,
 } from "../_lib/apiClient";
@@ -229,18 +230,70 @@ export function RecommendationWorkspace({
       setWorkspaceStatus("feedbackを保存するには推薦実行が必要です。");
       return;
     }
-    if (!currentUser) {
-      setGuestFeedbackSaved(true);
-      setFeedbackComment("");
-      setWorkspaceStatus(
-        authState.status === "guest"
-          ? "ゲストの評価をこの画面の一時状態へ保存しました。個人memoryには保存していません。"
-          : "評価を一時保存しました。ログインすると個人memoryへ保存できます。",
-      );
-      return;
-    }
     setIsSavingFeedback(true);
     try {
+      const sessionType = currentUser
+        ? "user"
+        : authState.status === "guest"
+          ? "guest"
+          : "unknown";
+      const evidenceUsed = [
+        "preference answers",
+        ...(mode === "ryo" ? ["owned / wishlist / curated hints"] : []),
+        ...(result.analysis.visualAnalysis ? ["image analysis"] : []),
+        ...(result.analysis.urlAnalysis ? ["URL analysis"] : []),
+        ...(result.candidate.source === "rakuten" ? ["Rakuten evidence"] : []),
+        "user feedback",
+      ];
+      const globalFeedback = await saveGlobalRecommendationFeedback({
+        sessionType,
+        recommendationMode: result.modeRecommendation.mode,
+        eightQuestionAnswers: preferenceDiagnosisQuestions.map(
+          (question) => answers[question.id] ?? "unanswered",
+        ),
+        userContextSummary: [
+          sessionType === "user" ? "logged-in user" : sessionType,
+          onboardingHint?.purpose,
+          onboardingHint?.experience,
+        ].filter(Boolean).join(" / "),
+        inputSneakerName:
+          result.analysis.sneakerName ??
+          result.analysis.urlAnalysis?.extractedNameHint ??
+          result.candidate.name,
+        ...(budgetText.trim()
+          ? { budgetRange: `up to ${budgetText.trim()} JPY` }
+          : {}),
+        importantTags: [
+          ...new Set([
+            ...result.candidate.tags,
+            ...(onboardingHint?.preferenceTags ?? []),
+          ]),
+        ],
+        generatedRecommendation: [result.candidate.name],
+        decision: result.modeRecommendation.decision,
+        balancedScore: result.modeRecommendation.balancedScore,
+        ryoScore: result.modeRecommendation.ryoScore,
+        reasonSummary: result.modeRecommendation.modeReason,
+        evidenceUsed,
+        userEvaluation: feedbackEvaluation,
+        userReason: feedbackComment,
+      });
+      if (!globalFeedback.ok) {
+        setWorkspaceStatus(globalFeedback.error.message);
+        return;
+      }
+
+      if (!currentUser) {
+        setGuestFeedbackSaved(true);
+        setFeedbackComment("");
+        setWorkspaceStatus(
+          authState.status === "guest"
+            ? "ゲストの評価を匿名の共通corpusへ保存しました。個人memoryには保存していません。"
+            : "評価を匿名の共通corpusへ保存しました。ログインすると個人memoryにも保存できます。",
+        );
+        return;
+      }
+
       const payload = await saveUserFeedback(currentUser.profile.userId, {
         sneakerName:
           result.analysis.sneakerName ??
@@ -264,7 +317,9 @@ export function RecommendationWorkspace({
       }
       setCurrentUser(payload.data);
       setFeedbackComment("");
-      setWorkspaceStatus("feedbackをmemory.mdへ保存しました。");
+      setWorkspaceStatus(
+        "feedbackを個人memory.mdと匿名の共通corpusへ保存しました。",
+      );
     } finally {
       setIsSavingFeedback(false);
     }
@@ -473,8 +528,8 @@ export function RecommendationWorkspace({
               </div>
               <label>理由メモ<textarea maxLength={500} onChange={(event) => setFeedbackComment(event.target.value)} placeholder="なぜそう思いましたか？" value={feedbackComment} /></label>
               <button disabled={isSavingFeedback} onClick={handleSaveFeedback} type="button">{isSavingFeedback ? "保存中…" : "次回に反映するために保存"}</button>
-              {!currentUser ? <small>ゲスト評価は個人memoryへ永続保存しません。</small> : null}
-              {guestFeedbackSaved ? <small>この画面内に一時保存済みです。</small> : null}
+              {!currentUser ? <small>ゲスト評価は匿名の共通corpusに保存し、個人memoryには保存しません。</small> : null}
+              {guestFeedbackSaved ? <small>匿名化して保存済みです。</small> : null}
             </div>
           ) : null}
 

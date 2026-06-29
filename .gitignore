@@ -18,3 +18,8 @@ out
 # Local user memory is runtime data and must never be committed.
 data/users/*
 !data/users/.gitkeep
+
+# Shared feedback examples may be committed, runtime feedback must not be.
+data/recommendation-feedback/*
+!data/recommendation-feedback/.gitkeep
+!data/recommendation-feedback/recommendation-feedback-corpus.example.md
