@@ -10,7 +10,19 @@ import { DiagnosisQuestionCard } from "./DiagnosisQuestionCard";
 import { CoreV1RecommendationPanel } from "./CoreV1RecommendationPanel";
 import { PreferenceDiagnosisSummary } from "./PreferenceDiagnosisSummary";
 
-export function PreferenceDiagnosisFlow() {
+type PreferenceDiagnosisFlowProps = {
+  isRecommendationDisabled?: boolean;
+  onComplete?: ((answers: Record<string, DiagnosisAnswerId>) => void) | undefined;
+  onOpenProductJudgement?: (() => void) | undefined;
+  onRecommendationComplete?: (() => void) | undefined;
+};
+
+export function PreferenceDiagnosisFlow({
+  isRecommendationDisabled = false,
+  onComplete,
+  onOpenProductJudgement,
+  onRecommendationComplete,
+}: PreferenceDiagnosisFlowProps = {}) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswerByQuestionId, setSelectedAnswerByQuestionId] = useState<
     Record<string, DiagnosisAnswerId | undefined>
@@ -48,6 +60,13 @@ export function PreferenceDiagnosisFlow() {
 
   function handleNext() {
     if (isLastQuestion) {
+      const completedAnswers = Object.fromEntries(
+        preferenceDiagnosisQuestions.map((question) => [
+          question.id,
+          selectedAnswerByQuestionId[question.id] ?? "neutral",
+        ]),
+      ) as Record<string, DiagnosisAnswerId>;
+      onComplete?.(completedAnswers);
       setIsSummaryVisible(true);
       return;
     }
@@ -114,6 +133,8 @@ export function PreferenceDiagnosisFlow() {
             selectedAnswerByQuestionId={selectedAnswerByQuestionId}
           />
           <CoreV1RecommendationPanel
+            disabled={isRecommendationDisabled}
+            onRecommendationComplete={onRecommendationComplete}
             selectedAnswerByQuestionId={selectedAnswerByQuestionId}
           />
           <div className="diagnosis-actions">
@@ -124,6 +145,15 @@ export function PreferenceDiagnosisFlow() {
             >
               前へ
             </button>
+            {onOpenProductJudgement ? (
+              <button
+                className="diagnosis-primary-button"
+                onClick={onOpenProductJudgement}
+                type="button"
+              >
+                この好みを使って商品判断へ
+              </button>
+            ) : null}
           </div>
         </>
       )}

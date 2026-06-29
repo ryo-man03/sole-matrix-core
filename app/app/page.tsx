@@ -6,11 +6,13 @@ export default function ProductAppPage() {
   return (
     <AppShell>
       <MainContainer labelledBy="product-app-title">
+        <a className="back-home-link" href="/">← ホームに戻る</a>
         <header className="product-app-heading">
-          <p className="home-kicker">SOLE//MATRIX / PRODUCT BETA</p>
-          <h1 id="product-app-title">迷っている一足を、判断できる材料に。</h1>
+          <p className="home-kicker">SOLE//MATRIX / WORKSPACE</p>
+          <h1 id="product-app-title">今日は何をしますか？</h1>
           <p>
-            ゲストでも1回の診断を試せます。ログインは必須ではありません。
+            好みを整理する診断と、気になる一足の購入判断を分けて進めます。
+            選んだ機能だけが画面に表示されます。
           </p>
         </header>
         <ProductSessionBoundary />

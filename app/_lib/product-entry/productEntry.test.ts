@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import ProductAppPage from "../../app/page";
 import LoginPage, { productEntryActions } from "../../login/page";
+import HomePage from "../../page";
 
 describe("product entry", () => {
   it("renders login, signup, guest entry, and the storage explanation", () => {
@@ -24,9 +25,18 @@ describe("product entry", () => {
     );
 
     expect(guestAction?.href).toBe("/app?session=guest");
-    expect(loginAction?.href).toBe("/login?intent=login");
+    expect(loginAction?.status).toBe("preparing");
     expect(renderToStaticMarkup(createElement(ProductAppPage))).toContain(
-      "ログインは必須ではありません",
+      "今日は何をしますか？",
     );
+  });
+
+  it("keeps the home page as a landing page with a login CTA", () => {
+    const html = renderToStaticMarkup(createElement(HomePage));
+
+    expect(html).toContain('href="/login"');
+    expect(html).toContain("はじめる");
+    expect(html).not.toContain("recommendation-workspace");
+    expect(html).not.toContain("preference-diagnosis-section");
   });
 });

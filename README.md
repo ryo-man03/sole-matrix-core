@@ -6,39 +6,28 @@
 
 [Release Notes v1.1.1 Draft](docs/releases/v1.1.1.md) · [Release Notes v1.1.0](docs/releases/v1.1.0.md) · [Release Notes v1.0.0](docs/releases/v1.0.0.md) · [Architecture](docs/core-v1-architecture.md) · [Security](docs/security/all-in-one-security.md)
 
-SOLE//MATRIX は、自分の好みをまだ言語化しきれない人が、スニーカー選びの軸を作るための判断支援プロダクトです。ログイン相当またはゲストで開始し、初回設定、8問診断、Ryo Mode / Balanced Mode、満足度feedbackをPC・mobileの同じ導線で扱います。
+SOLE//MATRIX は、自分の好みをまだ言語化しきれない人が、スニーカー選びの軸を作るための判断支援プロダクトです。`/` → `/login` → `/app`の順に進み、現在利用できるゲスト入口から、8問診断または一足の商品判断を選びます。ログインと新規登録は本番認証前の準備中UIです。
 
 最終的なscoreとDecisionはTypeScript Coreだけが決定します。Rakuten listing、Gemini画像分析、Gemini URL Context、共通feedback corpusは外部証拠として別表示され、Coreの候補・budgetFit・Decisionを変更しません。外部APIが失敗してもlocal候補とrule-based explanationへfallbackします。
 
 ## Product Preview
 
-### Top Screen
+### PC
 
-![SOLE//MATRIX all-in-one PC workspace](docs/screenshots/all-in-one-top.png)
+![PC home](docs/screenshots/flow-pc-01-home.png)
+![PC diagnosis result with URL](docs/screenshots/flow-pc-04-diagnosis-result-url.png)
 
-<table>
-  <tr>
-    <th>Diagnosis</th>
-    <th>Recommendation Result</th>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/all-in-one-inputs.png" alt="Eight-question diagnosis and sneaker inputs" width="100%"></td>
-    <td><img src="docs/screenshots/all-in-one-recommendation.png" alt="TypeScript-controlled recommendation result" width="100%"></td>
-  </tr>
-  <tr>
-    <th>Gemini Explanation</th>
-    <th>Rakuten Readiness</th>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/core-v1-recommendation-result.png" alt="Structured Gemini explanation after Core scoring" width="100%"></td>
-    <td><img src="docs/screenshots/core-v1-readiness-feedback.png" alt="Gemini and Rakuten provider readiness" width="100%"></td>
-  </tr>
-</table>
+### Mobile
+
+![Mobile mode select](docs/screenshots/flow-mobile-03-mode-select.png)
+![Mobile product judgment with URL](docs/screenshots/flow-mobile-05-product-judgment-url.png)
+
+10画面の導線証跡と各画面の役割は[Screen Flow](docs/product/SCREEN_FLOW.md)にまとめています。
 
 ## 主な機能
 
 - 8問回答を`PreferenceVector`の8軸へ変換
-- `/login`、`/app`、`/onboarding`、`/settings`のproduct entry flow
+- `/` → `/login` → `/app`のproduct entry flowと、アプリ内モード選択
 - mobile 1カラムからPC 3カラムまでのresponsive workspace
 - guest 1回診断とlogin相当sessionの保存境界
 - `Ryo Mode`と`Balanced Mode`の切り替え
@@ -50,23 +39,30 @@ SOLE//MATRIX は、自分の好みをまだ言語化しきれない人が、ス�
 - 所有・wishlistと分離したRyo Mode curated recommendation seed
 - Rakuten listingのserver-side取得、正規化、external evidence表示
 - 推薦後にlive確認した外部商品・検索リンクの一時表示
+- 8問診断後のおすすめモデル名と安全確認済み参考リンク
 - 保存しない手動商品URLの安全確認
 - Gemini structured explanationまたはrule-based fallback
 
 ## 判断の流れ
 
 ```text
-login相当 / guest → 初回設定 → 8問診断
+/ → /login → guest → /appで利用目的を選択
+
+8問診断
+  → 8問を一問ずつ回答
   → user memory（untrusted user data）+ Ryo seed
   → local候補
   → Core v1 Balanced / Ryo score
   → mode evaluatorが最終Decision
   → Gemini explanation または rule-based fallback
+  → 推薦モデル名をproduct-links resolverへ渡す
+  → verified direct URLまたは「検索リンク」を参考情報として表示
 
-名前 / URL / 画像 / Rakuten / 匿名feedback corpus
+商品判断（名前 / URL / 画像 / 予算）
   → external evidenceとして正規化
   → readiness・confidence・warningと共に別panelへ表示
   → Core候補・score・budgetFit・Decisionには不介入
+  → 推薦結果後に商品参考リンクを表示
 
 推薦商品名 / 検証済みRakuten listing URL
   → server-sideでpublic HTTP/HTTPS、redirect、HTTP statusをlive確認
@@ -89,11 +85,11 @@ Ryo Modeは林諒馬の実所有41足、重複行を統合したwishlist 40候�
 
 ### How users start
 
-トップから`/login`へ進み、login相当sessionまたはguestを選びます。初回は`/onboarding`の6ステップで安全な好みhintを作り、`/app`で診断を開始します。guestはbrowser内で1回診断でき、個人memoryは永続化しません。
+トップから`/login`へ進み、現在利用できるguestを選びます。`/app?session=guest`では、8問診断と商品・URL・画像からの購入判断を最初に分けて選択します。選択後は該当機能だけを表示し、モード選択とホームへ戻れます。guestはbrowser内で8問診断または商品判断のどちらかを1回実行でき、個人memoryは永続化しません。`/onboarding`は任意の好みhint作成画面です。
 
 ### Login / Guest mode
 
-現段階のloginはSupabase接続を想定したUI・session境界であり、本番認証そのものではありません。guest識別子と診断済みflagはlocalStorage、onboardingの一時hintはsessionStorageに限定します。`/settings`からlogout、guest data削除、将来のaccount削除方針を確認できます。
+ログインと新規登録はSupabase接続を想定した準備中UIであり、操作できる本番認証ではありません。guest識別子と診断済みflagはlocalStorage、onboardingの一時hintはsessionStorageに限定します。`/settings`からlogout、guest data削除、将来のaccount削除方針を確認できます。
 
 ### Responsive UI
 
@@ -249,7 +245,9 @@ Remove-Item Env:RUN_EXTERNAL_SMOKE -ErrorAction SilentlyContinue
 ## 主なディレクトリ
 
 ```text
-app/_components/RecommendationWorkspace.tsx   PC版統合UI
+app/_components/RecommendationWorkspace.tsx   商品・URL・画像判断workspace
+app/_components/ProductSessionBoundary.tsx    session / モード選択境界
+app/_components/PreferenceDiagnosisFlow.tsx   独立した8問診断
 app/_lib/core-v1/                             score / Decision / providers
 app/_lib/url-analysis/                        safe URL analysis
 app/_lib/product-links/                       live URL verification / resolver
@@ -271,27 +269,32 @@ data/recommendation-feedback/                 ignored runtime corpus + synthetic
 
 ## 画面証跡
 
-Phase 9 / 10で更新するPC版証跡:
+PC 1440pxとmobile 390pxで、ホーム、入口、モード選択、8問診断結果、商品判断結果を`docs/screenshots/flow-*.png`へ保存しています。詳細は[Screen Flow](docs/product/SCREEN_FLOW.md)を参照してください。既存Core v1の過去証跡も`docs/screenshots/`に残しています。
 
-- `docs/screenshots/all-in-one-top.png`
-- `docs/screenshots/all-in-one-balanced-mode.png`
-- `docs/screenshots/all-in-one-inputs.png`
-- `docs/screenshots/all-in-one-recommendation.png`
-- `docs/screenshots/all-in-one-user-memory.png`
-- `docs/screenshots/all-in-one-ryo-image.png`
+## できること
 
-既存Core v1の証跡も`docs/screenshots/`に残しています。
+- ログイン / 新規登録 / ゲストの入口状態を確認し、ゲストで開始する
+- 8問診断で好みを整理し、おすすめモデル名と商品参考リンクを確認する
+- 商品名・URL・画像・予算から購入判断材料を整理する
+- 入力URLを外部参考情報として扱い、metadata・confidence・warningを確認する
+- 直接商品URLを確認できない場合、「検索リンク」と明記したfallbackを使う
+- Core Decision / score / budgetFitと外部証拠を分離する
 
-## 制限
+## できないこと・制限
 
-- login相当UIとsession境界は本番認証ではありません
-- Supabase接続とaccount削除は将来実装のplaceholderです
-- Rakuten listingは在庫・真贋・市場価格を保証せず、Coreの推薦候補ではありません
-- 商品参考リンクは購入先、在庫、最安値、価格、サイズを保証しません
-- 全商品に直接商品URLが見つかることは保証せず、検索fallbackを明記します
-- 画像からのbrand / model名は推定であり、真贋判定ではありません
+- ログイン / 新規登録の本番認証とaccount削除は未実装です
+- 価格比較、在庫・サイズ確認、最安値、購入可能性を保証しません
+- 真贋判定は行いません
+- 全商品に直接商品URLが見つかることは保証しません
+- Rakuten listing、Gemini、AI説明、外部URLはCore判断を直接決定しません
 - 別server化は境界までで、現在はNext.js process内です
-- Core v0.1 / v1の既存API、CLI、golden testsは維持しています
+
+## 今後の発展
+
+- Supabase等による本番認証とユーザー別診断履歴
+- 楽天以外の正式providerと、安全な価格推移・在庫・サイズ情報
+- おすすめモデルURLと画像分析の精度向上
+- スマホ導線の短縮と発表用デモモード
 
 ```bash
 pnpm demo

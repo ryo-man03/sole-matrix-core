@@ -53,6 +53,7 @@ const modeDecisionLabels: Record<
 
 type RecommendationWorkspaceProps = {
   authState?: AuthState;
+  diagnosisAnswers?: Record<string, DiagnosisAnswerId> | null;
   onGuestDiagnosisCompleted?: () => void;
   onUserSession?: (session: UserSession) => void;
   onboardingHint?: OnboardingPreferenceHint | null;
@@ -61,6 +62,7 @@ type RecommendationWorkspaceProps = {
 
 export function RecommendationWorkspace({
   authState = { status: "signed_out" },
+  diagnosisAnswers = null,
   onGuestDiagnosisCompleted,
   onUserSession,
   onboardingHint = null,
@@ -76,8 +78,9 @@ export function RecommendationWorkspace({
   const [currentUser, setCurrentUser] = useState<UserMemorySummary | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, DiagnosisAnswerId>>({});
+  const [answers, setAnswers] = useState<Record<string, DiagnosisAnswerId>>(() =>
+    diagnosisAnswers ?? createNeutralDiagnosisAnswers(),
+  );
   const [result, setResult] = useState<IntegratedRecommendationResult | null>(null);
   const [productLinks, setProductLinks] = useState<LiveProductUrl[]>([]);
   const [isResolvingProductLinks, setIsResolvingProductLinks] = useState(false);
@@ -92,12 +95,11 @@ export function RecommendationWorkspace({
   const [guestFeedbackSaved, setGuestFeedbackSaved] = useState(false);
   const [isSavingFeedback, setIsSavingFeedback] = useState(false);
   const [workspaceStatus, setWorkspaceStatus] = useState(
-    "候補情報と8問診断を入力してください。画像とURLは任意です。",
+    "商品名・URL・画像のいずれかを入力してください。予算は任意です。",
   );
   const productLinkRequestGateRef = useRef(createLatestRequestGate());
 
   const selectedMode = workspaceModes.find((item) => item.id === mode)!;
-  const currentQuestion = preferenceDiagnosisQuestions[currentQuestionIndex]!;
   const answeredCount = Object.keys(answers).length;
   const allQuestionsAnswered = answeredCount === preferenceDiagnosisQuestions.length;
   const allCautions = useMemo(
@@ -118,6 +120,10 @@ export function RecommendationWorkspace({
       );
     }
   }, [onboardingHint]);
+
+  useEffect(() => {
+    setAnswers(diagnosisAnswers ?? createNeutralDiagnosisAnswers());
+  }, [diagnosisAnswers]);
 
   useEffect(() => {
     return () => {
@@ -166,10 +172,12 @@ export function RecommendationWorkspace({
     setProductLinksMessage("推薦結果の確定後に参考リンクを確認します。");
     setGuestFeedbackSaved(false);
     setWorkspaceStatus("URLと画像を安全に分析しています…");
+    const requestedProductUrl = productUrl.trim();
+    if (requestedProductUrl) setProductUrl("");
     try {
       const analysisResponse = await analyzeSneakerApi({
         ...(sneakerName.trim() ? { sneakerName: sneakerName.trim() } : {}),
-        ...(productUrl.trim() ? { url: productUrl.trim() } : {}),
+        ...(requestedProductUrl ? { url: requestedProductUrl } : {}),
         ...(imageFile ? { image: imageFile } : {}),
       });
       if (!analysisResponse.ok) {
@@ -259,6 +267,7 @@ export function RecommendationWorkspace({
     }
     const requestId = productLinkRequestGateRef.current.beginRequest();
     setIsResolvingManualUrl(true);
+    setManualProductUrl("");
     setProductLinksMessage("手動URLの安全性と存在を確認しています…");
     try {
       const response = await resolveManualProductLink(input);
@@ -275,7 +284,6 @@ export function RecommendationWorkspace({
         ...current.filter((link) => link.href !== response.data.links[0]!.href),
         response.data.links[0]!,
       ]);
-      setManualProductUrl("");
       setProductLinksMessage(response.data.message);
     } finally {
       if (productLinkRequestGateRef.current.isCurrent(requestId)) {
@@ -461,13 +469,12 @@ export function RecommendationWorkspace({
 
       <p className="workspace-status" aria-live="polite">{workspaceStatus}</p>
 
-      <nav className="mobile-workspace-steps" aria-label="スマホ診断ステップ">
+      <nav className="mobile-workspace-steps" aria-label="スマホ商品判断ステップ">
         <a href="#mobile-step-1"><span>1</span>入力</a>
-        <a href="#mobile-step-2"><span>2</span>好み</a>
-        <a href="#mobile-step-3"><span>3</span>画像 / URL</a>
-        <a href="#mobile-step-4"><span>4</span>推薦結果</a>
-        <a href="#mobile-step-5"><span>5</span>理由 / 証拠</a>
-        <a href="#mobile-step-6"><span>6</span>保存 / 評価</a>
+        <a href="#mobile-step-2"><span>2</span>画像 / URL</a>
+        <a href="#mobile-step-3"><span>3</span>推薦結果</a>
+        <a href="#mobile-step-4"><span>4</span>理由 / 証拠</a>
+        <a href="#mobile-step-5"><span>5</span>保存 / 評価</a>
       </nav>
 
       <div className="workspace-grid desktop-workspace-layout">
@@ -475,7 +482,7 @@ export function RecommendationWorkspace({
           <div className="workspace-panel-heading">
             <span>01 / INPUT</span>
             <h3 id="workspace-input-title">入力エリア</h3>
-            <p>診断と候補情報を、無理のない順番で集めます。</p>
+            <p>気になる一足の情報を、無理のない順番で集めます。</p>
           </div>
 
           <div className="mobile-step-section" data-mobile-step="1" id="mobile-step-1">
@@ -484,46 +491,19 @@ export function RecommendationWorkspace({
               <label><span>スニーカー名</span><input onChange={(event) => setSneakerName(event.target.value)} placeholder="例: adidas Samba OG" type="text" value={sneakerName} /></label>
               <label><span>予算</span><input inputMode="numeric" min="1" onChange={(event) => setBudgetText(event.target.value)} placeholder="例: 20000" type="number" value={budgetText} /></label>
             </div>
+            <p className="workspace-preference-context">
+              <strong>好みの参照:</strong>{" "}
+              {diagnosisAnswers
+                ? "このセッションの8問診断結果を使用します。"
+                : "診断結果がないため、中立回答をCore入力として使用します。"}
+              外部URLはこの好みやCore scoreを上書きしません。
+            </p>
           </div>
 
           <div className="mobile-step-section" data-mobile-step="2" id="mobile-step-2">
-            <p className="mobile-step-label">Step 2 / 好みタグ</p>
-            <div className="diagnosis-entry-row">
-              <div><strong>8問診断</strong><span>好みをPreferenceVectorへ変換</span></div>
-              <span className="workspace-chip">{answeredCount} / 8</span>
-            </div>
-
-            <div className="workspace-diagnosis-card">
-              <div className="workspace-question-meta">
-                <span>Q{currentQuestionIndex + 1}</span>
-                <strong>{currentQuestionIndex + 1} / 8</strong>
-              </div>
-              <p>{currentQuestion.question}</p>
-              <small>{currentQuestion.helperText}</small>
-              <div className="workspace-answer-buttons" role="group" aria-label={`${currentQuestion.question}への回答`}>
-                {currentQuestion.options.map((option) => (
-                  <button
-                    aria-pressed={answers[currentQuestion.id] === option.id}
-                    data-selected={answers[currentQuestion.id] === option.id}
-                    key={option.id}
-                    onClick={() => setAnswers((current) => ({ ...current, [currentQuestion.id]: option.id }))}
-                    type="button"
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-              <div className="workspace-question-nav">
-                <button disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex((index) => Math.max(0, index - 1))} type="button">前へ</button>
-                <button disabled={currentQuestionIndex === 7} onClick={() => setCurrentQuestionIndex((index) => Math.min(7, index + 1))} type="button">次へ</button>
-              </div>
-            </div>
-          </div>
-
-          <div className="mobile-step-section" data-mobile-step="3" id="mobile-step-3">
-            <p className="mobile-step-label">Step 3 / 画像・URL</p>
+            <p className="mobile-step-label">Step 2 / 画像・URL</p>
             <div className="workspace-fields workspace-evidence-fields">
-              <label><span>商品URL</span><input inputMode="url" onChange={(event) => setProductUrl(event.target.value)} placeholder="https://example.com/item" type="url" value={productUrl} /><small>server-sideでprivate IPと危険schemeを遮断します。</small></label>
+              <label><span>商品URL</span><input inputMode="url" onChange={(event) => setProductUrl(event.target.value)} placeholder="https://example.com/item" type="url" value={productUrl} /><small>外部参考情報として確認し、private IP・危険scheme・credential入りURLをserver-sideで拒否します。raw URLは保存しません。</small></label>
               <div className="workspace-image-field">
                 <label><span>画像アップロード</span><input accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} type="file" /><small>{imageFile ? `${imageFile.name} / ${formatFileSize(imageFile.size)}` : "JPEG / PNG / WebP・5MBまで"}</small></label>
                 <button onClick={handleUseDemoImage} type="button">サンプル画像を使う</button>
@@ -553,8 +533,8 @@ export function RecommendationWorkspace({
           </button>
         </section>
 
-        <section aria-labelledby="workspace-result-title" className="workspace-panel workspace-result-panel" data-mobile-step="4" id="mobile-step-4">
-          <p className="mobile-step-label">Step 4 / 推薦結果</p>
+        <section aria-labelledby="workspace-result-title" className="workspace-panel workspace-result-panel" data-mobile-step="3" id="mobile-step-3">
+          <p className="mobile-step-label">Step 3 / 推薦結果</p>
           <div className="workspace-panel-heading">
             <span>02 / RESULT</span><h3 id="workspace-result-title">解析・推薦結果</h3><p>{selectedMode.label}の観点を選択中です。</p>
           </div>
@@ -586,8 +566,8 @@ export function RecommendationWorkspace({
             {result?.analysis.visualAnalysis ? <div><dt>Image analysis</dt><dd>{[result.analysis.visualAnalysis.detectedBrand, result.analysis.visualAnalysis.detectedModelName, ...result.analysis.visualAnalysis.mainColors].filter(Boolean).join(" / ") || "特徴を特定できませんでした"}</dd></div> : null}
           </dl>
 
-          <div className="workspace-external-evidence-step" data-mobile-step="5" id="mobile-step-5">
-            <p className="mobile-step-label">Step 5 / 理由・外部証拠</p>
+          <div className="workspace-external-evidence-step" data-mobile-step="4" id="mobile-step-4">
+            <p className="mobile-step-label">Step 4 / 理由・外部証拠</p>
             <ExternalEvidencePanel
               isProductLinksLoading={isResolvingProductLinks}
               isResolvingManualUrl={isResolvingManualUrl}
@@ -601,14 +581,22 @@ export function RecommendationWorkspace({
           </div>
         </section>
 
-        <aside aria-labelledby="workspace-user-title" className="workspace-panel workspace-user-panel" data-mobile-step="6" id="mobile-step-6">
-          <p className="mobile-step-label">Step 6 / 保存・フィードバック</p>
-          <div className="workspace-panel-heading"><span>03 / USER</span><h3 id="workspace-user-title">ユーザー情報</h3><p>好みと判断履歴を、ユーザーごとに育てます。</p></div>
-          <div className="workspace-fields workspace-user-fields">
-            <label><span>ユーザーID</span><input autoComplete="username" onChange={(event) => setUserId(event.target.value)} placeholder="ryo_01" type="text" value={userId} /></label>
-            <label><span>表示名</span><input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} placeholder="Ryo" type="text" value={displayName} /></label>
-          </div>
-          <button className="workspace-secondary-button" disabled={isRegistering} onClick={handleRegisterUser} type="button">{isRegistering ? "登録中…" : "ユーザーを登録する"}</button>
+        <aside aria-labelledby="workspace-user-title" className="workspace-panel workspace-user-panel" data-mobile-step="5" id="mobile-step-5">
+          <p className="mobile-step-label">Step 5 / 保存・フィードバック</p>
+          <div className="workspace-panel-heading"><span>03 / FEEDBACK</span><h3 id="workspace-user-title">保存と評価</h3><p>ゲスト入力は個人履歴として保存しません。</p></div>
+          {authState.status !== "guest" ? (
+            <>
+              <div className="workspace-fields workspace-user-fields">
+                <label><span>ユーザーID</span><input autoComplete="username" onChange={(event) => setUserId(event.target.value)} placeholder="ryo_01" type="text" value={userId} /></label>
+                <label><span>表示名</span><input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} placeholder="Ryo" type="text" value={displayName} /></label>
+              </div>
+              <button className="workspace-secondary-button" disabled={isRegistering} onClick={handleRegisterUser} type="button">{isRegistering ? "登録中…" : "プロトタイプユーザーを登録する"}</button>
+            </>
+          ) : (
+            <p className="workspace-preference-context">
+              ゲストの入力商品URL・画像・診断履歴は個人memoryへ保存しません。
+            </p>
+          )}
 
           <div className="workspace-user-summary"><span>現在のユーザー</span><strong>{currentUser ? `${currentUser.profile.displayName} / ${currentUser.profile.userId}` : "未登録"}</strong></div>
           <div className="workspace-memory-preview">
@@ -672,6 +660,12 @@ function formatFileSize(bytes: number): string {
 
 function formatYen(value: number): string {
   return new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(value);
+}
+
+function createNeutralDiagnosisAnswers(): Record<string, DiagnosisAnswerId> {
+  return Object.fromEntries(
+    preferenceDiagnosisQuestions.map((question) => [question.id, "neutral"]),
+  ) as Record<string, DiagnosisAnswerId>;
 }
 
 async function createDemoSneakerFile(): Promise<File> {

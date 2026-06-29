@@ -2,42 +2,65 @@ import { AppShell } from "../_components/AppShell";
 import { MainContainer } from "../_components/MainContainer";
 
 export const productEntryActions = [
-  { href: "/login?intent=login", label: "ログイン", kind: "primary" },
-  { href: "/login?intent=signup", label: "新規登録", kind: "secondary" },
-  { href: "/app?session=guest", label: "ゲストで試す", kind: "guest" },
+  { label: "ログイン", kind: "primary", status: "preparing" },
+  { label: "新規登録", kind: "secondary", status: "preparing" },
+  {
+    href: "/app?session=guest",
+    label: "ゲストで試す",
+    kind: "guest",
+    status: "available",
+  },
 ] as const;
 
 export default function LoginPage() {
   return (
     <AppShell>
       <MainContainer labelledBy="product-entry-title">
+        <a className="back-home-link" href="/">← ホームに戻る</a>
         <section className="product-entry" data-provider-optional="true">
           <div className="product-entry-copy">
-            <p className="product-entry-kicker">SOLE//MATRIX</p>
-            <h1 id="product-entry-title">
-              スニーカー選びを、好み・予算・手持ち・画像・URLから整理する。
-            </h1>
+            <p className="product-entry-kicker">SOLE//MATRIX / ENTRY</p>
+            <h1 id="product-entry-title">利用方法を選ぶ</h1>
             <p>
-              買うか迷っている一足を、8つの質問と外部の参考情報から整理します。ログインは必須ではありません。
+              現在はゲストとして、8問の好み診断と一足の購入判断を試せます。
+              入力した商品URLや画像は個人履歴として保存しません。
             </p>
           </div>
 
           <div className="product-entry-panel" aria-label="利用方法を選択">
             <div className="product-entry-actions">
-              {productEntryActions.map((action) => (
-                <a
-                  className="product-entry-action"
-                  data-kind={action.kind}
-                  href={action.href}
-                  key={action.label}
-                >
-                  {action.label}
-                  <span aria-hidden="true">→</span>
-                </a>
-              ))}
+              {productEntryActions.map((action) =>
+                action.status === "available" ? (
+                  <a
+                    className="product-entry-action"
+                    data-kind={action.kind}
+                    href={action.href}
+                    key={action.label}
+                  >
+                    <span>
+                      <strong>{action.label}</strong>
+                      <small>保存なしで1回試せます</small>
+                    </span>
+                    <span aria-hidden="true">→</span>
+                  </a>
+                ) : (
+                  <div
+                    className="product-entry-action"
+                    data-availability="preparing"
+                    data-kind={action.kind}
+                    key={action.label}
+                  >
+                    <span>
+                      <strong>{action.label}</strong>
+                      <small>認証連携を準備中</small>
+                    </span>
+                    <span className="product-entry-badge">準備中</span>
+                  </div>
+                ),
+              )}
             </div>
             <p className="product-entry-provider-note">
-              認証サービスの設定がない環境でも、ゲスト診断は利用できます。ログインと新規登録は現在準備中です。
+              ログインと新規登録は本番認証の設定前です。利用可能な機能として誤認されないよう、現在は操作できません。
             </p>
           </div>
 
@@ -45,9 +68,9 @@ export default function LoginPage() {
             <p className="product-entry-kicker">Data policy</p>
             <h2 id="storage-title">保存される情報</h2>
             <ul>
-              <li>ゲスト: 診断履歴や個人を特定できる情報は保存しません。</li>
-              <li>ログインユーザー: 好み、診断履歴、推薦への評価を本人の記録として保存できます。</li>
-              <li>画像、外部APIの生レスポンス、APIキーは保存しません。</li>
+              <li>ゲストの診断履歴と入力した商品URLは個人データとして保存しません。</li>
+              <li>推薦への評価は、URLなどを除去した匿名の参考パターンとして扱います。</li>
+              <li>画像、外部APIの生レスポンス、APIキーは保存・表示しません。</li>
             </ul>
           </aside>
         </section>

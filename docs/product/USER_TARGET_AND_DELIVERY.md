@@ -17,15 +17,15 @@ SOLE//MATRIX answers those problems with an explicit preference vector, determin
 
 ## Start and return flow
 
-1. Enter through the product home and `/login`.
-2. Choose the login-equivalent path or a one-diagnosis guest session.
-3. Complete the six-step `/onboarding` flow when a temporary preference hint is useful.
-4. Run the eight-question diagnosis in `/app`.
-5. Review the Core recommendation and external evidence as separate outputs.
-6. Record one of three satisfaction states and an optional reason.
+1. Enter through the landing-only `/` and continue to `/login`.
+2. Use the guest entry; login and signup remain clearly disabled until production authentication exists.
+3. In `/app?session=guest`, choose either the standalone eight-question diagnosis or product judgment.
+4. In diagnosis mode, answer eight questions and review the recommended model plus a verified direct URL or labeled search fallback.
+5. In product mode, provide a name, URL, image, or budget and review Core output separately from external evidence.
+6. Return to mode selection or home from either flow. Use `/onboarding` only when a temporary preference hint is useful.
 7. Review storage and deletion boundaries in `/settings`.
 
-Guest state is limited to browser storage and never creates personal `memory.md` data. The login-equivalent path can use the existing local profile and memory boundary, but it is not production authentication. Supabase environment placeholders document the intended next integration without exposing a secret to the browser.
+Guest state is limited to browser storage and never creates personal `memory.md` data. Login and signup are preparation-only UI, not production authentication. Supabase environment placeholders document the intended next integration without exposing a secret to the browser.
 
 ## Responsive delivery
 
@@ -43,4 +43,4 @@ The UI shows the domain, source, verification status, and `verifiedAt`. It expli
 
 ## Beta delivery status
 
-This beta includes the entry flow, guest and login-equivalent session boundary, onboarding, responsive workspace, satisfaction feedback, anonymized global corpus, Ryo curated seed, external evidence panel, transient live product reference links, settings, tests, and documentation. It does not promise price comparison, inventory, size availability, or a direct product page for every model. Production authentication, durable hosted storage, account deletion, provider credentials, and operational monitoring remain deployment work rather than completed product capabilities.
+This beta includes the landing and entry flow, guest session boundary, separate diagnosis and product modes, onboarding, responsive workspace, satisfaction feedback, anonymized global corpus, Ryo curated seed, external evidence panel, transient live product reference links, settings, tests, and documentation. It does not promise price comparison, inventory, size availability, or a direct product page for every model. Production authentication, durable hosted storage, account deletion, provider credentials, and operational monitoring remain deployment work rather than completed product capabilities.

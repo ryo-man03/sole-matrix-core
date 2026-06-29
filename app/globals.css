@@ -23,6 +23,16 @@ body {
   background: #f8f7f3;
 }
 
+.back-home-link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 28px;
+  color: #40546c;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
 .product-entry {
   width: 100%;
   min-width: 0;
@@ -93,6 +103,33 @@ body {
   color: #17202b;
   font-weight: 800;
   text-decoration: none;
+}
+
+.product-entry-action > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.product-entry-action small {
+  color: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  opacity: 0.76;
+}
+
+.product-entry-action[data-availability="preparing"] {
+  background: #eceae4;
+  color: #6b7078;
+  cursor: not-allowed;
+}
+
+.product-entry-badge {
+  flex: 0 0 auto;
+  border: 1px solid rgba(35, 43, 55, 0.15);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.68rem;
 }
 
 .product-entry-action[data-kind="primary"] {
@@ -404,6 +441,154 @@ body {
 
 .home-hero {
   max-width: 680px;
+}
+
+.home-hero--landing {
+  padding: clamp(20px, 5vw, 56px) 0;
+}
+
+.section-heading h2,
+.prototype-boundary h2,
+.experience-selector-heading h2 {
+  margin: 8px 0 0;
+  color: #11151b;
+  font-size: clamp(1.65rem, 4vw, 2.5rem);
+  line-height: 1.15;
+}
+
+.prototype-boundary {
+  margin-top: 32px;
+  border: 1px solid rgba(35, 43, 55, 0.14);
+  border-radius: 14px;
+  background: #fffefa;
+  padding: 24px;
+}
+
+.prototype-boundary > p:last-child {
+  margin: 14px 0 0;
+  color: #4d5764;
+  line-height: 1.75;
+}
+
+.experience-selector,
+.experience-flow {
+  min-width: 0;
+  margin-top: 32px;
+}
+
+.experience-selector-heading > p:last-child {
+  margin: 12px 0 0;
+  color: #566070;
+  line-height: 1.7;
+}
+
+.experience-context-note,
+.workspace-preference-context {
+  margin: 18px 0 0;
+  border-left: 3px solid #40546c;
+  background: #f3f0e9;
+  padding: 11px 13px;
+  color: #4d5764;
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.experience-mode-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.experience-mode-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(35, 43, 55, 0.14);
+  border-radius: 14px;
+  background: #fffefa;
+  padding: 22px;
+}
+
+.experience-mode-card > p {
+  margin: 0;
+  color: #6b4f32;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.experience-mode-card h3 {
+  margin: 12px 0 0;
+  color: #17202b;
+  font-size: 1.25rem;
+}
+
+.experience-mode-card > span,
+.experience-mode-card li {
+  color: #566070;
+  font-size: 0.84rem;
+  line-height: 1.65;
+}
+
+.experience-mode-card > span {
+  display: block;
+  margin-top: 10px;
+}
+
+.experience-mode-card ul {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0 22px;
+  padding-left: 20px;
+}
+
+.experience-mode-card button,
+.experience-flow-nav button,
+.experience-flow-nav a {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #17202b;
+  border-radius: 9px;
+  background: #17202b;
+  padding: 0 14px;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.experience-mode-card button {
+  width: 100%;
+  margin-top: auto;
+}
+
+.experience-flow-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.experience-flow-nav a {
+  border-color: rgba(35, 43, 55, 0.18);
+  background: #ffffff;
+  color: #40546c;
+}
+
+.diagnosis-product-links {
+  margin-top: 20px;
+  border-top: 1px solid rgba(35, 43, 55, 0.12);
+  padding-top: 20px;
+}
+
+.diagnosis-product-links h4 {
+  margin: 8px 0 0;
+  color: #17202b;
+  font-size: 1.12rem;
 }
 
 .home-kicker {
@@ -2366,6 +2551,10 @@ h1 {
     gap: 18px;
   }
 
+  .experience-mode-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .home-entry-card {
     padding: 28px;
   }
@@ -2804,4 +2993,18 @@ h1 {
   background: #e8e6df;
   color: #858b94;
   cursor: not-allowed;
+}
+
+.workspace-image-field button,
+.workspace-feedback-form button,
+.guest-upgrade-callout a,
+.product-link-list a,
+.manual-product-link button {
+  min-height: 44px;
+}
+
+.guest-upgrade-callout a {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
 }

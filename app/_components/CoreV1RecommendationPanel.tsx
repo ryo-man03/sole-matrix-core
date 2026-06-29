@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { DiagnosisAnswerId } from "../_data/preferenceDiagnosisQuestions";
 import type {
@@ -8,8 +8,14 @@ import type {
   PreferenceVector,
   RecommendationResult,
 } from "../_lib/core-v1/types";
+import { resolveRecommendationProductLinks } from "../_lib/apiClient";
+import type { LiveProductUrl } from "../_lib/product-links/types";
+import { ProductReferenceLinks } from "./ProductReferenceLinks";
+import { createLatestRequestGate } from "./productLinkResolution";
 
 type CoreV1RecommendationPanelProps = {
+  disabled?: boolean;
+  onRecommendationComplete?: (() => void) | undefined;
   selectedAnswerByQuestionId: Record<
     string,
     DiagnosisAnswerId | undefined
@@ -56,6 +62,8 @@ const candidateSourceLabels: Record<
 };
 
 export function CoreV1RecommendationPanel({
+  disabled = false,
+  onRecommendationComplete,
   selectedAnswerByQuestionId,
 }: CoreV1RecommendationPanelProps) {
   const [budgetText, setBudgetText] = useState("");
@@ -66,6 +74,16 @@ export function CoreV1RecommendationPanel({
   const [feedbackState, setFeedbackState] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
+  const [productLinks, setProductLinks] = useState<LiveProductUrl[]>([]);
+  const [productLinksMessage, setProductLinksMessage] = useState(
+    "推薦結果の確定後に参考リンクを確認します。",
+  );
+  const [isResolvingProductLinks, setIsResolvingProductLinks] = useState(false);
+  const productLinkRequestGateRef = useRef(createLatestRequestGate());
+
+  useEffect(() => {
+    return () => productLinkRequestGateRef.current.invalidate();
+  }, []);
 
   async function handleRecommend() {
     const budgetYen = normalizeBudget(budgetText);
@@ -78,6 +96,9 @@ export function CoreV1RecommendationPanel({
     setIsLoading(true);
     setErrorMessage("");
     setFeedbackState("idle");
+    productLinkRequestGateRef.current.invalidate();
+    setProductLinks([]);
+    setProductLinksMessage("推薦結果の確定後に参考リンクを確認します。");
 
     try {
       const response = await fetch("/api/core-v1/recommend", {
@@ -101,6 +122,8 @@ export function CoreV1RecommendationPanel({
       }
 
       setResult(payload.data);
+      onRecommendationComplete?.();
+      void loadProductLinks(payload.data);
     } catch {
       setResult(null);
       setErrorMessage(
@@ -108,6 +131,40 @@ export function CoreV1RecommendationPanel({
       );
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function loadProductLinks(recommendation: RecommendationResult) {
+    const requestId = productLinkRequestGateRef.current.beginRequest();
+    setIsResolvingProductLinks(true);
+    setProductLinksMessage("安全な参考リンクを確認しています…");
+    try {
+      const response = await resolveRecommendationProductLinks({
+        productName: recommendation.candidate.name,
+        directUrls: recommendation.candidate.url
+          ? [
+              {
+                href: recommendation.candidate.url,
+                source:
+                  recommendation.candidate.source === "rakuten"
+                    ? "rakuten"
+                    : "retailer",
+              },
+            ]
+          : [],
+      });
+      if (!productLinkRequestGateRef.current.isCurrent(requestId)) return;
+      if (!response.ok) {
+        setProductLinks([]);
+        setProductLinksMessage(response.error.message);
+        return;
+      }
+      setProductLinks(response.data.links);
+      setProductLinksMessage(response.data.message);
+    } finally {
+      if (productLinkRequestGateRef.current.isCurrent(requestId)) {
+        setIsResolvingProductLinks(false);
+      }
     }
   }
 
@@ -168,11 +225,15 @@ export function CoreV1RecommendationPanel({
 
       <button
         className="diagnosis-primary-button core-v1-submit"
-        disabled={isLoading}
+        disabled={isLoading || disabled}
         onClick={handleRecommend}
         type="button"
       >
-        {isLoading ? "候補を比較しています…" : "推薦結果を見る"}
+        {isLoading
+          ? "候補を比較しています…"
+          : disabled
+            ? "ゲスト診断は利用済み"
+            : "推薦結果を見る"}
       </button>
 
       {isLoading ? (
@@ -241,6 +302,12 @@ export function CoreV1RecommendationPanel({
               ) : null}
             </dl>
           ) : null}
+
+          <ProductReferenceLinks
+            isLoading={isResolvingProductLinks}
+            links={productLinks}
+            message={productLinksMessage}
+          />
 
           <div className="core-v1-score-grid">
             <ScoreCard
