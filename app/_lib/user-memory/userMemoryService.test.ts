@@ -79,6 +79,27 @@ describe("user memory service", () => {
     );
   });
 
+  it("never persists raw product URLs or tracking tokens", async () => {
+    const service = createUserMemoryService({ rootDir });
+    await service.registerUser({ userId: "ryo", displayName: "Ryo" });
+    await service.saveFeedback("ryo", {
+      sneakerName: "Puma Clyde MIJ",
+      mode: "ryo",
+      decision: "buy",
+      balancedScore: 74,
+      ryoScore: 88,
+      userRating: 4,
+      userComment:
+        "manual link https://shop.example/item?token=secret&utm_source=mail",
+    });
+    const memory = await readFile(path.join(rootDir, "ryo", "memory.md"), "utf8");
+
+    expect(memory).toContain("[redacted-url]");
+    expect(memory).not.toContain("https://shop.example");
+    expect(memory).not.toContain("token=secret");
+    expect(memory).not.toContain("utm_source");
+  });
+
   it("stores diagnosis notes in the diagnosis section", async () => {
     const service = createUserMemoryService({ rootDir });
     await service.registerUser({ userId: "ryo", displayName: "Ryo" });

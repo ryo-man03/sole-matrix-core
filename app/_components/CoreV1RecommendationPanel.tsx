@@ -235,9 +235,7 @@ export function CoreV1RecommendationPanel({
                 <div>
                   <dt>商品情報</dt>
                   <dd>
-                    <a href={result.candidate.url} rel="noreferrer">
-                      楽天の商品ページで確認する
-                    </a>
+                    商品URLはlive確認後の参考リンク欄でのみ表示します。
                   </dd>
                 </div>
               ) : null}

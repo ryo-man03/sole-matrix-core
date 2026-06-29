@@ -67,6 +67,8 @@ describe("global recommendation feedback corpus", () => {
         displayName: "Ryo Private",
         rawGeminiResponse: "secret raw response",
         rawRakutenResponse: "secret listing response",
+        manualProductUrl: "https://shop.example/item?token=manual-secret",
+        liveProductUrls: ["https://shop.example/live?utm_source=runtime"],
         userReason: "mail me at ryo@example.com or 090-1234-5678; https://example.com/me",
       }),
     )!;
@@ -81,6 +83,8 @@ describe("global recommendation feedback corpus", () => {
     expect(content).not.toContain("Ryo Private");
     expect(content).not.toContain("secret raw response");
     expect(content).not.toContain("secret listing response");
+    expect(content).not.toContain("manual-secret");
+    expect(content).not.toContain("utm_source=runtime");
   });
 
   it("anonymizes user feedback into the shared corpus", () => {

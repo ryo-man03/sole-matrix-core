@@ -4,7 +4,7 @@
 
 > **AI-powered sneaker recommendation platform.** Diagnosis, reproducible TypeScript Core, and clearly separated external evidence.
 
-[Release Notes v1.1.0 Draft](docs/releases/v1.1.0.md) · [Release Notes v1.0.0](docs/releases/v1.0.0.md) · [Architecture](docs/core-v1-architecture.md) · [Security](docs/security/all-in-one-security.md)
+[Release Notes v1.1.1 Draft](docs/releases/v1.1.1.md) · [Release Notes v1.1.0](docs/releases/v1.1.0.md) · [Release Notes v1.0.0](docs/releases/v1.0.0.md) · [Architecture](docs/core-v1-architecture.md) · [Security](docs/security/all-in-one-security.md)
 
 SOLE//MATRIX は、自分の好みをまだ言語化しきれない人が、スニーカー選びの軸を作るための判断支援プロダクトです。ログイン相当またはゲストで開始し、初回設定、8問診断、Ryo Mode / Balanced Mode、満足度feedbackをPC・mobileの同じ導線で扱います。
 
@@ -49,6 +49,8 @@ SOLE//MATRIX は、自分の好みをまだ言語化しきれない人が、ス�
 - 診断履歴、3択満足度feedback、匿名共通corpus
 - 所有・wishlistと分離したRyo Mode curated recommendation seed
 - Rakuten listingのserver-side取得、正規化、external evidence表示
+- 推薦後にlive確認した外部商品・検索リンクの一時表示
+- 保存しない手動商品URLの安全確認
 - Gemini structured explanationまたはrule-based fallback
 
 ## 判断の流れ
@@ -65,6 +67,11 @@ login相当 / guest → 初回設定 → 8問診断
   → external evidenceとして正規化
   → readiness・confidence・warningと共に別panelへ表示
   → Core候補・score・budgetFit・Decisionには不介入
+
+推薦商品名 / 検証済みRakuten listing URL
+  → server-sideでpublic HTTP/HTTPS、redirect、HTTP statusをlive確認
+  → verified liveまたは検索fallbackとして参考リンク欄へ表示
+  → URLは保存せず、Core候補・score・budgetFit・Decisionには不介入
 
 推薦後の満足度feedback
   → login相当userはmemoryへ保存
@@ -99,6 +106,26 @@ workspaceは390px級のmobile 1カラムから始まり、1024px以上では入�
 ### External Evidence Layer
 
 Rakuten listing、画像visual evidence、URL metadata / Gemini URL Context、匿名feedback patternsを一つのpanelへ集約します。各sourceはreadiness、confidence、warningを持ち、参考情報であることをUI上でも明記します。
+
+### v1.1.1 Draft: Live product reference links
+
+PR #5 adds live product reference links after the 8-question recommendation flow.
+
+After a recommendation is generated, SOLE//MATRIX can show external reference links for the recommended model. These links are treated as external evidence only.
+
+- Shows product reference links after the recommendation result
+- Uses the displayed recommended product name for search fallback links
+- Labels fallback links clearly as search links, not direct product pages
+- Supports safe manual URL input after recommendation
+- Removes sensitive or tracking query parameters such as `access_key`, `api_key`, `token`, `utm_*`, and `ref`
+- Blocks unsafe URLs such as `javascript:`, `data:`, `file:`, `ftp:`, localhost, private IPs, and tunnel URLs
+- Keeps product URLs separate from Core Decision, score, and budgetFit
+
+Boundary:
+
+Product reference links do not guarantee price, inventory, size availability, or the cheapest purchase option.
+They do not change the recommendation score or purchase decision.
+If a direct product page cannot be verified, the UI may show a clearly labelled search fallback link instead.
 
 ### Global Recommendation Feedback Corpus
 
@@ -145,6 +172,7 @@ RUN_EXTERNAL_SMOKE=
 | `POST /api/recommendation-feedback` | 匿名共通corpusへの安全な追記 |
 | `POST /api/sneakers/analyze` | 名前・URL・画像の統合分析 |
 | `POST /api/recommendations/search` | mode-aware統合推薦 |
+| `POST /api/product-links/resolve` | 推薦後・手動URLのlive確認（非永続） |
 | `POST /api/core-v1/recommend` | 既存Core v1互換endpoint |
 
 `/api/sneakers/analyze`は`multipart/form-data`で`sneakerName`、`url`、`image`を受け取ります。画像は5MB以下のJPEG / PNG / WebPだけを許可し、永続保存しません。
@@ -158,6 +186,8 @@ RUN_EXTERNAL_SMOKE=
 - title、description、Open Graph、canonicalだけを抽出
 - cookie、API key、raw HTMLを送信・保存・表示しない
 - 失敗時はURL情報なしで推薦を継続
+
+商品参考リンクも同じSSRF境界を再利用し、各redirect先を再検証します。表示前にHTTP statusを確認し、tracking、affiliate、token系queryとfragmentを除去します。blocked / not-found URLはリンクにせず、検索URLは直接商品URLと区別します。
 
 ## 画像分析とGeminiの役割
 
@@ -193,7 +223,7 @@ schema不一致、禁止field、通信失敗、設定不足ではstructured fall
 data/users/{safeUserId}/memory.md
 ```
 
-自由文は制御文字と改行を正規化してJSON文字列として保存します。AIへ渡す場合もsystem instructionにはせず、ファイル内の命令文には従いません。
+自由文は制御文字と改行を正規化し、URL-like値を伏せてJSON文字列として保存します。AIへ渡す場合もsystem instructionにはせず、ファイル内の命令文には従いません。
 
 ## 検証
 
@@ -222,6 +252,7 @@ Remove-Item Env:RUN_EXTERNAL_SMOKE -ErrorAction SilentlyContinue
 app/_components/RecommendationWorkspace.tsx   PC版統合UI
 app/_lib/core-v1/                             score / Decision / providers
 app/_lib/url-analysis/                        safe URL analysis
+app/_lib/product-links/                       live URL verification / resolver
 app/_lib/image-analysis/                      image validation / vision adapter
 app/_lib/user-memory/                         memory.md persistence
 app/_lib/auth-session/                        login相当 / guest session boundary
@@ -256,6 +287,8 @@ Phase 9 / 10で更新するPC版証跡:
 - login相当UIとsession境界は本番認証ではありません
 - Supabase接続とaccount削除は将来実装のplaceholderです
 - Rakuten listingは在庫・真贋・市場価格を保証せず、Coreの推薦候補ではありません
+- 商品参考リンクは購入先、在庫、最安値、価格、サイズを保証しません
+- 全商品に直接商品URLが見つかることは保証せず、検索fallbackを明記します
 - 画像からのbrand / model名は推定であり、真贋判定ではありません
 - 別server化は境界までで、現在はNext.js process内です
 - Core v0.1 / v1の既存API、CLI、golden testsは維持しています

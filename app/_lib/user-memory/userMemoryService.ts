@@ -1,6 +1,8 @@
 import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { sanitizePersistentText } from "../recommendation-feedback/globalFeedbackCorpus";
+
 import type {
   LocalUserFeedback,
   LocalUserProfile,
@@ -408,11 +410,7 @@ function normalizeRequiredText(value: string, field: string, max: number): strin
 }
 
 function normalizeOptionalText(value: string, max: number): string {
-  return String(value ?? "")
-    .replace(/[\u0000-\u001F\u007F]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, max);
+  return sanitizePersistentText(value, max);
 }
 
 function normalizeScore(value: number, field: string): number {

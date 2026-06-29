@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type DiagnosisAnswerId,
@@ -10,6 +10,8 @@ import {
   analyzeSneaker as analyzeSneakerApi,
   getUserProfile,
   registerUser as registerUserApi,
+  resolveManualProductLink,
+  resolveRecommendationProductLinks,
   saveGlobalRecommendationFeedback,
   saveUserFeedback,
   searchRecommendations,
@@ -17,9 +19,14 @@ import {
 import type { AuthState, UserSession } from "../_lib/auth-session/types";
 import type { IntegratedRecommendationResult } from "../_lib/integrated-recommendation/types";
 import type { OnboardingPreferenceHint } from "../_lib/onboarding/types";
+import type { LiveProductUrl } from "../_lib/product-links/types";
 import type { SatisfactionEvaluation } from "../_lib/satisfaction-feedback/types";
 import type { UserMemorySummary } from "../_lib/user-memory/types";
 import { ExternalEvidencePanel } from "./ExternalEvidencePanel";
+import {
+  createLatestRequestGate,
+  resolveRecommendationProductName,
+} from "./productLinkResolution";
 
 const workspaceModes = [
   {
@@ -72,6 +79,13 @@ export function RecommendationWorkspace({
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, DiagnosisAnswerId>>({});
   const [result, setResult] = useState<IntegratedRecommendationResult | null>(null);
+  const [productLinks, setProductLinks] = useState<LiveProductUrl[]>([]);
+  const [isResolvingProductLinks, setIsResolvingProductLinks] = useState(false);
+  const [productLinksMessage, setProductLinksMessage] = useState(
+    "推薦後に、その時点で存在を確認できたリンクだけ表示します。",
+  );
+  const [manualProductUrl, setManualProductUrl] = useState("");
+  const [isResolvingManualUrl, setIsResolvingManualUrl] = useState(false);
   const [feedbackEvaluation, setFeedbackEvaluation] =
     useState<SatisfactionEvaluation>("good");
   const [feedbackComment, setFeedbackComment] = useState("");
@@ -80,6 +94,7 @@ export function RecommendationWorkspace({
   const [workspaceStatus, setWorkspaceStatus] = useState(
     "候補情報と8問診断を入力してください。画像とURLは任意です。",
   );
+  const productLinkRequestGateRef = useRef(createLatestRequestGate());
 
   const selectedMode = workspaceModes.find((item) => item.id === mode)!;
   const currentQuestion = preferenceDiagnosisQuestions[currentQuestionIndex]!;
@@ -103,6 +118,12 @@ export function RecommendationWorkspace({
       );
     }
   }, [onboardingHint]);
+
+  useEffect(() => {
+    return () => {
+      productLinkRequestGateRef.current.invalidate();
+    };
+  }, []);
 
   async function handleRecommend() {
     if (
@@ -138,7 +159,11 @@ export function RecommendationWorkspace({
     }
 
     setIsAnalyzing(true);
+    productLinkRequestGateRef.current.invalidate();
     setResult(null);
+    setProductLinks([]);
+    setManualProductUrl("");
+    setProductLinksMessage("推薦結果の確定後に参考リンクを確認します。");
     setGuestFeedbackSaved(false);
     setWorkspaceStatus("URLと画像を安全に分析しています…");
     try {
@@ -170,6 +195,7 @@ export function RecommendationWorkspace({
       }
 
       setResult(recommendationResponse.data);
+      void loadRecommendationProductLinks(recommendationResponse.data);
       if (authState.status === "guest") {
         onGuestDiagnosisCompleted?.();
       }
@@ -182,6 +208,79 @@ export function RecommendationWorkspace({
       }
     } finally {
       setIsAnalyzing(false);
+    }
+  }
+
+  async function loadRecommendationProductLinks(
+    recommendation: IntegratedRecommendationResult,
+  ) {
+    const requestId = productLinkRequestGateRef.current.beginRequest();
+    setIsResolvingProductLinks(true);
+    setProductLinksMessage("現在の参考リンクを安全に確認しています…");
+    const productName = resolveRecommendationProductName(recommendation);
+    if (!productName) {
+      if (productLinkRequestGateRef.current.isCurrent(requestId)) {
+        setProductLinks([]);
+        setProductLinksMessage("現在確認できる商品URLはありません。");
+        setIsResolvingProductLinks(false);
+      }
+      return;
+    }
+    try {
+      const response = await resolveRecommendationProductLinks({
+        productName,
+        directUrls: recommendation.externalEvidence.listings
+          .slice(0, 3)
+          .map((listing) => ({
+            href: listing.productUrl,
+            source: "rakuten" as const,
+          })),
+      });
+      if (!productLinkRequestGateRef.current.isCurrent(requestId)) return;
+      if (!response.ok) {
+        setProductLinks([]);
+        setProductLinksMessage(response.error.message);
+        return;
+      }
+      setProductLinks(response.data.links);
+      setProductLinksMessage(response.data.message);
+    } finally {
+      if (productLinkRequestGateRef.current.isCurrent(requestId)) {
+        setIsResolvingProductLinks(false);
+      }
+    }
+  }
+
+  async function handleAddManualProductUrl() {
+    const input = manualProductUrl.trim();
+    if (!input) {
+      setProductLinksMessage("確認するURLを入力してください。");
+      return;
+    }
+    const requestId = productLinkRequestGateRef.current.beginRequest();
+    setIsResolvingManualUrl(true);
+    setProductLinksMessage("手動URLの安全性と存在を確認しています…");
+    try {
+      const response = await resolveManualProductLink(input);
+      if (!productLinkRequestGateRef.current.isCurrent(requestId)) return;
+      if (!response.ok) {
+        setProductLinksMessage(response.error.message);
+        return;
+      }
+      if (!response.data.links.length) {
+        setProductLinksMessage(response.data.message);
+        return;
+      }
+      setProductLinks((current) => [
+        ...current.filter((link) => link.href !== response.data.links[0]!.href),
+        response.data.links[0]!,
+      ]);
+      setManualProductUrl("");
+      setProductLinksMessage(response.data.message);
+    } finally {
+      if (productLinkRequestGateRef.current.isCurrent(requestId)) {
+        setIsResolvingManualUrl(false);
+      }
     }
   }
 
@@ -345,7 +444,10 @@ export function RecommendationWorkspace({
               key={item.id}
               onClick={() => {
                 setMode(item.id);
+                productLinkRequestGateRef.current.invalidate();
                 setResult(null);
+                setProductLinks([]);
+                setProductLinksMessage("推薦後に、その時点で存在を確認できたリンクだけ表示します。");
                 setWorkspaceStatus(`${item.label}へ切り替えました。推薦を再実行してください。`);
               }}
               type="button"
@@ -486,7 +588,16 @@ export function RecommendationWorkspace({
 
           <div className="workspace-external-evidence-step" data-mobile-step="5" id="mobile-step-5">
             <p className="mobile-step-label">Step 5 / 理由・外部証拠</p>
-            <ExternalEvidencePanel result={result} />
+            <ExternalEvidencePanel
+              isProductLinksLoading={isResolvingProductLinks}
+              isResolvingManualUrl={isResolvingManualUrl}
+              manualProductUrl={manualProductUrl}
+              onAddManualProductUrl={handleAddManualProductUrl}
+              onManualProductUrlChange={setManualProductUrl}
+              productLinks={productLinks}
+              productLinksMessage={productLinksMessage}
+              result={result}
+            />
           </div>
         </section>
 

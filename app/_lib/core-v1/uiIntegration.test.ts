@@ -28,7 +28,8 @@ describe("Core v1 UI integration", () => {
     expect(componentSource).toContain("診断 / ローカル候補");
     expect(componentSource).toContain("fallback候補");
     expect(componentSource).toContain("楽天取得データ");
-    expect(componentSource).toContain("楽天の商品ページで確認する");
+    expect(componentSource).toContain("商品URLはlive確認後の参考リンク欄でのみ表示します");
+    expect(componentSource).not.toContain("href={result.candidate.url}");
     expect(componentSource).toContain("shape検証を通過した説明");
   });
 });
