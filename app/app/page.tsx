@@ -1,6 +1,6 @@
 import { AppShell } from "../_components/AppShell";
 import { MainContainer } from "../_components/MainContainer";
-import { RecommendationWorkspace } from "../_components/RecommendationWorkspace";
+import { ProductSessionBoundary } from "../_components/ProductSessionBoundary";
 
 export default function ProductAppPage() {
   return (
@@ -13,7 +13,7 @@ export default function ProductAppPage() {
             ゲストでも1回の診断を試せます。ログインは必須ではありません。
           </p>
         </header>
-        <RecommendationWorkspace />
+        <ProductSessionBoundary />
       </MainContainer>
     </AppShell>
   );

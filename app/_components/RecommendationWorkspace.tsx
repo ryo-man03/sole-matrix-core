@@ -13,6 +13,7 @@ import {
   saveUserFeedback,
   searchRecommendations,
 } from "../_lib/apiClient";
+import type { AuthState, UserSession } from "../_lib/auth-session/types";
 import type { IntegratedRecommendationResult } from "../_lib/integrated-recommendation/types";
 import type { UserMemorySummary } from "../_lib/user-memory/types";
 
@@ -39,7 +40,19 @@ const modeDecisionLabels: Record<
   skip: "SKIP",
 };
 
-export function RecommendationWorkspace() {
+type RecommendationWorkspaceProps = {
+  authState?: AuthState;
+  onGuestDiagnosisCompleted?: () => void;
+  onUserSession?: (session: UserSession) => void;
+  requireSessionSelection?: boolean;
+};
+
+export function RecommendationWorkspace({
+  authState = { status: "signed_out" },
+  onGuestDiagnosisCompleted,
+  onUserSession,
+  requireSessionSelection = false,
+}: RecommendationWorkspaceProps = {}) {
   const [mode, setMode] = useState<(typeof workspaceModes)[number]["id"]>("ryo");
   const [sneakerName, setSneakerName] = useState("");
   const [productUrl, setProductUrl] = useState("");
@@ -76,6 +89,24 @@ export function RecommendationWorkspace() {
   );
 
   async function handleRecommend() {
+    if (
+      requireSessionSelection &&
+      (authState.status === "loading" || authState.status === "signed_out")
+    ) {
+      setWorkspaceStatus(
+        "ログインまたはゲストモードを選んでから診断を開始してください。",
+      );
+      return;
+    }
+    if (
+      authState.status === "guest" &&
+      authState.session.hasCompletedDiagnosis
+    ) {
+      setWorkspaceStatus(
+        "ゲスト診断は1回までです。ログインすると次の診断と履歴保存を利用できます。",
+      );
+      return;
+    }
     if (!allQuestionsAnswered) {
       setWorkspaceStatus(`8問すべてに回答してください。残り${preferenceDiagnosisQuestions.length - answeredCount}問です。`);
       return;
@@ -122,6 +153,9 @@ export function RecommendationWorkspace() {
       }
 
       setResult(recommendationResponse.data);
+      if (authState.status === "guest") {
+        onGuestDiagnosisCompleted?.();
+      }
       setWorkspaceStatus(
         `${selectedMode.label}の推薦が完了しました。scoreとDecisionはTypeScriptが確定しています。`,
       );
@@ -152,6 +186,11 @@ export function RecommendationWorkspace() {
         return;
       }
       setCurrentUser(payload.data);
+      onUserSession?.({
+        kind: "user",
+        userId: payload.data.profile.userId,
+        displayName: payload.data.profile.displayName,
+      });
       setWorkspaceStatus("ユーザーを登録し、memory.mdを読み込みました。");
     } finally {
       setIsRegistering(false);
@@ -283,8 +322,25 @@ export function RecommendationWorkspace() {
             <label><span>予算</span><input inputMode="numeric" min="1" onChange={(event) => setBudgetText(event.target.value)} placeholder="例: 20000" type="number" value={budgetText} /></label>
           </div>
 
-          <button className="workspace-primary-button" disabled={isAnalyzing} onClick={handleRecommend} type="button">
-            {isAnalyzing ? "分析・推薦中…" : "分析して推薦を実行する"}
+          <button
+            className="workspace-primary-button"
+            disabled={
+              isAnalyzing ||
+              (requireSessionSelection &&
+                (authState.status === "loading" ||
+                  authState.status === "signed_out")) ||
+              (authState.status === "guest" &&
+                authState.session.hasCompletedDiagnosis)
+            }
+            onClick={handleRecommend}
+            type="button"
+          >
+            {isAnalyzing
+              ? "分析・推薦中…"
+              : authState.status === "guest" &&
+                  authState.session.hasCompletedDiagnosis
+                ? "ゲスト診断は利用済み"
+                : "分析して推薦を実行する"}
           </button>
         </section>
 
@@ -348,6 +404,17 @@ export function RecommendationWorkspace() {
               <label>コメント<textarea maxLength={500} onChange={(event) => setFeedbackComment(event.target.value)} placeholder="履いた場面や迷った理由" value={feedbackComment} /></label>
               <button disabled={isSavingFeedback || !currentUser} onClick={handleSaveFeedback} type="button">{isSavingFeedback ? "保存中…" : "feedbackを保存する"}</button>
               {!currentUser ? <small>先にユーザー登録してください。</small> : null}
+            </div>
+          ) : null}
+
+          {authState.status === "guest" &&
+          authState.session.hasCompletedDiagnosis ? (
+            <div className="guest-upgrade-callout">
+              <strong>結果を保存して、次の一足も診断する</strong>
+              <p>
+                ログインすると診断履歴と推薦への評価を自分のmemoryへ保存できます。
+              </p>
+              <a href="/login?intent=login&next=/app">ログインへ</a>
             </div>
           ) : null}
 
