@@ -3,17 +3,18 @@ import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import ProductAppPage from "../../app/page";
+import { RecommendationWorkspace } from "../../_components/RecommendationWorkspace";
 
 describe("responsive product workspace", () => {
-  it("renders a six-step mobile structure and the desktop workspace grid", () => {
-    const html = renderToStaticMarkup(createElement(ProductAppPage));
+  it("renders a five-step product-only mobile structure and the desktop grid", () => {
+    const html = renderToStaticMarkup(createElement(RecommendationWorkspace));
 
     expect(html).toContain("mobile-workspace-steps");
     expect(html).toContain("desktop-workspace-layout");
-    for (let step = 1; step <= 6; step += 1) {
+    for (let step = 1; step <= 5; step += 1) {
       expect(html).toContain(`mobile-step-${step}`);
     }
+    expect(html).not.toContain("workspace-diagnosis-card");
   });
 
   it("uses intrinsic grid tracks and enables three columns at 1024px", () => {

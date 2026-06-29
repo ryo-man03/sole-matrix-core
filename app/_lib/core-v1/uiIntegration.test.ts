@@ -14,6 +14,9 @@ describe("Core v1 UI integration", () => {
     expect(diagnosisFlowSource).toContain("CoreV1RecommendationPanel");
     expect(componentSource).toContain("/api/core-v1/recommend");
     expect(componentSource).toContain("diagnosisAnswers");
+    expect(componentSource).toContain("resolveRecommendationProductLinks");
+    expect(componentSource).toContain("ProductReferenceLinks");
+    expect(componentSource).toContain("onRecommendationComplete?.()");
   });
 
   it("renders result, fallback, readiness, and feedback states", () => {
@@ -31,5 +34,6 @@ describe("Core v1 UI integration", () => {
     expect(componentSource).toContain("商品URLはlive確認後の参考リンク欄でのみ表示します");
     expect(componentSource).not.toContain("href={result.candidate.url}");
     expect(componentSource).toContain("shape検証を通過した説明");
+    expect(componentSource).toContain('source === "rakuten"');
   });
 });
