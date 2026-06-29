@@ -143,6 +143,7 @@ export async function recommendCoreV1(
     },
     externalEvidence: {
       listings: rakutenResult.evidence,
+      feedbackPatterns: [],
     },
   };
 }

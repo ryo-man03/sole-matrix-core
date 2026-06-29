@@ -34,8 +34,18 @@ export type ExternalUrlEvidence = {
   coreDecisionImpact: "none";
 };
 
+export type ExternalFeedbackPatternEvidence = {
+  kind: "recommendation_feedback_patterns";
+  source: "global_anonymized_corpus";
+  sampleSize: number;
+  patterns: string[];
+  trust: "reference_only";
+  coreDecisionImpact: "none";
+};
+
 export type ExternalEvidenceBundle = {
   listings: ExternalListingEvidence[];
+  feedbackPatterns: ExternalFeedbackPatternEvidence[];
   visual?: ExternalVisualEvidence;
   url?: ExternalUrlEvidence;
 };

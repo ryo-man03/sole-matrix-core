@@ -19,6 +19,7 @@ import type { IntegratedRecommendationResult } from "../_lib/integrated-recommen
 import type { OnboardingPreferenceHint } from "../_lib/onboarding/types";
 import type { SatisfactionEvaluation } from "../_lib/satisfaction-feedback/types";
 import type { UserMemorySummary } from "../_lib/user-memory/types";
+import { ExternalEvidencePanel } from "./ExternalEvidencePanel";
 
 const workspaceModes = [
   {
@@ -483,11 +484,9 @@ export function RecommendationWorkspace({
             {result?.analysis.visualAnalysis ? <div><dt>Image analysis</dt><dd>{[result.analysis.visualAnalysis.detectedBrand, result.analysis.visualAnalysis.detectedModelName, ...result.analysis.visualAnalysis.mainColors].filter(Boolean).join(" / ") || "特徴を特定できませんでした"}</dd></div> : null}
           </dl>
 
-          <div className="workspace-provider-readiness" data-mobile-step="5" id="mobile-step-5">
+          <div className="workspace-external-evidence-step" data-mobile-step="5" id="mobile-step-5">
             <p className="mobile-step-label">Step 5 / 理由・外部証拠</p>
-            <span>Provider readiness</span>
-            <div><strong>Rakuten</strong><em data-status={result?.readiness.rakuten.status ?? "not_checked"}>{result?.readiness.rakuten.status ?? "診断実行後に確認"}</em></div>
-            <div><strong>Gemini</strong><em data-status={result?.readiness.gemini.status ?? "not_checked"}>{result ? `${result.readiness.gemini.status} / ${result.explanation.source}` : "補助分析のみ"}</em></div>
+            <ExternalEvidencePanel result={result} />
           </div>
         </section>
 
