@@ -15,7 +15,7 @@ const maxDisplayedLinks = 3;
 
 type DirectProductUrl = {
   href: string;
-  source: Exclude<ProductUrlSource, "manual" | "search_fallback">;
+  source: Exclude<ProductUrlSource, "search_fallback">;
 };
 
 export function createProductUrlCandidates(
@@ -80,7 +80,7 @@ export async function resolveLiveProductUrls(
       links: [],
       checkedAt,
       status: "not_found",
-      message: "商品名がないため参考リンクを確認できませんでした。",
+      message: "現在確認できる商品URLはありません。",
     };
   }
 
@@ -186,5 +186,6 @@ function directLabel(source: DirectProductUrl["source"]): string {
   if (source === "rakuten") return "楽天の商品ページを見る";
   if (source === "official") return "公式の商品ページを見る";
   if (source === "retailer") return "販売店の商品ページを見る";
+  if (source === "manual") return "手動で追加した参考リンク";
   return "マーケットプレイスの商品ページを見る";
 }

@@ -11,6 +11,7 @@ const directSources = new Set<ProductUrlSource>([
   "official",
   "retailer",
   "marketplace",
+  "manual",
 ]);
 
 export async function POST(request: Request) {
@@ -45,7 +46,7 @@ async function readJson(request: Request): Promise<unknown> {
 function normalizeDirectUrls(value: unknown) {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > 3) return null;
-  const output: { href: string; source: "rakuten" | "official" | "retailer" | "marketplace" }[] = [];
+  const output: { href: string; source: Exclude<ProductUrlSource, "search_fallback"> }[] = [];
   for (const item of value) {
     if (!isRecord(item)) return null;
     const href = boundedString(item["href"], 2_048);
@@ -55,10 +56,22 @@ function normalizeDirectUrls(value: unknown) {
     }
     output.push({
       href,
-      source: source as "rakuten" | "official" | "retailer" | "marketplace",
+      source: classifyDirectUrlSource(href),
     });
   }
   return output;
+}
+
+function classifyDirectUrlSource(href: string): Exclude<ProductUrlSource, "search_fallback"> {
+  try {
+    const hostname = new URL(href).hostname.toLowerCase();
+    if (hostname === "rakuten.co.jp") return "rakuten";
+    if (hostname.endsWith(".rakuten.co.jp")) return "rakuten";
+  } catch {
+    return "manual";
+  }
+
+  return "manual";
 }
 
 function boundedString(value: unknown, maxLength: number): string | null {

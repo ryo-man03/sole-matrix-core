@@ -39,7 +39,7 @@ describe("live product URL verification", () => {
       new Response(null, { status: 200 }),
     );
     const result = await verifyProductUrl(
-      "https://example.com/item?size=27&utm_source=mail&token=secret&ref=affiliate#buy",
+      "https://example.com/item?size=27&access_key=secret&api_key=hidden&token=gone&access_token=gone&id_token=gone&refresh_token=gone&client_secret=gone&password=gone&pass=gone&key=gone&signature=gone&sig=gone&utm_source=mail&utm_campaign=promo&ref=affiliate&affiliate=abc#buy",
       { fetcher, resolveHostname: publicResolver, now: fixedNow },
     );
 
@@ -49,8 +49,42 @@ describe("live product URL verification", () => {
       displayDomain: "example.com",
       verifiedAt: "2026-06-29T03:04:05.000Z",
     });
-    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("secret");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("access_key");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("api_key");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("token=");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("access_token");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("id_token");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("refresh_token");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("client_secret");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("password");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("pass=");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("key=");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("signature");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("sig=");
     expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("utm_");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("ref=");
+    expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("affiliate=");
+  });
+
+  it.each([
+    ["access_key", "https://example.com/item?access_key=secret&size=27"],
+    ["api_key", "https://example.com/item?api_key=hidden&size=27"],
+    ["token/access_token/client_secret", "https://example.com/item?token=gone&access_token=gone&client_secret=gone&size=27"],
+    ["utm/ref/affiliate params", "https://example.com/item?utm_source=mail&utm_medium=email&ref=abc&affiliate=xyz&size=27"],
+  ])("sanitizeUrlForDisplay removes %s", async (_label, input) => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(null, { status: 200 }),
+    );
+    const result = await verifyProductUrl(input, {
+      fetcher,
+      resolveHostname: publicResolver,
+      now: fixedNow,
+    });
+
+    expect(result).toMatchObject({
+      status: "verified_live",
+      href: "https://example.com/item?size=27",
+    });
   });
 
   it("revalidates redirects and blocks a private redirect target", async () => {

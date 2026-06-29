@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type DiagnosisAnswerId,
@@ -23,6 +23,10 @@ import type { LiveProductUrl } from "../_lib/product-links/types";
 import type { SatisfactionEvaluation } from "../_lib/satisfaction-feedback/types";
 import type { UserMemorySummary } from "../_lib/user-memory/types";
 import { ExternalEvidencePanel } from "./ExternalEvidencePanel";
+import {
+  createLatestRequestGate,
+  resolveRecommendationProductName,
+} from "./productLinkResolution";
 
 const workspaceModes = [
   {
@@ -90,6 +94,7 @@ export function RecommendationWorkspace({
   const [workspaceStatus, setWorkspaceStatus] = useState(
     "候補情報と8問診断を入力してください。画像とURLは任意です。",
   );
+  const productLinkRequestGateRef = useRef(createLatestRequestGate());
 
   const selectedMode = workspaceModes.find((item) => item.id === mode)!;
   const currentQuestion = preferenceDiagnosisQuestions[currentQuestionIndex]!;
@@ -113,6 +118,12 @@ export function RecommendationWorkspace({
       );
     }
   }, [onboardingHint]);
+
+  useEffect(() => {
+    return () => {
+      productLinkRequestGateRef.current.invalidate();
+    };
+  }, []);
 
   async function handleRecommend() {
     if (
@@ -148,6 +159,7 @@ export function RecommendationWorkspace({
     }
 
     setIsAnalyzing(true);
+    productLinkRequestGateRef.current.invalidate();
     setResult(null);
     setProductLinks([]);
     setManualProductUrl("");
@@ -202,11 +214,21 @@ export function RecommendationWorkspace({
   async function loadRecommendationProductLinks(
     recommendation: IntegratedRecommendationResult,
   ) {
+    const requestId = productLinkRequestGateRef.current.beginRequest();
     setIsResolvingProductLinks(true);
     setProductLinksMessage("現在の参考リンクを安全に確認しています…");
+    const productName = resolveRecommendationProductName(recommendation);
+    if (!productName) {
+      if (productLinkRequestGateRef.current.isCurrent(requestId)) {
+        setProductLinks([]);
+        setProductLinksMessage("現在確認できる商品URLはありません。");
+        setIsResolvingProductLinks(false);
+      }
+      return;
+    }
     try {
       const response = await resolveRecommendationProductLinks({
-        productName: recommendation.candidate.name,
+        productName,
         directUrls: recommendation.externalEvidence.listings
           .slice(0, 3)
           .map((listing) => ({
@@ -214,6 +236,7 @@ export function RecommendationWorkspace({
             source: "rakuten" as const,
           })),
       });
+      if (!productLinkRequestGateRef.current.isCurrent(requestId)) return;
       if (!response.ok) {
         setProductLinks([]);
         setProductLinksMessage(response.error.message);
@@ -222,7 +245,9 @@ export function RecommendationWorkspace({
       setProductLinks(response.data.links);
       setProductLinksMessage(response.data.message);
     } finally {
-      setIsResolvingProductLinks(false);
+      if (productLinkRequestGateRef.current.isCurrent(requestId)) {
+        setIsResolvingProductLinks(false);
+      }
     }
   }
 
@@ -232,10 +257,12 @@ export function RecommendationWorkspace({
       setProductLinksMessage("確認するURLを入力してください。");
       return;
     }
+    const requestId = productLinkRequestGateRef.current.beginRequest();
     setIsResolvingManualUrl(true);
     setProductLinksMessage("手動URLの安全性と存在を確認しています…");
     try {
       const response = await resolveManualProductLink(input);
+      if (!productLinkRequestGateRef.current.isCurrent(requestId)) return;
       if (!response.ok) {
         setProductLinksMessage(response.error.message);
         return;
@@ -251,7 +278,9 @@ export function RecommendationWorkspace({
       setManualProductUrl("");
       setProductLinksMessage(response.data.message);
     } finally {
-      setIsResolvingManualUrl(false);
+      if (productLinkRequestGateRef.current.isCurrent(requestId)) {
+        setIsResolvingManualUrl(false);
+      }
     }
   }
 
@@ -415,6 +444,7 @@ export function RecommendationWorkspace({
               key={item.id}
               onClick={() => {
                 setMode(item.id);
+                productLinkRequestGateRef.current.invalidate();
                 setResult(null);
                 setProductLinks([]);
                 setProductLinksMessage("推薦後に、その時点で存在を確認できたリンクだけ表示します。");

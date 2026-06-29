@@ -4,7 +4,7 @@ import type { ProductUrlVerificationStatus } from "./types";
 
 const redirectStatuses = new Set([301, 302, 303, 307, 308]);
 const sensitiveParameterPattern =
-  /^(?:utm_.+|ref|referrer|affiliate|aff(?:_?id)?|tracking|tracking_?id|token|access_?token|auth|authorization|credential|api_?key|key|session)$/i;
+  /^(?:utm_.+|ref|referrer|affiliate|aff(?:_?id)?|tracking|tracking_?id|token|access_?token|id_?token|refresh_?token|client_?secret|secret|password|pass|auth|authorization|credential|api_?key|access_?key|key|signature|sig|session)$/i;
 const defaultTimeoutMs = 5_000;
 const defaultMaxRedirects = 3;
 
@@ -125,7 +125,7 @@ export function sanitizeUrlForDisplay(url: URL): URL {
   sanitized.password = "";
   sanitized.hash = "";
   for (const key of [...sanitized.searchParams.keys()]) {
-    if (sensitiveParameterPattern.test(key)) {
+    if (sensitiveParameterPattern.test(key.toLowerCase())) {
       sanitized.searchParams.delete(key);
     }
   }

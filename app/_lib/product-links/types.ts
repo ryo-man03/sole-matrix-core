@@ -34,6 +34,6 @@ export type ProductUrlResolution = {
 export type ProductUrlCandidate = {
   label: string;
   href: string;
-  source: Exclude<ProductUrlSource, "manual">;
+  source: ProductUrlSource;
   kind: "direct" | "search";
 };

@@ -27,6 +27,20 @@ describe("live product URL resolver", () => {
     expect(createProductUrlCandidates("   ")).toEqual([]);
   });
 
+  it("does not create product links for an empty product name", async () => {
+    const result = await resolveLiveProductUrls("   ", [], {
+      fetcher: vi.fn<typeof fetch>(),
+      resolveHostname: publicResolver,
+      now: fixedNow,
+    });
+
+    expect(result).toMatchObject({
+      status: "not_found",
+      links: [],
+      message: "現在確認できる商品URLはありません。",
+    });
+  });
+
   it("prefers a verified direct URL and labels verified searches as fallbacks", async () => {
     const result = await resolveLiveProductUrls(
       "adidas Samba OG",
@@ -119,5 +133,25 @@ describe("live product URL resolver", () => {
     });
     expect(unsafe).toMatchObject({ status: "blocked", links: [] });
     expect(JSON.stringify(unsafe)).not.toContain("javascript:");
+  });
+
+  it("keeps direct manual URLs as manual links without promoting them", async () => {
+    const result = await resolveLiveProductUrls(
+      "adidas Samba OG",
+      [{ href: "https://example.com/item?token=secret", source: "manual" }],
+      {
+        fetcher: vi.fn<typeof fetch>().mockResolvedValue(
+          new Response(null, { status: 200 }),
+        ),
+        resolveHostname: publicResolver,
+        now: fixedNow,
+      },
+    );
+
+    expect(result.links[0]).toMatchObject({
+      source: "manual",
+      verificationStatus: "verified_live",
+    });
+    expect(JSON.stringify(result)).not.toContain("token=secret");
   });
 });
