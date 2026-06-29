@@ -92,6 +92,79 @@ describe("global recommendation feedback corpus", () => {
     expect(entry).not.toHaveProperty("displayName");
   });
 
+  it("redacts labeled identifiers and URL-like values from free text", async () => {
+    const rootDir = await tempRoot();
+    const entry = normalizeGlobalFeedbackInput(
+      validInput({
+        userReason: [
+          "userId: ryo_private",
+          "user_id=ryo_secondary",
+          "userid ryo_third",
+          "displayName: Ryo Private",
+          "display_name=Ryo Secondary",
+          "display name Ryo Third",
+          "ftp://example.com/path",
+          "example.com/path",
+          "sneaker-shop.jp/item/123",
+        ].join("; "),
+      }),
+    )!;
+    const target = await appendGlobalFeedbackEntry(entry, { rootDir });
+    const content = await readFile(target, "utf8");
+
+    expect(content).toContain("userId: [redacted-user-id]");
+    expect(content).toContain("displayName: [redacted-display-name]");
+    expect(content).toContain("[redacted-url]");
+    for (const forbidden of [
+      "ryo_private",
+      "ryo_secondary",
+      "ryo_third",
+      "Ryo Private",
+      "Ryo Secondary",
+      "Ryo Third",
+      "ftp://example.com/path",
+      "example.com/path",
+      "sneaker-shop.jp/item/123",
+    ]) {
+      expect(content).not.toContain(forbidden);
+    }
+  });
+
+  it("sanitizes every accepted free-text field before persistence", async () => {
+    const rootDir = await tempRoot();
+    const entry = normalizeGlobalFeedbackInput(
+      validInput({
+        userContextSummary: "userId: context_private",
+        inputSneakerName: "example.com/private-item",
+        budgetRange: "display name Budget Private",
+        eightQuestionAnswers: ["ftp://answers.example/path"],
+        importantTags: ["tags.example/private"],
+        generatedRecommendation: ["displayName: Recommendation Private"],
+        reasonSummary: "user_id=reason_private",
+        evidenceUsed: ["evidence.example/private"],
+        userReason: "userid reason_private",
+      }),
+    )!;
+    const target = await appendGlobalFeedbackEntry(entry, { rootDir });
+    const content = await readFile(target, "utf8");
+
+    expect(content).toContain("[redacted-user-id]");
+    expect(content).toContain("[redacted-display-name]");
+    expect(content).toContain("[redacted-url]");
+    for (const forbidden of [
+      "context_private",
+      "Budget Private",
+      "Recommendation Private",
+      "reason_private",
+      "example.com",
+      "answers.example",
+      "tags.example",
+      "evidence.example",
+    ]) {
+      expect(content).not.toContain(forbidden);
+    }
+  });
+
   it("redacts and bounds free-form reasons", () => {
     const reason = sanitizeUserReason(
       `${"x".repeat(600)} ryo@example.com 03-1234-5678 https://example.com/private`,

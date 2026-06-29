@@ -99,11 +99,14 @@ export function normalizeGlobalFeedbackInput(
     createdAtValue && !Number.isNaN(Date.parse(createdAtValue))
       ? new Date(createdAtValue).toISOString()
       : now().toISOString();
-  const inferredRequirementPattern = inferRequirementPattern(
-    userEvaluation,
-    importantTags,
+  const inferredRequirementPattern = sanitizeText(
+    inferRequirementPattern(userEvaluation, importantTags),
+    500,
   );
-  const learningNote = createLearningNote(userEvaluation, userReason);
+  const learningNote = sanitizeText(
+    createLearningNote(userEvaluation, userReason),
+    500,
+  );
 
   return {
     createdAt,
@@ -203,8 +206,20 @@ function resolveCorpusPath(options: CorpusOptions): string {
 function sanitizeText(value: unknown, maxLength: number): string {
   if (typeof value !== "string") return "";
   return value
-    .replace(/https?:\/\/[^\s<>()]+|www\.[^\s<>()]+/giu, "[redacted-url]")
+    .replace(
+      /\buser[\s_-]?id\b(?:\s*[:=]\s*|\s+)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;|/]+)/giu,
+      "userId: [redacted-user-id]",
+    )
+    .replace(
+      /\bdisplay[\s_-]?name\b(?:\s*[:=]\s*|\s+)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^,;|/\r\n]+)/giu,
+      "displayName: [redacted-display-name]",
+    )
     .replace(/[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}/gu, "[redacted-email]")
+    .replace(/(?:https?|ftp):\/\/[^\s<>()]+/giu, "[redacted-url]")
+    .replace(
+      /\b(?:[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\.)+[a-z]{2,63}(?::\d{2,5})?(?:\/[^\s<>()]*)?/giu,
+      "[redacted-url]",
+    )
     .replace(/(?:\+?\d[\d ()-]{8,}\d)/gu, "[redacted-phone]")
     .replace(/[\u0000-\u001F\u007F]+/gu, " ")
     .replace(/\s+/gu, " ")
