@@ -6,15 +6,36 @@ export type RyoSeedSneaker = {
   context: string;
 };
 
+export type RyoCuratedSneakerSeed = {
+  rawName: string;
+  brand: string;
+  modelFamily?: string;
+  colorway?: string;
+  status: "wishlist" | "recommendable" | "release_watch";
+  recommendationReasonTags: string[];
+  priceExpectation?: "affordable" | "mid" | "premium" | "unknown";
+  styleTags: string[];
+  notes?: string;
+};
+
 export type RyoModeSeedProfile = {
   profileId: "ryo-mode-seed-v2";
-  displayName: "林諒馬";
+  displayName: "Ryo Mode";
   ownedModels: RyoSeedSneaker[];
   wishlistModels: RyoSeedSneaker[];
+  curatedRecommendationModels: RyoCuratedSneakerSeed[];
   preferredBrands: string[];
   preferredColors: string[];
   preferredMaterials: string[];
   preferredContexts: string[];
+  rainyDayPreferenceTags: string[];
+  recommendationPrinciples: string[];
+  newBalancePreference: {
+    preferredFamilies: string[];
+    budgetAlternatives: string[];
+    cautionFamilies: string[];
+    rationale: string;
+  };
   cautionSignals: string[];
 };
 
@@ -105,11 +126,66 @@ const wishlistModelNames = [
   'New Balance 2010 "Brown"',
 ] as const;
 
+const curatedRecommendationNames = [
+  'Nike TERMINATOR HIGH OG "Georgetown" GRANITE / DARK OBSIDIAN / SAIL',
+  "Nike Blazer Mid '77 Vintage White / Black",
+  "Nike Blazer Mid '77 Vintage Black",
+  "Nike WMNS Cortez VNTG Black / Sail",
+  "Nike LD-1000 Black / Sail / Sesame",
+  "Converse Stranger Things 5 × Converse All Star Aged 87 CL HI",
+  "Converse One Star Suede Black",
+  "Converse All Star J HI Black",
+  "Converse Star & Bars Suede Red",
+  "Converse One Star J VTG HS Suede Black",
+  "Converse One Star Suede Navy",
+  "Converse One Star J Suede Purple",
+  "adidas Liverpool College Green / Pyrite / College Royal",
+  "adidas Campus 80s by Preloved Inc / Wonder White",
+  "adidas Dover Street Market × adidas Samba Core Black / Footwear White / Gum",
+  "adidas Brain Dead × adidas Bowling Black",
+  "adidas Brain Dead × adidas Bowling White",
+  "adidas Japan",
+  "adidas MK II Conavy / Legink / FTWWHT",
+  "adidas Gazelle Core Black / White / Gold Metallic",
+  "adidas Superstar 82 FI Forum Home Alone",
+  "adidas Country OG Night Indigo / Off White / Silver Metallic",
+  "adidas Forum Home Alone Cream White / College Red / Off White",
+  "adidas Samba OG Core Black / Footwear White / Gum",
+  "adidas Samba OG Footwear White / Core Black / Clear Granite",
+  "adidas Country OG College Green / Chalk White / Gum",
+  "adidas MK II Auburn / Carbrn / Mesa",
+  "adidas Campus 00s CBLK / SVMT / CWHT",
+  "Vans Authentic Black / Black",
+  "Vans Authentic Reissue 44 LX",
+  "Vans OG Authentic LX Black / White",
+  "Vans Bold Ni Staple Black / White",
+  "Vans Knu Skool Red / True White",
+  "Vans Half Cab Black / White",
+  "Vans OG Classic Slip-On LX Black / White Checkerboard",
+  "Vans Knu Skool Navy / True White",
+  "Puma Brasil Myrtle / Tangerine",
+  "Puma Brasil Tangerine / Dark Myrtle",
+  "Puma Clyde OG Parisian Night / Puma White / Pristine",
+  "Puma Suede",
+  "New Balance U1500PBK Black / Gray",
+  "New Balance M991GL Gray",
+  "New Balance U991GG2 Gray / Navy",
+  "New Balance U990NV4 Navy",
+  "New Balance U993GG Gray",
+  "New Balance M2002RHO Phantom",
+  "Size? × New Balance 990v3 Orange / Cream",
+  "Last Resort AB Julian Smith × Last Resort AB VM001 Canvas Lo",
+  "Reebok Classic Leather 1983 Vintage Chalk",
+] as const;
+
 export const ryoModeSeed: RyoModeSeedProfile = {
   profileId: "ryo-mode-seed-v2",
-  displayName: "林諒馬",
+  displayName: "Ryo Mode",
   ownedModels: ownedModelNames.map(createSeedSneaker),
   wishlistModels: wishlistModelNames.map(createSeedSneaker),
+  curatedRecommendationModels: curatedRecommendationNames.map(
+    createCuratedRecommendation,
+  ),
   preferredBrands: [
     "Nike",
     "Jordan",
@@ -158,6 +234,30 @@ export const ryoModeSeed: RyoModeSeedProfile = {
     "store exclusive",
     "brand history",
   ],
+  rainyDayPreferenceTags: [
+    "gore_tex_practicality",
+    "canvas_rain_candidate",
+    "canvas_color_fade",
+    "easy_care",
+  ],
+  recommendationPrinciples: [
+    "classic",
+    "retro",
+    "historical_context",
+    "patina",
+    "wearable_deep_color",
+    "playful_detail",
+    "affordable_first",
+    "limited_colorway",
+    "release_watch_requires_external_evidence",
+    "high_tech_is_user_context_dependent",
+  ],
+  newBalancePreference: {
+    preferredFamilies: ["991", "993", "990v4_or_earlier", "1500"],
+    budgetAlternatives: ["2002R", "2010"],
+    cautionFamilies: ["990v5_or_later"],
+    rationale: "990v5以降は大きく見えるNロゴがRyo Modeの主な好みではない。",
+  },
   cautionSignals: [
     "所有モデルとfamily・役割が重複する",
     "色違いだけで体験が増えない",
@@ -166,6 +266,27 @@ export const ryoModeSeed: RyoModeSeedProfile = {
     "既存コレクション内で役割が薄い",
   ],
 };
+
+function createCuratedRecommendation(rawName: string): RyoCuratedSneakerSeed {
+  const brand = inferBrand(rawName);
+  const modelFamily = inferFamily(rawName);
+  const colorway = inferColorway(rawName, modelFamily);
+  const isReleaseWatch = /Stranger Things 5/i.test(rawName);
+
+  return {
+    rawName,
+    brand,
+    ...(modelFamily !== rawName ? { modelFamily } : {}),
+    ...(colorway ? { colorway } : {}),
+    status: isReleaseWatch ? "release_watch" : "recommendable",
+    recommendationReasonTags: inferRecommendationReasonTags(rawName),
+    priceExpectation: inferPriceExpectation(rawName),
+    styleTags: inferCuratedStyleTags(rawName),
+    ...(isReleaseWatch ? {
+      notes: "発売状況・価格・サイズ・入手性は外部証拠で確認する。",
+    } : {}),
+  };
+}
 
 function createSeedSneaker(model: string): RyoSeedSneaker {
   const brand = inferBrand(model);
@@ -181,8 +302,10 @@ function createSeedSneaker(model: string): RyoSeedSneaker {
 
 function inferBrand(model: string): string {
   const brands = [
+    "Last Resort AB",
     "New Balance",
     "PRO-Keds",
+    "Reebok",
     "Converse",
     "adidas",
     "Puma",
@@ -194,6 +317,9 @@ function inferBrand(model: string): string {
 
 function inferFamily(model: string): string {
   const families: Array<[string, RegExp]> = [
+    ["Terminator High", /terminator high/i],
+    ["Blazer Mid", /blazer mid/i],
+    ["LD-1000", /ld-1000/i],
     ["Air Jordan 11", /air jordan 11/i],
     ["Air Jordan 6", /air jordan 6/i],
     ["Air Jordan 1", /air jordan 1/i],
@@ -201,6 +327,13 @@ function inferFamily(model: string): string {
     ["Astro Grabber", /astro grabber/i],
     ["Moon Shoe", /moon shoe/i],
     ["Cortez", /cortez/i],
+    ["Campus 80s", /campus 80s/i],
+    ["Campus 00s", /campus 00s/i],
+    ["Country OG", /country og/i],
+    ["Forum", /\bforum\b/i],
+    ["Bowling", /\bbowling\b/i],
+    ["MK II", /mk ii/i],
+    ["Liverpool", /\bliverpool\b/i],
     ["Superstar", /superstar/i],
     ["Samba", /samba/i],
     ["Gazelle Indoor", /gazelle indoor/i],
@@ -218,10 +351,13 @@ function inferFamily(model: string): string {
     ["All Star", /all star/i],
     ["Weapon", /weapon/i],
     ["Pro Leather", /pro leather/i],
+    ["Star & Bars", /star & bars/i],
     ["Puma Clyde", /puma clyde/i],
     ["Puma Suede", /puma suede/i],
     ["Era 95", /era 95/i],
     ["Authentic", /authentic/i],
+    ["Classic Slip-On", /classic slip-on/i],
+    ["Bold Ni", /bold ni/i],
     ["Style 31", /style 31/i],
     ["Half Cab", /half cab/i],
     ["Chukka 49", /chukka 49/i],
@@ -231,9 +367,65 @@ function inferFamily(model: string): string {
     ["New Balance 990V3", /990v3/i],
     ["New Balance 991V2", /991v2/i],
     ["New Balance 2010", /new balance 2010/i],
+    ["New Balance 1500", /\b(?:u|m)?1500/i],
+    ["New Balance 991", /\b(?:u|m)?991/i],
+    ["New Balance 993", /\b(?:u|m)?993/i],
+    ["New Balance 990V4", /990nv4|990v4/i],
+    ["New Balance 990V3", /990v3/i],
+    ["VM001", /vm001/i],
+    ["Classic Leather", /classic leather/i],
+    ["Puma Brasil", /puma brasil/i],
     ["Royal Plus", /royal plus/i],
   ];
   return families.find(([, pattern]) => pattern.test(model))?.[0] ?? model;
+}
+
+function inferColorway(rawName: string, family: string): string | undefined {
+  const familyIndex = rawName.toLowerCase().indexOf(family.toLowerCase());
+  if (familyIndex < 0) return undefined;
+  const suffix = rawName.slice(familyIndex + family.length).trim();
+  return suffix.length > 0 ? suffix.replace(/^[-–—:/\s]+/, "") : undefined;
+}
+
+function inferRecommendationReasonTags(rawName: string): string[] {
+  const tags = ["classic_heritage", "curated_reference"];
+  if (/vintage|vntg|vtg|aged|1983|og|reissue|80s/i.test(rawName)) {
+    tags.push("historical_context");
+  }
+  if (/suede|leather|canvas/i.test(rawName)) tags.push("patina_material");
+  if (/authentic|all star j hi|puma suede$|classic leather|blazer mid|2002r/i.test(rawName)) {
+    tags.push("affordable_alternative");
+  }
+  if (/black|navy|indigo|gray|granite|myrtle|auburn|phantom/i.test(rawName)) {
+    tags.push("wearable_deep_color");
+  }
+  return tags;
+}
+
+function inferPriceExpectation(
+  rawName: string,
+): NonNullable<RyoCuratedSneakerSeed["priceExpectation"]> {
+  if (/new balance (?!m2002r)|u1500|m991|u991|u990|u993|990v3/i.test(rawName)) {
+    return "premium";
+  }
+  if (/authentic|all star j hi|puma suede$|classic leather|blazer mid|2002r/i.test(rawName)) {
+    return "affordable";
+  }
+  if (/×|dover street market|brain dead|preloved/i.test(rawName)) return "premium";
+  return "mid";
+}
+
+function inferCuratedStyleTags(rawName: string): string[] {
+  const tags = ["classic", "retro", "low_tech"];
+  if (/vintage|vntg|vtg|aged|1983|og|reissue|80s/i.test(rawName)) {
+    tags.push("historical");
+  }
+  if (/suede/i.test(rawName)) tags.push("suede", "patina");
+  if (/leather/i.test(rawName)) tags.push("leather", "patina");
+  if (/canvas|all star|authentic|slip-on/i.test(rawName)) {
+    tags.push("canvas", "rain_candidate", "patina");
+  }
+  return [...new Set(tags)];
 }
 
 function familyAliases(family: string): string[] {

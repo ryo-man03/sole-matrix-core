@@ -332,6 +332,13 @@ function parseGeminiVisualAnalysis(
   if (/偽物|本物と断定|正規品と断定|価格(?:は|が)正しい|購入すべき/.test(combinedText)) {
     return undefined;
   }
+  const evidenceCautions = [
+    ...cautions,
+    "画像だけでは商品名・カラーを確定できません。",
+    ...(confidence < 0.6
+      ? ["confidenceが低いため、画像分析結果は不確かです。"]
+      : []),
+  ];
 
   return {
     ...(optionalFields.detectedBrand
@@ -353,7 +360,7 @@ function parseGeminiVisualAnalysis(
     uniquenessScore: signalToScore(candidate.uniquenessSignal as string),
     culturalContext,
     confidence: Math.round(confidence * 100) / 100,
-    cautions,
+    cautions: [...new Set(evidenceCautions)],
   };
 }
 

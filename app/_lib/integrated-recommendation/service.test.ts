@@ -40,6 +40,7 @@ describe("integrated mode-aware recommendation", () => {
     const rakutenProvider = vi.fn(async () => ({
       status: "missing_config" as const,
       candidates: [],
+      evidence: [],
       readiness: createRakutenProviderReadiness("missing_config"),
       networkAttempted: false,
       responseOk: false,
@@ -93,6 +94,105 @@ describe("integrated mode-aware recommendation", () => {
         userId: "../admin",
       }),
     ).toMatchObject({ ok: false, error: { field: "userId" } });
+  });
+
+  it("keeps Core score and Decision unchanged by visual evidence", async () => {
+    const withVisualInput = validRequest();
+    const withoutVisualBase = validRequest();
+    const { visualAnalysis: _visualAnalysis, ...analysisWithoutVisual } =
+      withoutVisualBase.analysis;
+    const { userId: _userId, ...requestWithoutUser } = withoutVisualBase;
+    const withoutVisualInput = {
+      ...requestWithoutUser,
+      analysis: analysisWithoutVisual,
+    };
+    withVisualInput.userId = "";
+    const withVisual = validateIntegratedRecommendationRequest(withVisualInput);
+    const withoutVisual = validateIntegratedRecommendationRequest(withoutVisualInput);
+    expect(withVisual.ok).toBe(true);
+    expect(withoutVisual.ok).toBe(true);
+    if (!withVisual.ok || !withoutVisual.ok) return;
+
+    const dependencies = {
+      core: {
+        env: {},
+        rakutenCandidateProvider: async () => ({
+          status: "missing_config" as const,
+          candidates: [],
+          evidence: [],
+          readiness: createRakutenProviderReadiness("missing_config"),
+          networkAttempted: false,
+          responseOk: false,
+          shapeValid: false,
+        }),
+        explanationProvider: async () => explanation,
+      },
+    };
+    const visualResult = await recommendIntegratedSneaker(
+      withVisual.value,
+      dependencies,
+    );
+    const noVisualResult = await recommendIntegratedSneaker(
+      withoutVisual.value,
+      dependencies,
+    );
+
+    expect(visualResult.externalEvidence.visual).toMatchObject({
+      provider: "gemini",
+      coreDecisionImpact: "none",
+    });
+    expect(visualResult.candidate).toEqual(noVisualResult.candidate);
+    expect(visualResult.balancedScore).toEqual(noVisualResult.balancedScore);
+    expect(visualResult.ryoScore).toEqual(noVisualResult.ryoScore);
+    expect(visualResult.decision).toBe(noVisualResult.decision);
+  });
+
+  it("keeps Core score and Decision unchanged by URL evidence", async () => {
+    const withUrlInput = validRequest();
+    withUrlInput.userId = "";
+    const withoutUrlBase = validRequest();
+    const { urlAnalysis: _urlAnalysis, ...analysisWithoutUrl } =
+      withoutUrlBase.analysis;
+    const { userId: _userId, ...requestWithoutUser } = withoutUrlBase;
+    const withoutUrlInput = {
+      ...requestWithoutUser,
+      analysis: analysisWithoutUrl,
+    };
+    const withUrl = validateIntegratedRecommendationRequest(withUrlInput);
+    const withoutUrl = validateIntegratedRecommendationRequest(withoutUrlInput);
+    expect(withUrl.ok).toBe(true);
+    expect(withoutUrl.ok).toBe(true);
+    if (!withUrl.ok || !withoutUrl.ok) return;
+
+    const dependencies = {
+      core: {
+        env: {},
+        rakutenCandidateProvider: async () => ({
+          status: "missing_config" as const,
+          candidates: [],
+          evidence: [],
+          readiness: createRakutenProviderReadiness("missing_config"),
+          networkAttempted: false,
+          responseOk: false,
+          shapeValid: false,
+        }),
+        explanationProvider: async () => explanation,
+      },
+    };
+    const urlResult = await recommendIntegratedSneaker(withUrl.value, dependencies);
+    const noUrlResult = await recommendIntegratedSneaker(
+      withoutUrl.value,
+      dependencies,
+    );
+
+    expect(urlResult.externalEvidence.url).toMatchObject({
+      domain: "shop.example",
+      coreDecisionImpact: "none",
+    });
+    expect(urlResult.candidate).toEqual(noUrlResult.candidate);
+    expect(urlResult.balancedScore).toEqual(noUrlResult.balancedScore);
+    expect(urlResult.ryoScore).toEqual(noUrlResult.ryoScore);
+    expect(urlResult.decision).toBe(noUrlResult.decision);
   });
 });
 

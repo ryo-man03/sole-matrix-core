@@ -9,12 +9,20 @@ import type {
   IntegratedRecommendationRequest,
   IntegratedRecommendationResult,
 } from "./types";
+import { createExternalVisualEvidence } from "../external-evidence/visualEvidence";
+import { createExternalUrlEvidence } from "../external-evidence/urlEvidence";
+import { createExternalFeedbackPatternEvidence } from "../external-evidence/feedbackPatternEvidence";
+import {
+  readGlobalFeedbackCorpus,
+  type GlobalFeedbackCorpusReference,
+} from "../recommendation-feedback/globalFeedbackCorpus";
 
 type UserMemoryService = ReturnType<typeof createUserMemoryService>;
 
 export type IntegratedRecommendationDependencies = {
   core?: RecommendCoreV1Dependencies;
   userMemoryService?: UserMemoryService;
+  feedbackCorpusReader?: () => Promise<GlobalFeedbackCorpusReference>;
 };
 
 export async function recommendIntegratedSneaker(
@@ -22,6 +30,8 @@ export async function recommendIntegratedSneaker(
   dependencies: IntegratedRecommendationDependencies = {},
 ): Promise<IntegratedRecommendationResult> {
   const memoryService = dependencies.userMemoryService ?? createUserMemoryService();
+  const feedbackCorpusReader =
+    dependencies.feedbackCorpusReader ?? readGlobalFeedbackCorpus;
   const contextCautions = [
     ...(input.analysis?.urlAnalysis?.cautions ?? []),
     ...(input.analysis?.visualAnalysis?.cautions ?? []),
@@ -40,10 +50,13 @@ export async function recommendIntegratedSneaker(
     }
   }
 
-  const coreResult = await recommendCoreV1(input, {
+  const [coreResult, feedbackReference] = await Promise.all([
+    recommendCoreV1(input, {
     ...(dependencies.core ?? {}),
     ...(userMemoryContext ? { userMemoryContext } : {}),
-  });
+    }),
+    loadFeedbackReferenceSafely(feedbackCorpusReader),
+  ]);
   const baseModeRecommendation = createModeAwareRecommendation({
     mode: input.mode,
     candidate: coreResult.candidate,
@@ -94,6 +107,22 @@ export async function recommendIntegratedSneaker(
 
   return {
     ...coreResult,
+    externalEvidence: {
+      ...coreResult.externalEvidence,
+      feedbackPatterns: feedbackReference
+        ? createExternalFeedbackPatternEvidence(feedbackReference)
+        : [],
+      ...(input.analysis?.visualAnalysis
+        ? {
+            visual: createExternalVisualEvidence(
+              input.analysis.visualAnalysis,
+            ),
+          }
+        : {}),
+      ...(input.analysis?.urlAnalysis
+        ? { url: createExternalUrlEvidence(input.analysis.urlAnalysis) }
+        : {}),
+    },
     modeRecommendation,
     analysis: input.analysis ?? {},
     ...(memory
@@ -107,6 +136,16 @@ export async function recommendIntegratedSneaker(
       : {}),
     contextCautions,
   };
+}
+
+async function loadFeedbackReferenceSafely(
+  reader: () => Promise<GlobalFeedbackCorpusReference>,
+): Promise<GlobalFeedbackCorpusReference | null> {
+  try {
+    return await reader();
+  } catch {
+    return null;
+  }
 }
 
 function normalize(value: string): string {

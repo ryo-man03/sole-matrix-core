@@ -8,6 +8,7 @@ import type {
   LocalUserFeedback,
   UserMemorySummary,
 } from "./user-memory/types";
+import type { GlobalRecommendationFeedbackInput } from "./recommendation-feedback/globalFeedbackCorpus";
 
 type ApiSuccess<T> = { ok: true; data: T };
 type ApiFailure = { ok: false; error: { code: string; message: string; field?: string } };
@@ -41,6 +42,23 @@ export async function saveUserFeedback(
   input: Omit<LocalUserFeedback, "createdAt">,
 ): Promise<ApiResult<UserMemorySummary>> {
   return requestJson(`/api/users/${encodeURIComponent(userId)}/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function saveGlobalRecommendationFeedback(
+  input: GlobalRecommendationFeedbackInput,
+): Promise<
+  ApiResult<{
+    saved: true;
+    sessionType: "guest" | "user" | "unknown";
+    anonymized: true;
+    referenceOnly: true;
+  }>
+> {
+  return requestJson("/api/recommendation-feedback", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

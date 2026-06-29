@@ -1,5 +1,6 @@
 import type { SneakerVector } from "../../../src/domain/sneaker/sneakerVector";
 import type { SneakerTag } from "../../../src/domain/sneaker/sneakerTag";
+import type { ExternalEvidenceBundle } from "../external-evidence/types";
 
 export type DiagnosisAnswerValue = "like" | "neutral" | "dislike";
 
@@ -22,6 +23,7 @@ export type ModeAwareRecommendation = {
   modeReason: string;
   overlapWithOwned: string[];
   relatedWishlistModels: string[];
+  relatedCuratedModels: string[];
   cautions: string[];
 };
 
@@ -122,6 +124,7 @@ export type RecommendationResult = {
     gemini: ProviderReadiness;
     rakuten: ProviderReadiness;
   };
+  externalEvidence: ExternalEvidenceBundle;
 };
 
 export type FeedbackSentiment = "helpful" | "not_helpful" | "unsure";

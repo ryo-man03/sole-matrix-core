@@ -116,4 +116,69 @@ describe("mode-aware recommendation", () => {
 
     expect(result.decision).toBe("skip");
   });
+
+  it("references curated recommendations without mutating Core score inputs", () => {
+    const balancedInput = { ...balancedScore };
+    const ryoInput = { ...ryoScore };
+    const result = createModeAwareRecommendation({
+      mode: "ryo",
+      candidate: candidate({
+        name: "Vans Authentic Black / Black",
+        description: "classic black canvas",
+        priceYen: 8_800,
+      }),
+      balancedScore: balancedInput,
+      ryoScore: ryoInput,
+    });
+
+    expect(result.relatedCuratedModels).toContain("Vans Authentic Black / Black");
+    expect(balancedInput).toEqual(balancedScore);
+    expect(ryoInput).toEqual(ryoScore);
+  });
+
+  it("prefers an affordable classic when the same budget fits poorly elsewhere", () => {
+    const affordable = createModeAwareRecommendation({
+      mode: "ryo",
+      candidate: candidate({
+        name: "Reebok Classic Leather 1983 Vintage Chalk",
+        priceYen: 11_000,
+        budgetFit: 90,
+      }),
+      balancedScore: { ...balancedScore, budgetFit: 90 },
+      ryoScore,
+    });
+    const expensive = createModeAwareRecommendation({
+      mode: "ryo",
+      candidate: candidate({
+        name: "New Balance U993GG Gray",
+        priceYen: 39_600,
+        budgetFit: 35,
+      }),
+      balancedScore: { ...balancedScore, budgetFit: 35 },
+      ryoScore,
+    });
+
+    expect(affordable.ryoScore).toBeGreaterThan(expensive.ryoScore);
+    expect(affordable.decision).not.toBe("wait");
+    expect(expensive.decision).toBe("wait");
+  });
+
+  it("does not automatically boost New Balance 990v5 or later", () => {
+    const v4 = createModeAwareRecommendation({
+      mode: "ryo",
+      candidate: candidate({ name: "New Balance U990NV4 Navy" }),
+      balancedScore,
+      ryoScore,
+    });
+    const v5 = createModeAwareRecommendation({
+      mode: "ryo",
+      candidate: candidate({ name: "New Balance 990v5 Navy" }),
+      balancedScore,
+      ryoScore,
+    });
+
+    expect(v4.relatedCuratedModels).toContain("New Balance U990NV4 Navy");
+    expect(v5.relatedCuratedModels).toHaveLength(0);
+    expect(v5.ryoScore).toBeLessThan(v4.ryoScore);
+  });
 });

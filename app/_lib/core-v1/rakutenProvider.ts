@@ -9,6 +9,7 @@ import {
   type RakutenProviderStatus,
 } from "./rakutenReadiness";
 import type { CandidateProfile, ProviderReadiness } from "./types";
+import type { ExternalListingEvidence } from "../external-evidence/types";
 
 type SafeEnvironment = Record<string, string | undefined>;
 
@@ -24,6 +25,7 @@ export type RakutenCandidateProviderInput = {
 export type RakutenCandidateProviderResult = {
   status: RakutenProviderStatus;
   candidates: CandidateProfile[];
+  evidence: ExternalListingEvidence[];
   readiness: ProviderReadiness;
   networkAttempted: boolean;
   responseOk: boolean;
@@ -116,9 +118,8 @@ export async function fetchRakutenCandidates(
 
   return {
     status: "ready",
-    candidates: normalized.candidates.map((candidate) =>
-      toCandidateProfile(candidate, input.budgetYen),
-    ),
+    candidates: normalized.candidates.map(toCandidateProfile),
+    evidence: normalized.candidates.map(toExternalListingEvidence),
     readiness: createRakutenProviderReadiness("ready"),
     networkAttempted: true,
     responseOk: true,
@@ -129,10 +130,7 @@ export async function fetchRakutenCandidates(
 
 function toCandidateProfile(
   candidate: ExternalCandidate,
-  budgetYen: number | undefined,
 ): CandidateProfile {
-  const budgetFit = calculateBudgetFit(budgetYen, candidate.priceYen);
-
   return {
     id: candidate.id,
     name: candidate.name,
@@ -141,8 +139,8 @@ function toCandidateProfile(
       "楽天市場で取得し、安全な項目だけを正規化した商品候補です。価格や在庫は購入前に商品ページで確認してください。",
     tags: [...candidate.tags],
     vector: createCandidateVector(candidate.tags, candidate.priceYen),
-    budgetFit,
-    risk: calculateBudgetRisk(budgetYen, candidate.priceYen),
+    budgetFit: 65,
+    risk: "medium",
     informationCompleteness: 88,
     readiness: "ready_external",
     priceYen: candidate.priceYen,
@@ -150,6 +148,27 @@ function toCandidateProfile(
     ...(candidate.imageUrl ? { imageUrl: candidate.imageUrl } : {}),
     ...(candidate.shopName ? { shopName: candidate.shopName } : {}),
     ...(candidate.note ? { note: candidate.note } : {}),
+  };
+}
+
+function toExternalListingEvidence(
+  candidate: ExternalCandidate,
+): ExternalListingEvidence {
+  return {
+    kind: "external_listing",
+    provider: "rakuten",
+    listingName: candidate.name,
+    priceYen: candidate.priceYen,
+    productUrl: candidate.url,
+    ...(candidate.imageUrl ? { imageUrl: candidate.imageUrl } : {}),
+    ...(candidate.shopName ? { shopName: candidate.shopName } : {}),
+    confidence: "normalized_listing",
+    warnings: [
+      "価格・在庫・サイズ・販売状態は商品ページで再確認してください。",
+      "この価格はCore budgetFitとDecisionを直接変更しません。",
+    ],
+    budgetFitImpact: "none",
+    coreDecisionImpact: "none",
   };
 }
 
@@ -236,34 +255,6 @@ function tagScore(
   return matches === 0 ? fallback : Math.min(92, 70 + matches * 8);
 }
 
-function calculateBudgetFit(
-  budgetYen: number | undefined,
-  priceYen: number,
-): number {
-  if (budgetYen === undefined) {
-    return 65;
-  }
-
-  return budgetYen >= priceYen
-    ? 100
-    : Math.round(Math.max(0, (budgetYen / priceYen) * 100));
-}
-
-function calculateBudgetRisk(
-  budgetYen: number | undefined,
-  priceYen: number,
-): CandidateProfile["risk"] {
-  if (budgetYen === undefined) {
-    return "medium";
-  }
-
-  if (priceYen <= budgetYen) {
-    return "low";
-  }
-
-  return priceYen <= budgetYen * 1.25 ? "medium" : "high";
-}
-
 function failure(
   status: Exclude<RakutenProviderStatus, "ready">,
   networkAttempted: boolean,
@@ -274,6 +265,7 @@ function failure(
   return {
     status,
     candidates: [],
+    evidence: [],
     readiness: createRakutenProviderReadiness(status),
     networkAttempted,
     responseOk,

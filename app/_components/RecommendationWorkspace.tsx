@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   type DiagnosisAnswerId,
@@ -10,11 +10,16 @@ import {
   analyzeSneaker as analyzeSneakerApi,
   getUserProfile,
   registerUser as registerUserApi,
+  saveGlobalRecommendationFeedback,
   saveUserFeedback,
   searchRecommendations,
 } from "../_lib/apiClient";
+import type { AuthState, UserSession } from "../_lib/auth-session/types";
 import type { IntegratedRecommendationResult } from "../_lib/integrated-recommendation/types";
+import type { OnboardingPreferenceHint } from "../_lib/onboarding/types";
+import type { SatisfactionEvaluation } from "../_lib/satisfaction-feedback/types";
 import type { UserMemorySummary } from "../_lib/user-memory/types";
+import { ExternalEvidencePanel } from "./ExternalEvidencePanel";
 
 const workspaceModes = [
   {
@@ -39,7 +44,21 @@ const modeDecisionLabels: Record<
   skip: "SKIP",
 };
 
-export function RecommendationWorkspace() {
+type RecommendationWorkspaceProps = {
+  authState?: AuthState;
+  onGuestDiagnosisCompleted?: () => void;
+  onUserSession?: (session: UserSession) => void;
+  onboardingHint?: OnboardingPreferenceHint | null;
+  requireSessionSelection?: boolean;
+};
+
+export function RecommendationWorkspace({
+  authState = { status: "signed_out" },
+  onGuestDiagnosisCompleted,
+  onUserSession,
+  onboardingHint = null,
+  requireSessionSelection = false,
+}: RecommendationWorkspaceProps = {}) {
   const [mode, setMode] = useState<(typeof workspaceModes)[number]["id"]>("ryo");
   const [sneakerName, setSneakerName] = useState("");
   const [productUrl, setProductUrl] = useState("");
@@ -53,8 +72,10 @@ export function RecommendationWorkspace() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, DiagnosisAnswerId>>({});
   const [result, setResult] = useState<IntegratedRecommendationResult | null>(null);
-  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackEvaluation, setFeedbackEvaluation] =
+    useState<SatisfactionEvaluation>("good");
   const [feedbackComment, setFeedbackComment] = useState("");
+  const [guestFeedbackSaved, setGuestFeedbackSaved] = useState(false);
   const [isSavingFeedback, setIsSavingFeedback] = useState(false);
   const [workspaceStatus, setWorkspaceStatus] = useState(
     "候補情報と8問診断を入力してください。画像とURLは任意です。",
@@ -75,7 +96,33 @@ export function RecommendationWorkspace() {
     [result],
   );
 
+  useEffect(() => {
+    if (onboardingHint?.preferredBudgetYen) {
+      setBudgetText((current) =>
+        current.trim() ? current : String(onboardingHint.preferredBudgetYen),
+      );
+    }
+  }, [onboardingHint]);
+
   async function handleRecommend() {
+    if (
+      requireSessionSelection &&
+      (authState.status === "loading" || authState.status === "signed_out")
+    ) {
+      setWorkspaceStatus(
+        "ログインまたはゲストモードを選んでから診断を開始してください。",
+      );
+      return;
+    }
+    if (
+      authState.status === "guest" &&
+      authState.session.hasCompletedDiagnosis
+    ) {
+      setWorkspaceStatus(
+        "ゲスト診断は1回までです。ログインすると次の診断と履歴保存を利用できます。",
+      );
+      return;
+    }
     if (!allQuestionsAnswered) {
       setWorkspaceStatus(`8問すべてに回答してください。残り${preferenceDiagnosisQuestions.length - answeredCount}問です。`);
       return;
@@ -92,6 +139,7 @@ export function RecommendationWorkspace() {
 
     setIsAnalyzing(true);
     setResult(null);
+    setGuestFeedbackSaved(false);
     setWorkspaceStatus("URLと画像を安全に分析しています…");
     try {
       const analysisResponse = await analyzeSneakerApi({
@@ -110,7 +158,7 @@ export function RecommendationWorkspace() {
           questionId: question.id,
           value: answers[question.id]!,
         })),
-        preferenceTags: [],
+        preferenceTags: onboardingHint?.preferenceTags ?? [],
         mode,
         ...(budgetYen === undefined ? {} : { budgetYen }),
         ...(currentUser ? { userId: currentUser.profile.userId } : {}),
@@ -122,6 +170,9 @@ export function RecommendationWorkspace() {
       }
 
       setResult(recommendationResponse.data);
+      if (authState.status === "guest") {
+        onGuestDiagnosisCompleted?.();
+      }
       setWorkspaceStatus(
         `${selectedMode.label}の推薦が完了しました。scoreとDecisionはTypeScriptが確定しています。`,
       );
@@ -152,6 +203,11 @@ export function RecommendationWorkspace() {
         return;
       }
       setCurrentUser(payload.data);
+      onUserSession?.({
+        kind: "user",
+        userId: payload.data.profile.userId,
+        displayName: payload.data.profile.displayName,
+      });
       setWorkspaceStatus("ユーザーを登録し、memory.mdを読み込みました。");
     } finally {
       setIsRegistering(false);
@@ -171,12 +227,74 @@ export function RecommendationWorkspace() {
   }
 
   async function handleSaveFeedback() {
-    if (!currentUser || !result) {
-      setWorkspaceStatus("feedbackを保存するにはユーザー登録と推薦実行が必要です。");
+    if (!result) {
+      setWorkspaceStatus("feedbackを保存するには推薦実行が必要です。");
       return;
     }
     setIsSavingFeedback(true);
     try {
+      const sessionType = currentUser
+        ? "user"
+        : authState.status === "guest"
+          ? "guest"
+          : "unknown";
+      const evidenceUsed = [
+        "preference answers",
+        ...(mode === "ryo" ? ["owned / wishlist / curated hints"] : []),
+        ...(result.analysis.visualAnalysis ? ["image analysis"] : []),
+        ...(result.analysis.urlAnalysis ? ["URL analysis"] : []),
+        ...(result.candidate.source === "rakuten" ? ["Rakuten evidence"] : []),
+        "user feedback",
+      ];
+      const globalFeedback = await saveGlobalRecommendationFeedback({
+        sessionType,
+        recommendationMode: result.modeRecommendation.mode,
+        eightQuestionAnswers: preferenceDiagnosisQuestions.map(
+          (question) => answers[question.id] ?? "unanswered",
+        ),
+        userContextSummary: [
+          sessionType === "user" ? "logged-in user" : sessionType,
+          onboardingHint?.purpose,
+          onboardingHint?.experience,
+        ].filter(Boolean).join(" / "),
+        inputSneakerName:
+          result.analysis.sneakerName ??
+          result.analysis.urlAnalysis?.extractedNameHint ??
+          result.candidate.name,
+        ...(budgetText.trim()
+          ? { budgetRange: `up to ${budgetText.trim()} JPY` }
+          : {}),
+        importantTags: [
+          ...new Set([
+            ...result.candidate.tags,
+            ...(onboardingHint?.preferenceTags ?? []),
+          ]),
+        ],
+        generatedRecommendation: [result.candidate.name],
+        decision: result.modeRecommendation.decision,
+        balancedScore: result.modeRecommendation.balancedScore,
+        ryoScore: result.modeRecommendation.ryoScore,
+        reasonSummary: result.modeRecommendation.modeReason,
+        evidenceUsed,
+        userEvaluation: feedbackEvaluation,
+        userReason: feedbackComment,
+      });
+      if (!globalFeedback.ok) {
+        setWorkspaceStatus(globalFeedback.error.message);
+        return;
+      }
+
+      if (!currentUser) {
+        setGuestFeedbackSaved(true);
+        setFeedbackComment("");
+        setWorkspaceStatus(
+          authState.status === "guest"
+            ? "ゲストの評価を匿名の共通corpusへ保存しました。個人memoryには保存していません。"
+            : "評価を匿名の共通corpusへ保存しました。ログインすると個人memoryにも保存できます。",
+        );
+        return;
+      }
+
       const payload = await saveUserFeedback(currentUser.profile.userId, {
         sneakerName:
           result.analysis.sneakerName ??
@@ -186,7 +304,12 @@ export function RecommendationWorkspace() {
         decision: result.modeRecommendation.decision,
         balancedScore: result.modeRecommendation.balancedScore,
         ryoScore: result.modeRecommendation.ryoScore,
-        userRating: feedbackRating,
+        userRating:
+          feedbackEvaluation === "good"
+            ? 5
+            : feedbackEvaluation === "neutral"
+              ? 3
+              : 1,
         userComment: feedbackComment,
       });
       if (!payload.ok) {
@@ -195,7 +318,9 @@ export function RecommendationWorkspace() {
       }
       setCurrentUser(payload.data);
       setFeedbackComment("");
-      setWorkspaceStatus("feedbackをmemory.mdへ保存しました。");
+      setWorkspaceStatus(
+        "feedbackを個人memory.mdと匿名の共通corpusへ保存しました。",
+      );
     } finally {
       setIsSavingFeedback(false);
     }
@@ -234,7 +359,16 @@ export function RecommendationWorkspace() {
 
       <p className="workspace-status" aria-live="polite">{workspaceStatus}</p>
 
-      <div className="workspace-grid">
+      <nav className="mobile-workspace-steps" aria-label="スマホ診断ステップ">
+        <a href="#mobile-step-1"><span>1</span>入力</a>
+        <a href="#mobile-step-2"><span>2</span>好み</a>
+        <a href="#mobile-step-3"><span>3</span>画像 / URL</a>
+        <a href="#mobile-step-4"><span>4</span>推薦結果</a>
+        <a href="#mobile-step-5"><span>5</span>理由 / 証拠</a>
+        <a href="#mobile-step-6"><span>6</span>保存 / 評価</a>
+      </nav>
+
+      <div className="workspace-grid desktop-workspace-layout">
         <section aria-labelledby="workspace-input-title" className="workspace-panel workspace-input-panel">
           <div className="workspace-panel-heading">
             <span>01 / INPUT</span>
@@ -242,53 +376,83 @@ export function RecommendationWorkspace() {
             <p>診断と候補情報を、無理のない順番で集めます。</p>
           </div>
 
-          <div className="diagnosis-entry-row">
-            <div><strong>8問診断</strong><span>好みをPreferenceVectorへ変換</span></div>
-            <span className="workspace-chip">{answeredCount} / 8</span>
-          </div>
-
-          <div className="workspace-diagnosis-card">
-            <div className="workspace-question-meta">
-              <span>Q{currentQuestionIndex + 1}</span>
-              <strong>{currentQuestionIndex + 1} / 8</strong>
-            </div>
-            <p>{currentQuestion.question}</p>
-            <small>{currentQuestion.helperText}</small>
-            <div className="workspace-answer-buttons" role="group" aria-label={`${currentQuestion.question}への回答`}>
-              {currentQuestion.options.map((option) => (
-                <button
-                  aria-pressed={answers[currentQuestion.id] === option.id}
-                  data-selected={answers[currentQuestion.id] === option.id}
-                  key={option.id}
-                  onClick={() => setAnswers((current) => ({ ...current, [currentQuestion.id]: option.id }))}
-                  type="button"
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <div className="workspace-question-nav">
-              <button disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex((index) => Math.max(0, index - 1))} type="button">前へ</button>
-              <button disabled={currentQuestionIndex === 7} onClick={() => setCurrentQuestionIndex((index) => Math.min(7, index + 1))} type="button">次へ</button>
+          <div className="mobile-step-section" data-mobile-step="1" id="mobile-step-1">
+            <p className="mobile-step-label">Step 1 / 入力</p>
+            <div className="workspace-fields workspace-basic-fields">
+              <label><span>スニーカー名</span><input onChange={(event) => setSneakerName(event.target.value)} placeholder="例: adidas Samba OG" type="text" value={sneakerName} /></label>
+              <label><span>予算</span><input inputMode="numeric" min="1" onChange={(event) => setBudgetText(event.target.value)} placeholder="例: 20000" type="number" value={budgetText} /></label>
             </div>
           </div>
 
-          <div className="workspace-fields">
-            <label><span>スニーカー名</span><input onChange={(event) => setSneakerName(event.target.value)} placeholder="例: adidas Samba OG" type="text" value={sneakerName} /></label>
-            <label><span>商品URL</span><input inputMode="url" onChange={(event) => setProductUrl(event.target.value)} placeholder="https://example.com/item" type="url" value={productUrl} /><small>server-sideでprivate IPと危険schemeを遮断します。</small></label>
-            <div className="workspace-image-field">
-              <label><span>画像アップロード</span><input accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} type="file" /><small>{imageFile ? `${imageFile.name} / ${formatFileSize(imageFile.size)}` : "JPEG / PNG / WebP・5MBまで"}</small></label>
-              <button onClick={handleUseDemoImage} type="button">サンプル画像を使う</button>
+          <div className="mobile-step-section" data-mobile-step="2" id="mobile-step-2">
+            <p className="mobile-step-label">Step 2 / 好みタグ</p>
+            <div className="diagnosis-entry-row">
+              <div><strong>8問診断</strong><span>好みをPreferenceVectorへ変換</span></div>
+              <span className="workspace-chip">{answeredCount} / 8</span>
             </div>
-            <label><span>予算</span><input inputMode="numeric" min="1" onChange={(event) => setBudgetText(event.target.value)} placeholder="例: 20000" type="number" value={budgetText} /></label>
+
+            <div className="workspace-diagnosis-card">
+              <div className="workspace-question-meta">
+                <span>Q{currentQuestionIndex + 1}</span>
+                <strong>{currentQuestionIndex + 1} / 8</strong>
+              </div>
+              <p>{currentQuestion.question}</p>
+              <small>{currentQuestion.helperText}</small>
+              <div className="workspace-answer-buttons" role="group" aria-label={`${currentQuestion.question}への回答`}>
+                {currentQuestion.options.map((option) => (
+                  <button
+                    aria-pressed={answers[currentQuestion.id] === option.id}
+                    data-selected={answers[currentQuestion.id] === option.id}
+                    key={option.id}
+                    onClick={() => setAnswers((current) => ({ ...current, [currentQuestion.id]: option.id }))}
+                    type="button"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <div className="workspace-question-nav">
+                <button disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex((index) => Math.max(0, index - 1))} type="button">前へ</button>
+                <button disabled={currentQuestionIndex === 7} onClick={() => setCurrentQuestionIndex((index) => Math.min(7, index + 1))} type="button">次へ</button>
+              </div>
+            </div>
           </div>
 
-          <button className="workspace-primary-button" disabled={isAnalyzing} onClick={handleRecommend} type="button">
-            {isAnalyzing ? "分析・推薦中…" : "分析して推薦を実行する"}
+          <div className="mobile-step-section" data-mobile-step="3" id="mobile-step-3">
+            <p className="mobile-step-label">Step 3 / 画像・URL</p>
+            <div className="workspace-fields workspace-evidence-fields">
+              <label><span>商品URL</span><input inputMode="url" onChange={(event) => setProductUrl(event.target.value)} placeholder="https://example.com/item" type="url" value={productUrl} /><small>server-sideでprivate IPと危険schemeを遮断します。</small></label>
+              <div className="workspace-image-field">
+                <label><span>画像アップロード</span><input accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} type="file" /><small>{imageFile ? `${imageFile.name} / ${formatFileSize(imageFile.size)}` : "JPEG / PNG / WebP・5MBまで"}</small></label>
+                <button onClick={handleUseDemoImage} type="button">サンプル画像を使う</button>
+              </div>
+            </div>
+          </div>
+
+          <button
+            className="workspace-primary-button"
+            disabled={
+              isAnalyzing ||
+              (requireSessionSelection &&
+                (authState.status === "loading" ||
+                  authState.status === "signed_out")) ||
+              (authState.status === "guest" &&
+                authState.session.hasCompletedDiagnosis)
+            }
+            onClick={handleRecommend}
+            type="button"
+          >
+            {isAnalyzing
+              ? "分析・推薦中…"
+              : authState.status === "guest" &&
+                  authState.session.hasCompletedDiagnosis
+                ? "ゲスト診断は利用済み"
+                : "分析して推薦を実行する"}
           </button>
         </section>
 
-        <section aria-labelledby="workspace-result-title" className="workspace-panel workspace-result-panel">
+        <section aria-labelledby="workspace-result-title" className="workspace-panel workspace-result-panel" data-mobile-step="4" id="mobile-step-4">
+          <p className="mobile-step-label">Step 4 / 推薦結果</p>
           <div className="workspace-panel-heading">
             <span>02 / RESULT</span><h3 id="workspace-result-title">解析・推薦結果</h3><p>{selectedMode.label}の観点を選択中です。</p>
           </div>
@@ -320,14 +484,14 @@ export function RecommendationWorkspace() {
             {result?.analysis.visualAnalysis ? <div><dt>Image analysis</dt><dd>{[result.analysis.visualAnalysis.detectedBrand, result.analysis.visualAnalysis.detectedModelName, ...result.analysis.visualAnalysis.mainColors].filter(Boolean).join(" / ") || "特徴を特定できませんでした"}</dd></div> : null}
           </dl>
 
-          <div className="workspace-provider-readiness">
-            <span>Provider readiness</span>
-            <div><strong>Rakuten</strong><em data-status={result?.readiness.rakuten.status ?? "not_checked"}>{result?.readiness.rakuten.status ?? "診断実行後に確認"}</em></div>
-            <div><strong>Gemini</strong><em data-status={result?.readiness.gemini.status ?? "not_checked"}>{result ? `${result.readiness.gemini.status} / ${result.explanation.source}` : "補助分析のみ"}</em></div>
+          <div className="workspace-external-evidence-step" data-mobile-step="5" id="mobile-step-5">
+            <p className="mobile-step-label">Step 5 / 理由・外部証拠</p>
+            <ExternalEvidencePanel result={result} />
           </div>
         </section>
 
-        <aside aria-labelledby="workspace-user-title" className="workspace-panel workspace-user-panel">
+        <aside aria-labelledby="workspace-user-title" className="workspace-panel workspace-user-panel" data-mobile-step="6" id="mobile-step-6">
+          <p className="mobile-step-label">Step 6 / 保存・フィードバック</p>
           <div className="workspace-panel-heading"><span>03 / USER</span><h3 id="workspace-user-title">ユーザー情報</h3><p>好みと判断履歴を、ユーザーごとに育てます。</p></div>
           <div className="workspace-fields workspace-user-fields">
             <label><span>ユーザーID</span><input autoComplete="username" onChange={(event) => setUserId(event.target.value)} placeholder="ryo_01" type="text" value={userId} /></label>
@@ -343,15 +507,48 @@ export function RecommendationWorkspace() {
 
           {result ? (
             <div className="workspace-feedback-form">
-              <span>この推薦をmemory.mdへ記録</span>
-              <label>評価（1〜5）<input max="5" min="1" onChange={(event) => setFeedbackRating(Number(event.target.value))} type="number" value={feedbackRating} /></label>
-              <label>コメント<textarea maxLength={500} onChange={(event) => setFeedbackComment(event.target.value)} placeholder="履いた場面や迷った理由" value={feedbackComment} /></label>
-              <button disabled={isSavingFeedback || !currentUser} onClick={handleSaveFeedback} type="button">{isSavingFeedback ? "保存中…" : "feedbackを保存する"}</button>
-              {!currentUser ? <small>先にユーザー登録してください。</small> : null}
+              <span>この推薦はどうでしたか？</span>
+              <div className="workspace-feedback-evaluation" role="group" aria-label="推薦への評価">
+                {([
+                  ["good", "納得できた"],
+                  ["neutral", "微妙"],
+                  ["bad", "違う"],
+                ] as const).map(([value, label]) => (
+                  <button
+                    aria-pressed={feedbackEvaluation === value}
+                    data-selected={feedbackEvaluation === value}
+                    key={value}
+                    onClick={() => setFeedbackEvaluation(value)}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <label>理由メモ<textarea maxLength={500} onChange={(event) => setFeedbackComment(event.target.value)} placeholder="なぜそう思いましたか？" value={feedbackComment} /></label>
+              <button disabled={isSavingFeedback} onClick={handleSaveFeedback} type="button">{isSavingFeedback ? "保存中…" : "次回に反映するために保存"}</button>
+              {!currentUser ? <small>ゲスト評価は匿名の共通corpusに保存し、個人memoryには保存しません。</small> : null}
+              {guestFeedbackSaved ? <small>匿名化して保存済みです。</small> : null}
+            </div>
+          ) : null}
+
+          {authState.status === "guest" &&
+          authState.session.hasCompletedDiagnosis ? (
+            <div className="guest-upgrade-callout">
+              <strong>結果を保存して、次の一足も診断する</strong>
+              <p>
+                ログインすると診断履歴と推薦への評価を自分のmemoryへ保存できます。
+              </p>
+              <a href="/login?intent=login&next=/app">ログインへ</a>
             </div>
           ) : null}
 
           <div className="workspace-mode-note" data-mode={mode}><span>{selectedMode.label}</span><p>{selectedMode.description}</p>{mode === "ryo" ? <small>実所有41足 / wishlist 40候補のseed v2を参照</small> : null}</div>
+          {onboardingHint ? (
+            <p className="workspace-onboarding-hint">
+              初回設定の補助タグ: {onboardingHint.preferenceTags.join(" / ") || "なし"}
+            </p>
+          ) : null}
         </aside>
       </div>
     </section>

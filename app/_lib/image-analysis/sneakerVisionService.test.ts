@@ -55,6 +55,7 @@ describe("Gemini sneaker visual analysis", () => {
       confidence: 0,
       vintageScore: 0,
     });
+    expect(result.cautions.join(" ")).toContain("画像分析を利用できない");
     expect(fetcher).not.toHaveBeenCalled();
   });
 
@@ -101,6 +102,9 @@ describe("Gemini sneaker visual analysis", () => {
   });
 
   it("rejects forbidden decision output and never exposes raw text", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const raw = {
       detectedBrand: "Unknown",
       mainColors: [],
@@ -125,6 +129,12 @@ describe("Gemini sneaker visual analysis", () => {
     expect(result.confidence).toBe(0);
     expect(JSON.stringify(result)).not.toContain("must not escape");
     expect(JSON.stringify(result)).not.toContain("strong_buy");
+    expect(info).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+    info.mockRestore();
+    log.mockRestore();
+    error.mockRestore();
   });
 
   it("falls back when Gemini returns invalid JSON", async () => {
@@ -142,6 +152,32 @@ describe("Gemini sneaker visual analysis", () => {
 
     expect(result.confidence).toBe(0);
     expect(JSON.stringify(result)).not.toContain("raw detail");
+  });
+
+  it("marks low-confidence visual estimates as uncertain", async () => {
+    const result = await analyzeSneakerImage(image, {
+      apiKey: "configured",
+      fetcher: vi.fn<typeof fetch>().mockResolvedValue(
+        geminiResponse({
+          detectedBrand: "Unknown",
+          mainColors: ["black"],
+          silhouette: "low",
+          category: "lifestyle",
+          materialHints: [],
+          vintageSignal: "low",
+          streetSignal: "low",
+          cleanSignal: "medium",
+          uniquenessSignal: "low",
+          culturalContext: [],
+          confidence: 0.4,
+          cautions: [],
+        }),
+      ),
+    });
+
+    expect(result.confidence).toBe(0.4);
+    expect(result.cautions.join(" ")).toContain("不確か");
+    expect(result.cautions.join(" ")).toContain("商品名・カラーを確定できません");
   });
 });
 

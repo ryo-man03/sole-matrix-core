@@ -65,7 +65,9 @@ export async function recommendCoreV1(
       ...(input.urlNameHint ? { urlNameHint: input.urlNameHint } : {}),
     }),
   ]);
-  const candidates = [...localCandidates, ...rakutenResult.candidates];
+  // External listings are observable evidence only. They never enter the Core
+  // scoring candidate set, so provider price cannot rewrite budgetFit/Decision.
+  const candidates = localCandidates;
 
   const scoredCandidates = candidates.map((candidate) => {
     const balancedScore = calculateBalancedScore({
@@ -139,6 +141,10 @@ export async function recommendCoreV1(
           : createGeminiFallbackReadiness(Boolean(env["GEMINI_API_KEY"])),
       rakuten: rakutenResult.readiness,
     },
+    externalEvidence: {
+      listings: rakutenResult.evidence,
+      feedbackPatterns: [],
+    },
   };
 }
 
@@ -152,6 +158,7 @@ async function loadRakutenCandidatesSafely(
     return {
       status: "network_or_http_error",
       candidates: [],
+      evidence: [],
       readiness: createRakutenProviderReadiness("network_or_http_error"),
       networkAttempted: true,
       responseOk: false,

@@ -19,24 +19,32 @@ const input = {
 };
 
 describe("Core v1 Rakuten candidate integration", () => {
-  it("scores a normalized ready candidate with the TypeScript Core", async () => {
-    const result = await recommendCoreV1(input, {
-      candidateRepository: { async listCandidates() { return []; } },
+  it("keeps normalized Rakuten listings outside Core scoring and Decision", async () => {
+    const withRakuten = await recommendCoreV1(input, {
+      candidateRepository: mockCandidateRepository,
       rakutenCandidateProvider: async () => providerResult("ready", [rakutenCandidate]),
       explanationProvider: async () => explanation,
       env: {},
     });
-
-    expect(result.candidate).toMatchObject({
-      id: "rakuten-item-1",
-      source: "rakuten",
-      priceYen: 15_000,
-      readiness: "ready_external",
+    const withoutRakuten = await recommendCoreV1(input, {
+      candidateRepository: mockCandidateRepository,
+      rakutenCandidateProvider: async () => providerResult("missing_config"),
+      explanationProvider: async () => explanation,
+      env: {},
     });
-    expect(result.readiness.rakuten.status).toBe("ready");
-    expect(result.decision).toMatch(/strong_buy|consider|wait|avoid|unknown/);
-    expect(result.balancedScore.total).toBeGreaterThan(0);
-    expect(result.ryoScore.total).toBeGreaterThan(0);
+
+    expect(withRakuten.candidate.source).toBe("local");
+    expect(withRakuten.readiness.rakuten.status).toBe("ready");
+    expect(withRakuten.externalEvidence.listings[0]).toMatchObject({
+      provider: "rakuten",
+      priceYen: 15_000,
+      budgetFitImpact: "none",
+      coreDecisionImpact: "none",
+    });
+    expect(withRakuten.candidate).toEqual(withoutRakuten.candidate);
+    expect(withRakuten.balancedScore).toEqual(withoutRakuten.balancedScore);
+    expect(withRakuten.ryoScore).toEqual(withoutRakuten.ryoScore);
+    expect(withRakuten.decision).toBe(withoutRakuten.decision);
   });
 
   it.each(["blocked_forbidden", "blocked_rate_limit", "invalid_response"] as const)(
@@ -129,6 +137,17 @@ function providerResult(
   return {
     status,
     candidates,
+    evidence: candidates.map((candidate) => ({
+      kind: "external_listing" as const,
+      provider: "rakuten" as const,
+      listingName: candidate.name,
+      priceYen: candidate.priceYen ?? 0,
+      productUrl: candidate.url ?? "https://example.com/",
+      confidence: "normalized_listing" as const,
+      warnings: ["参考情報"],
+      budgetFitImpact: "none" as const,
+      coreDecisionImpact: "none" as const,
+    })),
     readiness: createRakutenProviderReadiness(status),
     networkAttempted: status !== "missing_config",
     responseOk: ready,

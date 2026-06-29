@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml/badge.svg)](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml)
 
-> **AI-powered sneaker recommendation platform.** Diagnosis, rule-based scoring, Gemini explanation, Rakuten readiness, and reproducible TypeScript Core.
+> **AI-powered sneaker recommendation platform.** Diagnosis, reproducible TypeScript Core, and clearly separated external evidence.
 
-[Release Notes v1.0.0](docs/releases/v1.0.0.md) · [Architecture](docs/core-v1-architecture.md) · [Security](docs/security/all-in-one-security.md)
+[Release Notes v1.1.0 Draft](docs/releases/v1.1.0.md) · [Release Notes v1.0.0](docs/releases/v1.0.0.md) · [Architecture](docs/core-v1-architecture.md) · [Security](docs/security/all-in-one-security.md)
 
-SOLE//MATRIX は、気になるスニーカーの好み・商品URL・画像・予算・購入リスクを一画面で整理する判断支援プロトタイプです。PC版workspaceでは8問診断、Ryo Mode / Balanced Mode、URL・画像分析、楽天候補、ユーザーmemory、feedbackを一つの流れで扱います。
+SOLE//MATRIX は、自分の好みをまだ言語化しきれない人が、スニーカー選びの軸を作るための判断支援プロダクトです。ログイン相当またはゲストで開始し、初回設定、8問診断、Ryo Mode / Balanced Mode、満足度feedbackをPC・mobileの同じ導線で扱います。
 
-最終的なscoreとDecisionはTypeScriptが決定します。Geminiは説明と画像特徴抽出の補助、楽天APIは商品候補取得だけを担当します。外部APIが失敗してもlocal候補とrule-based explanationへfallbackします。
+最終的なscoreとDecisionはTypeScript Coreだけが決定します。Rakuten listing、Gemini画像分析、Gemini URL Context、共通feedback corpusは外部証拠として別表示され、Coreの候補・budgetFit・Decisionを変更しません。外部APIが失敗してもlocal候補とrule-based explanationへfallbackします。
 
 ## Product Preview
 
@@ -38,31 +38,79 @@ SOLE//MATRIX は、気になるスニーカーの好み・商品URL・画像・�
 ## 主な機能
 
 - 8問回答を`PreferenceVector`の8軸へ変換
-- PC向け3カラムUI（入力 / 解析・推薦結果 / user memory）
+- `/login`、`/app`、`/onboarding`、`/settings`のproduct entry flow
+- mobile 1カラムからPC 3カラムまでのresponsive workspace
+- guest 1回診断とlogin相当sessionの保存境界
 - `Ryo Mode`と`Balanced Mode`の切り替え
 - スニーカー名、商品URL、JPEG / PNG / WebP画像、予算の入力
 - SSRF対策済みserver-side URL meta抽出
-- Gemini visionの定性的signalをTypeScriptでstructured JSONへ正規化
+- Gemini画像・URL evidenceのstructured JSON正規化
 - local user profileと`data/users/{safeUserId}/memory.md`
-- 診断履歴とfeedbackの永続化
-- Ryo seedの所有モデル・wishlist・文化的背景参照
-- 楽天候補のserver-side検索、正規化、readiness表示
+- 診断履歴、3択満足度feedback、匿名共通corpus
+- 所有・wishlistと分離したRyo Mode curated recommendation seed
+- Rakuten listingのserver-side取得、正規化、external evidence表示
 - Gemini structured explanationまたはrule-based fallback
 
 ## 判断の流れ
 
 ```text
-8問診断 + 名前 / URL / 画像 / 予算
-  → URL meta analysis + image visual analysis
+login相当 / guest → 初回設定 → 8問診断
   → user memory（untrusted user data）+ Ryo seed
-  → local候補 + 検証済み楽天候補
+  → local候補
   → Core v1 Balanced / Ryo score
   → mode evaluatorが最終Decision
   → Gemini explanation または rule-based fallback
-  → feedbackをmemory.mdへ保存
+
+名前 / URL / 画像 / Rakuten / 匿名feedback corpus
+  → external evidenceとして正規化
+  → readiness・confidence・warningと共に別panelへ表示
+  → Core候補・score・budgetFit・Decisionには不介入
+
+推薦後の満足度feedback
+  → login相当userはmemoryへ保存
+  → 匿名化した評価例は共通corpusへ保存
+  → guestの個人memoryは保存しない
 ```
 
-Ryo Modeは林諒馬の実所有41足と、重複行を統合したwishlist 40候補のseed v2を参照し、colorway、collaboration、製造背景、同一familyの重複を評価します。Balanced Modeは価格、汎用性、情報の確かさ、サイズ・プレ値などの購入リスクを重視します。
+Ryo Modeは林諒馬の実所有41足、重複行を統合したwishlist 40候補、独立したcurated recommendation seedを参照し、colorway、collaboration、製造背景、同一familyの重複を評価します。Balanced Modeは価格、汎用性、情報の確かさ、サイズ・プレ値などの購入リスクを重視します。
+
+## v1.1 Product-ready Beta (Draft)
+
+### Who this is for
+
+主な対象は、スニーカーに興味はあるが、自分の好み・手持ちとの相性・予算・買うタイミングを一人では整理しにくい学生や若い社会人です。詳しい人の感覚をそのまま押しつけるのではなく、再現可能な判断軸として渡します。
+
+### How users start
+
+トップから`/login`へ進み、login相当sessionまたはguestを選びます。初回は`/onboarding`の6ステップで安全な好みhintを作り、`/app`で診断を開始します。guestはbrowser内で1回診断でき、個人memoryは永続化しません。
+
+### Login / Guest mode
+
+現段階のloginはSupabase接続を想定したUI・session境界であり、本番認証そのものではありません。guest識別子と診断済みflagはlocalStorage、onboardingの一時hintはsessionStorageに限定します。`/settings`からlogout、guest data削除、将来のaccount削除方針を確認できます。
+
+### Responsive UI
+
+workspaceは390px級のmobile 1カラムから始まり、1024px以上では入力・推薦・memory/evidenceの3カラムになります。主要操作はkeyboard focus、44px以上のbutton高、横overflowなしを基準にしています。
+
+### Ryo Mode Curated Recommendation Seed
+
+未購入でも人に勧めたい候補と推薦思想を、所有履歴・wishlist・user memoryから分離して管理します。boundedなRyo reference bonusにだけ使い、seed単独でDecisionを決めません。詳しくは[seed policy](docs/product/RYO_MODE_CURATED_SEED.md)を参照してください。
+
+### External Evidence Layer
+
+Rakuten listing、画像visual evidence、URL metadata / Gemini URL Context、匿名feedback patternsを一つのpanelへ集約します。各sourceはreadiness、confidence、warningを持ち、参考情報であることをUI上でも明記します。
+
+### Global Recommendation Feedback Corpus
+
+3択の満足度と任意理由から、個人識別子を含まない評価例をruntime corpusへ追記します。自由記述のemail・phone・URLは伏せ、AIへの命令ではなくuntrusted referenceとして扱います。詳しくは[corpus policy](docs/product/GLOBAL_RECOMMENDATION_FEEDBACK.md)を参照してください。
+
+### Rakuten / Gemini policy
+
+Rakutenは商品listingの外部証拠、Geminiは説明・画像特徴・公開URL文脈の補助です。API key、query全文、key入りrequest URL、raw responseをログ・UI・corpusへ出しません。どちらもTypeScript CoreのscoreまたはDecisionを決定しません。
+
+### User satisfaction feedback
+
+推薦後に「満足」「一部満足」「不満」の3択と任意理由を受け付けます。login相当userのfeedbackは個人memory、guestの個人feedbackはsession内、匿名化した評価例は共通corpusという境界で扱います。
 
 ## セットアップ
 
@@ -94,6 +142,7 @@ RUN_EXTERNAL_SMOKE=
 | `POST /api/users/register` | local user登録 / `memory.md`作成 |
 | `GET /api/users/:userId/profile` | profile・履歴summary取得 |
 | `POST /api/users/:userId/feedback` | feedback永続化 |
+| `POST /api/recommendation-feedback` | 匿名共通corpusへの安全な追記 |
 | `POST /api/sneakers/analyze` | 名前・URL・画像の統合分析 |
 | `POST /api/recommendations/search` | mode-aware統合推薦 |
 | `POST /api/core-v1/recommend` | 既存Core v1互換endpoint |
@@ -125,11 +174,11 @@ schema不一致、禁止field、通信失敗、設定不足ではstructured fall
 
 ## 楽天候補とfallback
 
-検索queryは名前・brand・color・URL name hint・診断tagから短く生成します。候補採用にはHTTP 200、JSON parse、shape validation、商品名、正の価格、安全なHTTPS URLが必要です。不正itemはrawのままUIやscoringへ渡しません。
+検索queryは名前・brand・color・URL name hintから短く生成します。listing採用にはHTTP 200、JSON parse、shape validation、商品名、正の価格、安全なHTTPS URLが必要です。不正itemはrawのままUIへ渡しません。有効なlistingもCore candidate setへ入れず、価格はbudgetFitへ使わず、external evidence panelだけへ表示します。
 
 | 状態 | 動作 |
 | --- | --- |
-| HTTP 200 + valid candidate | local候補と比較してTypeScriptでscore |
+| HTTP 200 + valid listing | external evidence panelへ表示。Core Decisionは不変 |
 | `missing_config` | local候補で継続 |
 | HTTP 403 | `blocked_forbidden`、local候補で継続 |
 | HTTP 429 | `blocked_rate_limit`、local候補で継続 |
@@ -175,12 +224,16 @@ app/_lib/core-v1/                             score / Decision / providers
 app/_lib/url-analysis/                        safe URL analysis
 app/_lib/image-analysis/                      image validation / vision adapter
 app/_lib/user-memory/                         memory.md persistence
+app/_lib/auth-session/                        login相当 / guest session boundary
+app/_lib/external-evidence/                    Rakuten / image / URL evidence view model
+app/_lib/recommendation-feedback/              satisfactionと匿名corpus
 app/_lib/integrated-recommendation/           mode-aware orchestration
 app/_lib/apiClient.ts                         frontend API boundary
 app/api/                                      Next.js transport routes
 server/routes/                                backend route boundary
 server/services/                              backend service boundary
 data/users/                                   ignored runtime user data
+data/recommendation-feedback/                 ignored runtime corpus + synthetic example
 ```
 
 設計と検証の詳細は[architecture](docs/core-v1-architecture.md)と[security notes](docs/security/all-in-one-security.md)を参照してください。
@@ -200,8 +253,9 @@ Phase 9 / 10で更新するPC版証跡:
 
 ## 制限
 
-- local user登録は認証ではありません
-- 楽天候補は在庫・真贋・市場価格を保証しません
+- login相当UIとsession境界は本番認証ではありません
+- Supabase接続とaccount削除は将来実装のplaceholderです
+- Rakuten listingは在庫・真贋・市場価格を保証せず、Coreの推薦候補ではありません
 - 画像からのbrand / model名は推定であり、真贋判定ではありません
 - 別server化は境界までで、現在はNext.js process内です
 - Core v0.1 / v1の既存API、CLI、golden testsは維持しています
