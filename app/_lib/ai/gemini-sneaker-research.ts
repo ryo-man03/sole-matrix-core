@@ -1,134 +1,458 @@
-import { buildGeminiSneakerResearchPrompt } from "./gemini-sneaker-research-prompt";
 import {
-  validateGeminiSneakerResearchResult,
+  buildGeminiSneakerNormalizationPrompt,
+  buildGeminiSneakerRepairPrompt,
+  buildGeminiSneakerResearchPrompt,
+  type GeminiSneakerResearchInput,
+} from "./gemini-sneaker-research-prompt";
+import {
+  geminiSneakerResearchResponseSchema,
+  validateEvidenceUrls,
+  validateGeminiSneakerResearchDraft,
+  type GeminiResearchEvidenceLink,
+  type GeminiSneakerResearchDraftCandidate,
+  type GeminiSneakerResearchCandidate,
   type GeminiSneakerResearchResult,
 } from "./gemini-sneaker-research-schema";
 
 const defaultModel = "gemini-2.5-flash";
+const requestTimeoutMs = 30_000;
 
 export type GeminiResearchReasonCode =
-  | "missing_env"
-  | "http_429"
-  | "http_403"
-  | "http_5xx"
+  | "gemini_success"
+  | "missing_api_key"
+  | "api_error"
+  | "rate_limited"
   | "timeout"
   | "invalid_json"
   | "schema_invalid"
-  | "no_valid_candidates"
-  | "unknown_error";
+  | "no_candidates"
+  | "no_evidence_url"
+  | "model_name_too_abstract"
+  | "core_reevaluation_failed"
+  | "fallback_catalog_used";
+
+export type GeminiResearchStageStatus =
+  | "ready"
+  | "fallback"
+  | "error"
+  | "not_checked";
+
+export type GeminiResearchStages = {
+  grounding: {
+    status: GeminiResearchStageStatus;
+    evidenceUrlCount: number;
+  };
+  normalization: {
+    status: GeminiResearchStageStatus;
+    repairAttempted: boolean;
+    candidateCount: number;
+  };
+};
+
+type OutcomeMetadata = {
+  modelUsed: string | null;
+  usedFallbackModel: boolean;
+  stages: GeminiResearchStages;
+};
 
 export type GeminiSneakerResearchOutcome =
-  | { status: "ready"; reasonCode: null; result: GeminiSneakerResearchResult }
-  | { status: "not_configured"; reasonCode: "missing_env"; result: null }
-  | { status: "fallback" | "error"; reasonCode: Exclude<GeminiResearchReasonCode, "missing_env">; result: null };
+  | ({
+      status: "ready";
+      reasonCode: "gemini_success";
+      result: GeminiSneakerResearchResult;
+    } & OutcomeMetadata)
+  | ({
+      status: "fallback" | "error";
+      reasonCode: Exclude<GeminiResearchReasonCode, "gemini_success">;
+      result: null;
+    } & OutcomeMetadata);
+
+type ResearchOptions = {
+  apiKey?: string;
+  model?: string;
+  fallbackModel?: string;
+  fetcher?: typeof fetch;
+};
+
+type RequestRuntime = {
+  currentModel: string;
+  fallbackModel: string | null;
+  usedFallbackModel: boolean;
+  modelUsed: string;
+};
+
+type GeminiEnvelope = {
+  body: unknown;
+  model: string;
+};
+
+type RequestResult =
+  | { ok: true; value: GeminiEnvelope }
+  | {
+      ok: false;
+      reasonCode: Exclude<GeminiResearchReasonCode, "gemini_success" | "missing_api_key" | "core_reevaluation_failed" | "fallback_catalog_used">;
+      retryWithFallbackModel: boolean;
+    };
+
+type GroundingEvidence = {
+  text: string;
+  chunks: Array<{ url: string; title: string } | null>;
+  supports: Array<{ text: string; chunkIndices: number[] }>;
+};
 
 export async function researchSneakerCandidatesWithGemini(
-  input: Parameters<typeof buildGeminiSneakerResearchPrompt>[0],
-  options: { apiKey?: string; model?: string; fetcher?: typeof fetch } = {},
+  input: GeminiSneakerResearchInput,
+  options: ResearchOptions = {},
 ): Promise<GeminiSneakerResearchOutcome> {
   const apiKey = options.apiKey ?? process.env.GEMINI_API_KEY;
   const fetcher = options.fetcher ?? globalThis.fetch;
-  if (!apiKey) return failure("not_configured", "missing_env");
-  if (typeof fetcher !== "function") return failure("error", "unknown_error");
+  const stages = createInitialStages();
+  if (!apiKey?.trim()) return failure("missing_api_key", null, false, stages);
+  if (typeof fetcher !== "function") {
+    stages.grounding.status = "error";
+    return failure("api_error", null, false, stages, "error");
+  }
 
+  const primaryModel = options.model ?? process.env.GEMINI_RESEARCH_MODEL ?? defaultModel;
+  const configuredFallback = options.fallbackModel ?? process.env.GEMINI_RESEARCH_FALLBACK_MODEL;
+  const runtime: RequestRuntime = {
+    currentModel: primaryModel,
+    fallbackModel: configuredFallback && configuredFallback !== primaryModel ? configuredFallback : null,
+    usedFallbackModel: false,
+    modelUsed: primaryModel,
+  };
+
+  const groundedResponse = await requestGemini(
+    buildGeminiSneakerResearchPrompt(input),
+    {
+      tools: [{ googleSearch: {} }],
+      generationConfig: {
+        temperature: 0,
+        candidateCount: 1,
+        maxOutputTokens: 4_096,
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    },
+    apiKey,
+    fetcher,
+    runtime,
+  );
+  if (!groundedResponse.ok) {
+    stages.grounding.status = stageFailureStatus(groundedResponse.reasonCode);
+    return runtimeFailure(groundedResponse.reasonCode, runtime, stages);
+  }
+  if (!hasUsableCandidate(groundedResponse.value.body)) {
+    stages.grounding.status = "error";
+    return runtimeFailure("api_error", runtime, stages);
+  }
+
+  const grounding = extractGroundingEvidence(groundedResponse.value.body);
+  if (!grounding) {
+    stages.grounding.status = "fallback";
+    return runtimeFailure("no_evidence_url", runtime, stages);
+  }
+  stages.grounding = {
+    status: "ready",
+    evidenceUrlCount: new Set(grounding.chunks.flatMap((chunk) => chunk?.url ?? [])).size,
+  };
+
+  const normalizedResponse = await requestGemini(
+    buildGeminiSneakerNormalizationPrompt(grounding.text),
+    structuredRequestBody(),
+    apiKey,
+    fetcher,
+    runtime,
+  );
+  if (!normalizedResponse.ok) {
+    stages.normalization.status = stageFailureStatus(normalizedResponse.reasonCode);
+    return runtimeFailure(normalizedResponse.reasonCode, runtime, stages);
+  }
+  if (!hasUsableCandidate(normalizedResponse.value.body)) {
+    stages.normalization.status = "error";
+    return runtimeFailure("api_error", runtime, stages);
+  }
+
+  const normalizedText = extractGeminiText(normalizedResponse.value.body);
+  if (!normalizedText || normalizedText.length > 30_000) {
+    stages.normalization.status = "fallback";
+    return runtimeFailure("schema_invalid", runtime, stages);
+  }
+
+  let parsed = parseJson(normalizedText);
+  if (!parsed.ok) {
+    stages.normalization.repairAttempted = true;
+    const repairResponse = await requestGemini(
+      buildGeminiSneakerRepairPrompt(normalizedText),
+      structuredRequestBody(),
+      apiKey,
+      fetcher,
+      runtime,
+    );
+    if (!repairResponse.ok) {
+      stages.normalization.status = "fallback";
+      return runtimeFailure("invalid_json", runtime, stages);
+    }
+    const repairedText = extractGeminiText(repairResponse.value.body);
+    if (!repairedText || repairedText.length > 30_000) {
+      stages.normalization.status = "fallback";
+      return runtimeFailure("invalid_json", runtime, stages);
+    }
+    parsed = parseJson(repairedText);
+    if (!parsed.ok) {
+      stages.normalization.status = "fallback";
+      return runtimeFailure("invalid_json", runtime, stages);
+    }
+  }
+
+  const validated = validateGeminiSneakerResearchDraft(parsed.value);
+  if (!validated.ok) {
+    stages.normalization.status = "fallback";
+    return runtimeFailure(validated.reasonCode, runtime, stages);
+  }
+
+  const candidates = validated.result.candidates
+    .map((candidate) => attachTrustedEvidence(candidate, grounding))
+    .filter((candidate): candidate is GeminiSneakerResearchCandidate => Boolean(candidate));
+  if (candidates.length < 1) {
+    stages.normalization.status = "fallback";
+    return runtimeFailure("no_evidence_url", runtime, stages);
+  }
+  stages.normalization = {
+    ...stages.normalization,
+    status: "ready",
+    candidateCount: candidates.length,
+  };
+
+  return {
+    status: "ready",
+    reasonCode: "gemini_success",
+    result: { candidates },
+    modelUsed: runtime.modelUsed,
+    usedFallbackModel: runtime.usedFallbackModel,
+    stages: snapshotStages(stages),
+  };
+}
+
+function structuredRequestBody(): Record<string, unknown> {
+  return {
+    generationConfig: {
+      temperature: 0,
+      candidateCount: 1,
+      maxOutputTokens: 4_096,
+      thinkingConfig: { thinkingBudget: 0 },
+      responseMimeType: "application/json",
+      responseSchema: geminiSneakerResearchResponseSchema,
+    },
+  };
+}
+
+async function requestGemini(
+  prompt: string,
+  body: Record<string, unknown>,
+  apiKey: string,
+  fetcher: typeof fetch,
+  runtime: RequestRuntime,
+): Promise<RequestResult> {
+  const first = await requestModel(prompt, body, runtime.currentModel, apiKey, fetcher);
+  if (first.ok) {
+    runtime.modelUsed = first.value.model;
+    return first;
+  }
+  if (!first.retryWithFallbackModel || !runtime.fallbackModel || runtime.usedFallbackModel) {
+    return first;
+  }
+
+  runtime.currentModel = runtime.fallbackModel;
+  runtime.usedFallbackModel = true;
+  runtime.modelUsed = runtime.currentModel;
+  return requestModel(prompt, body, runtime.currentModel, apiKey, fetcher);
+}
+
+async function requestModel(
+  prompt: string,
+  body: Record<string, unknown>,
+  model: string,
+  apiKey: string,
+  fetcher: typeof fetch,
+): Promise<RequestResult> {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   try {
-    const model = options.model ?? process.env.GEMINI_RESEARCH_MODEL ?? defaultModel;
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-    const request: RequestInit = {
-        method: "POST",
-        signal: AbortSignal.timeout(30_000),
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: buildGeminiSneakerResearchPrompt(input) }] }],
-          generationConfig: {
-            temperature: 0.15,
-            maxOutputTokens: 4_000,
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                candidates: {
-                  type: "ARRAY",
-                  items: {
-                    type: "OBJECT",
-                    properties: {
-                      brand: { type: "STRING" },
-                      modelName: { type: "STRING" },
-                      modelType: { type: "STRING" },
-                      reason: { type: "STRING" },
-                      cautions: { type: "ARRAY", items: { type: "STRING" } },
-                      searchKeywords: { type: "ARRAY", items: { type: "STRING" } },
-                      evidenceUrls: { type: "ARRAY", items: { type: "STRING" } },
-                      confidence: { type: "NUMBER" },
-                    },
-                    required: ["brand", "modelName", "modelType", "reason", "cautions", "searchKeywords", "evidenceUrls", "confidence"],
-                  },
-                },
-              },
-              required: ["candidates"],
-            },
-          },
-        }),
+    const response = await fetcher(endpoint, {
+      method: "POST",
+      signal: AbortSignal.timeout(requestTimeoutMs),
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        ...body,
+      }),
+    });
+    if (!response.ok) {
+      return {
+        ok: false,
+        reasonCode: mapHttpReason(response.status),
+        retryWithFallbackModel: response.status === 429 || response.status >= 500,
       };
-    let response = await fetcher(endpoint, request);
-    if (response.status === 429 || response.status >= 500) {
-      response = await fetcher(endpoint, { ...request, signal: AbortSignal.timeout(30_000) });
     }
-    if (!response.ok) return failure("error", mapHttpReason(response.status));
-
-    let responseBody: unknown;
     try {
-      responseBody = await response.json() as unknown;
+      return { ok: true, value: { body: await response.json() as unknown, model } };
     } catch {
-      return failure("fallback", "invalid_json");
+      return { ok: false, reasonCode: "invalid_json", retryWithFallbackModel: false };
     }
-    const text = extractGeminiText(responseBody);
-    if (!text || text.length > 30_000) return failure("fallback", "schema_invalid");
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "")) as unknown;
-    } catch {
-      return failure("fallback", "invalid_json");
-    }
-    if (!isRecord(parsed) || !Array.isArray(parsed["candidates"])) {
-      return failure("fallback", "schema_invalid");
-    }
-    const validated = validateGeminiSneakerResearchResult(parsed);
-    if (!validated) return failure("fallback", "no_valid_candidates");
-    return { status: "ready", reasonCode: null, result: validated };
   } catch (error) {
-    return failure("error", isTimeoutError(error) ? "timeout" : "unknown_error");
+    const timeout = isTimeoutError(error);
+    return {
+      ok: false,
+      reasonCode: timeout ? "timeout" : "api_error",
+      retryWithFallbackModel: timeout,
+    };
   }
 }
 
-function failure(status: "not_configured", reasonCode: "missing_env"): Extract<GeminiSneakerResearchOutcome, { status: "not_configured" }>;
-function failure(status: "fallback" | "error", reasonCode: Exclude<GeminiResearchReasonCode, "missing_env">): Extract<GeminiSneakerResearchOutcome, { status: "fallback" | "error" }>;
-function failure(status: "not_configured" | "fallback" | "error", reasonCode: GeminiResearchReasonCode): GeminiSneakerResearchOutcome {
-  if (status === "not_configured") return { status, reasonCode: "missing_env", result: null };
-  return { status, reasonCode: reasonCode as Exclude<GeminiResearchReasonCode, "missing_env">, result: null };
+function extractGroundingEvidence(value: unknown): GroundingEvidence | null {
+  const candidate = firstCandidate(value);
+  if (!candidate || hasAbnormalFinishReason(candidate)) return null;
+  const text = extractTextFromCandidate(candidate);
+  const metadata = candidate["groundingMetadata"];
+  if (!text || !isRecord(metadata)) return null;
+
+  const rawChunks = Array.isArray(metadata["groundingChunks"]) ? metadata["groundingChunks"] : [];
+  const chunks: GroundingEvidence["chunks"] = rawChunks.map((chunk) => {
+    if (!isRecord(chunk) || !isRecord(chunk["web"])) return null;
+    const url = typeof chunk["web"]["uri"] === "string" ? chunk["web"]["uri"] : "";
+    const title = typeof chunk["web"]["title"] === "string" ? chunk["web"]["title"] : "";
+    return validateEvidenceUrls([url]).length ? { url, title } : null;
+  });
+
+  const rawSupports = Array.isArray(metadata["groundingSupports"]) ? metadata["groundingSupports"] : [];
+  const supports = rawSupports.map((support) => {
+    if (!isRecord(support) || !isRecord(support["segment"])) return null;
+    const segmentText = typeof support["segment"]["text"] === "string" ? support["segment"]["text"] : "";
+    const indices = Array.isArray(support["groundingChunkIndices"])
+      ? support["groundingChunkIndices"].filter((index): index is number =>
+          Number.isInteger(index) && index >= 0 && index < chunks.length && Boolean(chunks[index]))
+      : [];
+    return segmentText && indices.length ? { text: segmentText, chunkIndices: indices } : null;
+  }).filter((support): support is { text: string; chunkIndices: number[] } => Boolean(support));
+
+  return chunks.some(Boolean) && supports.length ? { text, chunks, supports } : null;
 }
 
-function mapHttpReason(status: number): Exclude<GeminiResearchReasonCode, "missing_env"> {
-  if (status === 403) return "http_403";
-  if (status === 429) return "http_429";
-  if (status >= 500) return "http_5xx";
-  return "unknown_error";
+function attachTrustedEvidence(
+  candidate: GeminiSneakerResearchDraftCandidate,
+  grounding: GroundingEvidence,
+): GeminiSneakerResearchCandidate | null {
+  const modelName = normalizeForMatch(candidate.sourceModelName);
+  const citationUrls = grounding.supports
+    .filter((support) => normalizeForMatch(support.text).includes(modelName))
+    .flatMap((support) => support.chunkIndices.map((index) => grounding.chunks[index]?.url ?? ""));
+  const trustedCitationUrls = validateEvidenceUrls(citationUrls);
+  if (trustedCitationUrls.length < 1) return null;
+
+  const evidenceLinks: GeminiResearchEvidenceLink[] = [
+    ...trustedCitationUrls.slice(0, 4).map((url) => ({ url, type: "gemini_citation_url" as const })),
+    { url: createModelSearchEntryUrl(candidate.modelName), type: "search_entry_url" },
+  ];
+  const { sourceModelName: _sourceModelName, ...publicCandidate } = candidate;
+  return {
+    ...publicCandidate,
+    evidenceUrls: evidenceLinks.map((link) => link.url),
+    evidenceLinks,
+    researchOrigin: "gemini",
+  };
+}
+
+function createModelSearchEntryUrl(modelName: string): string {
+  return `https://www.google.com/search?q=${encodeURIComponent(modelName)}`;
+}
+
+function extractGeminiText(value: unknown): string | null {
+  const candidate = firstCandidate(value);
+  if (!candidate || hasAbnormalFinishReason(candidate)) return null;
+  return extractTextFromCandidate(candidate);
+}
+
+function firstCandidate(value: unknown): Record<string, unknown> | null {
+  if (!isRecord(value) || !Array.isArray(value["candidates"])) return null;
+  const candidate = value["candidates"][0];
+  return isRecord(candidate) ? candidate : null;
+}
+
+function hasUsableCandidate(value: unknown): boolean {
+  const candidate = firstCandidate(value);
+  return Boolean(candidate && !hasAbnormalFinishReason(candidate));
+}
+
+function extractTextFromCandidate(candidate: Record<string, unknown>): string | null {
+  if (!isRecord(candidate["content"]) || !Array.isArray(candidate["content"]["parts"])) return null;
+  const text = candidate["content"]["parts"]
+    .map((part) => isRecord(part) && typeof part["text"] === "string" ? part["text"] : "")
+    .join("\n")
+    .trim();
+  return text || null;
+}
+
+function hasAbnormalFinishReason(candidate: Record<string, unknown>): boolean {
+  const finishReason = candidate["finishReason"];
+  return typeof finishReason === "string" && finishReason !== "STOP";
+}
+
+function parseJson(text: string): { ok: true; value: unknown } | { ok: false } {
+  try {
+    return { ok: true, value: JSON.parse(text.trim()) as unknown };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function failure(
+  reasonCode: Exclude<GeminiResearchReasonCode, "gemini_success">,
+  modelUsed: string | null,
+  usedFallbackModel: boolean,
+  stages: GeminiResearchStages,
+  status: "fallback" | "error" = "fallback",
+): GeminiSneakerResearchOutcome {
+  return { status, reasonCode, result: null, modelUsed, usedFallbackModel, stages: snapshotStages(stages) };
+}
+
+function runtimeFailure(
+  reasonCode: Exclude<GeminiResearchReasonCode, "gemini_success">,
+  runtime: RequestRuntime,
+  stages: GeminiResearchStages,
+): GeminiSneakerResearchOutcome {
+  return failure(reasonCode, runtime.modelUsed, runtime.usedFallbackModel, stages);
+}
+
+function createInitialStages(): GeminiResearchStages {
+  return {
+    grounding: { status: "not_checked", evidenceUrlCount: 0 },
+    normalization: { status: "not_checked", repairAttempted: false, candidateCount: 0 },
+  };
+}
+
+function snapshotStages(stages: GeminiResearchStages): GeminiResearchStages {
+  return {
+    grounding: { ...stages.grounding },
+    normalization: { ...stages.normalization },
+  };
+}
+
+function stageFailureStatus(reasonCode: GeminiResearchReasonCode): GeminiResearchStageStatus {
+  return reasonCode === "api_error" || reasonCode === "rate_limited" || reasonCode === "timeout"
+    ? "error"
+    : "fallback";
+}
+
+function mapHttpReason(status: number): Exclude<GeminiResearchReasonCode, "gemini_success" | "missing_api_key" | "core_reevaluation_failed" | "fallback_catalog_used"> {
+  if (status === 429) return "rate_limited";
+  return "api_error";
 }
 
 function isTimeoutError(error: unknown): boolean {
   return error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
 }
 
-function extractGeminiText(value: unknown): string | null {
-  if (!isRecord(value) || !Array.isArray(value["candidates"])) return null;
-  const candidate = value["candidates"][0];
-  if (!isRecord(candidate) || !isRecord(candidate["content"]) || !Array.isArray(candidate["content"]["parts"])) return null;
-  const text = candidate["content"]["parts"]
-    .map((part) => isRecord(part) && typeof part["text"] === "string" ? part["text"] : "")
-    .join("\n")
-    .trim();
-  return text || null;
+function normalizeForMatch(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase("ja-JP").replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

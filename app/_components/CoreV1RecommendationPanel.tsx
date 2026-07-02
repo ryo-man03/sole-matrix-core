@@ -37,6 +37,12 @@ const decisionLabels: Record<RecommendationResult["decision"], string> = {
   unknown: "UNKNOWN",
 };
 
+const recommendationSourceLabels: Record<RecommendationResult["candidateResearch"]["source"], string> = {
+  gemini: "Gemini調査",
+  fallback_catalog: "fallback catalog",
+  product_input: "入力商品",
+};
+
 export function CoreV1RecommendationPanel({ onRecommendationComplete, selectedAnswerByQuestionId }: Props) {
   const [budgetText, setBudgetText] = useState("");
   const [result, setResult] = useState<RecommendationResult | null>(null);
@@ -92,7 +98,9 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, selectedAn
       const response = await resolveRecommendationProductLinks({
         productName: recommendation.candidate.name,
         directUrls: [
-          ...(recommendation.candidate.evidenceUrls ?? []).map((href) => ({ href, source: "marketplace" as const })),
+          ...(recommendation.candidate.evidenceLinks ?? [])
+            .filter((link) => link.type !== "search_entry_url")
+            .map((link) => ({ href: link.url, source: link.type === "gemini_citation_url" ? "marketplace" as const : "retailer" as const })),
           ...(recommendation.candidate.url ? [{ href: recommendation.candidate.url, source: recommendation.candidate.source === "rakuten" ? "rakuten" as const : "retailer" as const }] : []),
         ].slice(0, 6),
       });
@@ -126,11 +134,13 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, selectedAn
         <div className="core-v1-result-heading"><div><p className="diagnosis-summary-kicker">おすすめ</p><h4>{result.candidate.name}</h4>{result.candidate.modelType ? <p>タイプ: {result.candidate.modelType}</p> : null}<p>{result.candidate.description}</p></div><strong data-decision={result.decision}>{decisionLabels[result.decision]}</strong></div>
         <p className="core-v1-decision-note">最終DecisionはBalanced / Ryo score、budgetFit、リスク、情報充足度を使ってCoreが決定します。GeminiやURLは上書きできません。</p>
         <p className="core-v1-local-notice" data-source={result.candidate.researchSource}>{result.candidateResearch.detail}</p>
+        <p className="core-v1-provider-note" data-recommendation-source={result.candidateResearch.source}>推薦元: {recommendationSourceLabels[result.candidateResearch.source]}</p>
+        <p className="core-v1-provider-note">参考リンク: {formatEvidenceKinds(result.candidate.evidenceLinks)}</p>
         <ProductReferenceLinks isLoading={isResolvingProductLinks} links={productLinks} message={productLinksMessage} />
         <div className="core-v1-score-grid"><ScoreCard label="Balanced Score" description="汎用性・予算・情報の確かさを含む一般向け評価" value={result.balancedScore.total} /><ScoreCard label="Ryo Score" description="カルチャーやスタイルの好みを含む評価" value={result.ryoScore.total} /></div>
         <section className="core-v1-explanation" aria-labelledby="core-v1-explanation-title"><p className="diagnosis-summary-kicker">Explanation</p><h4 id="core-v1-explanation-title">判断の理由</h4><p>{result.explanation.summary}</p><p className="core-v1-provider-note">{result.readiness.geminiExplanation.detail}</p><div className="core-v1-explanation-columns"><ExplanationList title="理由" items={result.explanation.reasons} /><ExplanationList title="注意点" items={result.explanation.cautions} /></div></section>
         <section className="core-v1-vector" aria-labelledby="core-v1-vector-title"><p className="diagnosis-summary-kicker">PreferenceVector</p><h4 id="core-v1-vector-title">診断ベクトル</h4><dl>{(Object.keys(vectorLabels) as (keyof PreferenceVector)[]).map((axis) => <div key={axis}><dt>{vectorLabels[axis]}</dt><dd>{result.preferenceVector[axis]}</dd></div>)}</dl></section>
-        <section className="core-v1-readiness" aria-labelledby="core-v1-readiness-title"><p className="diagnosis-summary-kicker">Readiness</p><h4 id="core-v1-readiness-title">外部APIの状態</h4><div><strong data-status={result.readiness.geminiResearch.status}>Gemini候補調査: {result.readiness.geminiResearch.status}</strong><p>{result.readiness.geminiResearch.detail}</p></div><div><strong data-status={result.readiness.geminiExplanation.status}>Gemini補助説明: {result.readiness.geminiExplanation.status}</strong><p>{result.readiness.geminiExplanation.detail}</p></div><div><strong data-status={result.readiness.rakuten.status}>Rakuten: {result.readiness.rakuten.status}</strong><p>{result.readiness.rakuten.detail}</p></div></section>
+        <section className="core-v1-readiness" aria-labelledby="core-v1-readiness-title"><p className="diagnosis-summary-kicker">Readiness</p><h4 id="core-v1-readiness-title">外部APIの状態</h4><div><strong data-status={result.readiness.geminiResearch.status}>Gemini候補調査: {result.readiness.geminiResearch.status}</strong><p>{result.readiness.geminiResearch.detail}</p></div><div><strong data-research-stage="grounding" data-status={result.candidateResearch.stages.grounding.status}>Google Search Grounding: {result.candidateResearch.stages.grounding.status}</strong><p>Grounding由来の引用URL: {result.candidateResearch.stages.grounding.evidenceUrlCount}件</p></div><div><strong data-research-stage="normalization" data-status={result.candidateResearch.stages.normalization.status}>JSON整形・schema検証: {result.candidateResearch.stages.normalization.status}</strong><p>検証済み候補: {result.candidateResearch.stages.normalization.candidateCount}件 / JSON repair: {result.candidateResearch.stages.normalization.repairAttempted ? "実行" : "未実行"}</p></div><div><strong data-status={result.readiness.geminiExplanation.status}>Gemini補助説明: {result.readiness.geminiExplanation.status}</strong><p>{result.readiness.geminiExplanation.detail}</p></div><div><strong data-status={result.readiness.rakuten.status}>Rakuten: {result.readiness.rakuten.status}</strong><p>{result.readiness.rakuten.detail}</p></div></section>
         <section className="core-v1-feedback" aria-labelledby="core-v1-feedback-title"><p className="diagnosis-summary-kicker">Feedback</p><h4 id="core-v1-feedback-title">この結果は役に立ちましたか？</h4><textarea maxLength={500} onChange={(event) => setFeedbackComment(event.target.value)} placeholder="任意のコメント" value={feedbackComment} /><div><button onClick={() => handleFeedback("helpful")} type="button">役に立った</button><button onClick={() => handleFeedback("unsure")} type="button">まだ分からない</button><button onClick={() => handleFeedback("not_helpful")} type="button">改善してほしい</button></div><p aria-live="polite">{feedbackState === "saving" ? "保存中…" : feedbackState === "saved" ? "フィードバックを保存しました。" : feedbackState === "error" ? "保存できませんでした。" : null}</p></section>
       </div> : null}
     </section>
@@ -149,4 +159,14 @@ function normalizeBudget(value: string): number | null | undefined {
   if (!value.trim()) return undefined;
   const budget = Number(value);
   return Number.isInteger(budget) && budget > 0 ? budget : null;
+}
+
+function formatEvidenceKinds(evidenceLinks: RecommendationResult["candidate"]["evidenceLinks"]): string {
+  const types = new Set((evidenceLinks ?? []).map((link) => link.type));
+  const labels = [
+    types.has("gemini_citation_url") ? "引用URL" : null,
+    types.has("direct_product_url") ? "直接商品URL" : null,
+    types.has("search_entry_url") ? "検索入口" : null,
+  ].filter((label): label is string => Boolean(label));
+  return labels.length ? labels.join(" / ") : "検索入口";
 }

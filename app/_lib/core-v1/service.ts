@@ -2,7 +2,6 @@ import type { SneakerTag } from "../../../src/domain/sneaker/sneakerTag";
 import type { SneakerVector } from "../../../src/domain/sneaker/sneakerVector";
 import { researchSneakerCandidatesWithGemini } from "../ai/gemini-sneaker-research";
 import type { GeminiSneakerResearchCandidate } from "../ai/gemini-sneaker-research-schema";
-import { sneakerFallbackCatalog } from "../ai/sneaker-fallback-catalog";
 import type { UntrustedUserMemoryContext } from "../user-memory/types";
 import { decideRecommendation } from "./decision";
 import type { ExplanationInput } from "./explanation";
@@ -80,6 +79,8 @@ export async function recommendCoreV1(
           },
           {
             ...(env["GEMINI_API_KEY"] ? { apiKey: env["GEMINI_API_KEY"] } : {}),
+            ...(env["GEMINI_RESEARCH_MODEL"] ? { model: env["GEMINI_RESEARCH_MODEL"] } : {}),
+            ...(env["GEMINI_RESEARCH_FALLBACK_MODEL"] ? { fallbackModel: env["GEMINI_RESEARCH_FALLBACK_MODEL"] } : {}),
             ...(dependencies.geminiFetcher ? { fetcher: dependencies.geminiFetcher } : {}),
           },
         ),
@@ -95,6 +96,13 @@ export async function recommendCoreV1(
       status: "not_checked",
       reasonCode: null,
       validCandidateCount: 0,
+      coreReevaluated: false,
+      modelUsed: null,
+      usedFallbackModel: false,
+      stages: {
+        grounding: { status: "not_checked", evidenceUrlCount: 0 },
+        normalization: { status: "not_checked", repairAttempted: false, candidateCount: 0 },
+      },
       detail: "商品判断では入力商品をCore評価の対象に固定するため、Gemini候補調査は実行していません。",
     };
   } else if (geminiResearch?.status === "ready") {
@@ -104,26 +112,37 @@ export async function recommendCoreV1(
     candidateResearch = {
       source: "gemini",
       status: "ready",
-      reasonCode: null,
+      reasonCode: geminiResearch.reasonCode,
       validCandidateCount: candidates.length,
+      coreReevaluated: false,
+      modelUsed: geminiResearch.modelUsed,
+      usedFallbackModel: geminiResearch.usedFallbackModel,
+      stages: geminiResearch.stages,
       detail: "Gemini候補調査を検証し、Core再評価後の結果を表示しています。",
     };
   } else {
     candidates = fallbackCandidates;
-    const reasonCode = geminiResearch?.reasonCode ?? "unknown_error";
+    const reasonCode = geminiResearch?.reasonCode ?? "api_error";
     const status = geminiResearch?.status ?? "error";
     candidateResearch = {
       source: "fallback_catalog",
       status,
       reasonCode,
       validCandidateCount: 0,
-      detail: status === "not_configured"
+      coreReevaluated: false,
+      modelUsed: geminiResearch?.modelUsed ?? null,
+      usedFallbackModel: geminiResearch?.usedFallbackModel ?? false,
+      stages: geminiResearch?.stages ?? {
+        grounding: { status: "not_checked", evidenceUrlCount: 0 },
+        normalization: { status: "not_checked", repairAttempted: false, candidateCount: 0 },
+      },
+      detail: reasonCode === "missing_api_key"
         ? "Gemini候補調査は未設定のため、アプリ内の確認済み候補から推薦しています。"
         : `Gemini候補調査は利用できなかったため、アプリ内の確認済み候補から推薦しています。（理由: ${reasonCode}）`,
     };
   }
 
-  const scoredCandidates = candidates.map((candidate) => {
+  let scoredCandidates = candidates.map((candidate) => {
     const balancedScore = calculateBalancedScore({
       preferenceVector,
       candidate,
@@ -140,6 +159,35 @@ export async function recommendCoreV1(
     });
     return { candidate, balancedScore, ryoScore, decision };
   });
+
+  if (candidateResearch.source === "gemini") {
+    const coreReevaluated = scoredCandidates.length > 0 && scoredCandidates.every((entry) =>
+      Number.isFinite(entry.balancedScore.total) &&
+      Number.isFinite(entry.ryoScore.total) &&
+      Boolean(entry.decision) &&
+      entry.candidate.researchSource === "gemini",
+    );
+    if (coreReevaluated) {
+      candidateResearch = { ...candidateResearch, coreReevaluated: true };
+    } else {
+      candidates = fallbackCandidates;
+      scoredCandidates = candidates.map((candidate) => {
+        const balancedScore = calculateBalancedScore({ preferenceVector, candidate, preferredTags: input.preferenceTags });
+        const ryoScore = calculateRyoScore({ preferenceVector, candidate });
+        const decision = decideRecommendation({ balancedScore, ryoScore, budgetFit: candidate.budgetFit, risk: candidate.risk, informationCompleteness: candidate.informationCompleteness, readiness: candidate.readiness });
+        return { candidate, balancedScore, ryoScore, decision };
+      });
+      candidateResearch = {
+        ...candidateResearch,
+        source: "fallback_catalog",
+        status: "fallback",
+        reasonCode: "core_reevaluation_failed",
+        validCandidateCount: 0,
+        coreReevaluated: false,
+        detail: "Gemini候補をCoreで再評価できなかったため、アプリ内の確認済み候補から推薦しています。（理由: core_reevaluation_failed）",
+      };
+    }
+  }
 
   const best = scoredCandidates.sort((left, right) => {
     if (input.mode === "ryo") return right.ryoScore.total - left.ryoScore.total;
@@ -187,11 +235,8 @@ function mapGeminiCandidate(
   index: number,
   budgetYen: number | undefined,
 ): CandidateProfile {
-  const catalogMatch = sneakerFallbackCatalog.find((entry) =>
-    normalize(entry.modelName) === normalize(candidate.modelName),
-  );
-  const tags = catalogMatch?.tags ?? inferTags(`${candidate.modelName} ${candidate.modelType}`);
-  const vector = catalogMatch?.vector ?? createVectorFromTags(tags, candidate.modelName);
+  const tags = inferTags(`${candidate.modelName} ${candidate.modelType}`);
+  const vector = createVectorFromTags(tags, candidate.modelName);
   return {
     id: `gemini-${index + 1}-${slug(candidate.modelName)}`,
     name: candidate.modelName,
@@ -200,12 +245,13 @@ function mapGeminiCandidate(
     tags: [...tags],
     vector: { ...vector },
     budgetFit: calculateLocalBudgetFit(budgetYen, vector.priceLevel),
-    risk: catalogMatch?.risk ?? "medium",
-    informationCompleteness: catalogMatch?.informationCompleteness ?? 76,
+    risk: "medium",
+    informationCompleteness: 76,
     readiness: "ready_external",
     modelType: candidate.modelType,
     searchKeywords: [...candidate.searchKeywords],
     evidenceUrls: [...candidate.evidenceUrls],
+    evidenceLinks: candidate.evidenceLinks.map((link) => ({ ...link })),
     researchReason: candidate.reason,
     researchCautions: [...candidate.cautions],
     researchSource: "gemini",

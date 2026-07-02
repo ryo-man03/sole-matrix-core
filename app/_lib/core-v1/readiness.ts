@@ -38,7 +38,7 @@ export function createGeminiExplanationReadiness(
         capability: "explanation",
         status: "not_configured",
         detail: "Geminiは未設定です。推薦理由にはrule-based説明を使用しています。",
-        reasonCode: "missing_env",
+        reasonCode: "missing_api_key",
       };
 }
 
@@ -47,9 +47,15 @@ export function isGeminiResearchShowcaseReady(
 ): boolean {
   return result.candidateResearch.source === "gemini" &&
     result.candidateResearch.status === "ready" &&
+    result.candidateResearch.reasonCode === "gemini_success" &&
     result.candidateResearch.validCandidateCount > 0 &&
+    result.candidateResearch.coreReevaluated &&
+    result.candidateResearch.stages.grounding.status === "ready" &&
+    result.candidateResearch.stages.grounding.evidenceUrlCount > 0 &&
+    result.candidateResearch.stages.normalization.status === "ready" &&
+    result.candidateResearch.stages.normalization.candidateCount > 0 &&
     result.candidate.researchSource === "gemini" &&
-    Boolean(result.candidate.evidenceUrls?.length) &&
+    Boolean(result.candidate.evidenceLinks?.some((link) => link.type === "gemini_citation_url")) &&
     result.readiness.geminiResearch.status === "ready" &&
     Number.isFinite(result.balancedScore.total) &&
     Number.isFinite(result.ryoScore.total) &&
