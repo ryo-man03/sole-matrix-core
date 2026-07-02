@@ -11,6 +11,7 @@ export type GeminiActualSmokeStatus =
   | "ok"
   | "missing_env"
   | "skipped_external_smoke"
+  | "invalid_response"
   | "network_error";
 
 export type GeminiActualSmokeResult = {
@@ -25,6 +26,7 @@ export type GeminiActualSmokeResult = {
   decision: Decision;
   decisionSource: "typescript";
   fallback?: "rule_based";
+  httpStatus?: number;
 };
 
 const smokeInput = {
@@ -35,6 +37,7 @@ const smokeInput = {
   ],
   preferenceTags: ["classic" as const, "minimal" as const],
   budgetYen: 20_000,
+  sneakerName: "adidas SAMBA OG",
 };
 
 export async function runGeminiActualGenerationSmoke(
@@ -65,9 +68,12 @@ export async function runGeminiActualGenerationSmoke(
   }
 
   let networkAttempted = false;
-  const trackingFetcher: typeof fetch = (...args) => {
+  let httpStatus: number | undefined;
+  const trackingFetcher: typeof fetch = async (...args) => {
     networkAttempted = true;
-    return underlyingFetcher(...args);
+    const response = await underlyingFetcher(...args);
+    httpStatus = response.status;
+    return response;
   };
   const recommendation = await recommendCoreV1(smokeInput, {
     candidateRepository: mockCandidateRepository,
@@ -80,12 +86,13 @@ export async function runGeminiActualGenerationSmoke(
 
   return {
     provider: "gemini",
-    status: ok ? "ok" : "network_error",
+    status: ok ? "ok" : httpStatus === 200 ? "invalid_response" : "network_error",
     networkAttempted,
     ...shape,
     source: explanation.source,
     decision: recommendation.decision,
     decisionSource: "typescript",
+    ...(httpStatus === undefined ? {} : { httpStatus }),
     ...(ok ? {} : { fallback: "rule_based" as const }),
   };
 }
@@ -105,6 +112,7 @@ export function formatGeminiActualSmokeResult(
     `source: ${result.source}`,
     `decision: ${result.decision}`,
     `decisionSource: ${result.decisionSource}`,
+    ...(result.httpStatus === undefined ? [] : [`httpStatus: ${result.httpStatus}`]),
     ...(result.fallback ? [`fallback: ${result.fallback}`] : []),
   ].join("\n");
 }

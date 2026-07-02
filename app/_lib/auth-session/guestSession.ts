@@ -33,16 +33,13 @@ export function completeGuestDiagnosis(
   session: GuestSession,
   storage?: SessionStorage,
 ): GuestSession {
-  const completed: GuestSession = {
-    ...session,
-    hasCompletedDiagnosis: true,
-  };
-  persistGuestSession(storage, completed);
-  return completed;
+  const reusable = { ...session, hasCompletedDiagnosis: false };
+  persistGuestSession(storage, reusable);
+  return reusable;
 }
 
-export function canGuestDiagnose(session: GuestSession): boolean {
-  return !session.hasCompletedDiagnosis;
+export function canGuestDiagnose(_session: GuestSession): boolean {
+  return true;
 }
 
 export function readGuestSession(
@@ -64,7 +61,7 @@ export function readGuestSession(
     return {
       kind: "guest",
       guestId: value["guestId"],
-      hasCompletedDiagnosis: value["hasCompletedDiagnosis"],
+      hasCompletedDiagnosis: false,
     };
   } catch {
     return null;

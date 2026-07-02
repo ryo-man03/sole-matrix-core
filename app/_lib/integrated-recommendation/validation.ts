@@ -39,7 +39,10 @@ export function validateIntegratedRecommendationRequest(
     // Image and URL analysis are external evidence. They can enrich the UI and
     // Rakuten evidence query, but cannot inject tags into Core scoring.
     preferenceTags: suppliedTags,
-    sneakerName: analysis?.sneakerName ?? value["sneakerName"],
+    sneakerName:
+      analysis?.sneakerName ??
+      analysis?.visualAnalysis?.detectedModelName ??
+      value["sneakerName"],
     brand:
       analysis?.visualAnalysis?.detectedBrand ??
       value["brand"],

@@ -51,6 +51,12 @@ export type CandidateProfile = {
   imageUrl?: string;
   shopName?: string;
   note?: string;
+  modelType?: string;
+  searchKeywords?: string[];
+  evidenceUrls?: string[];
+  researchReason?: string;
+  researchCautions?: string[];
+  researchSource?: "gemini" | "fallback_catalog" | "product_input";
 };
 
 export type BalancedScore = {
@@ -125,6 +131,11 @@ export type RecommendationResult = {
     rakuten: ProviderReadiness;
   };
   externalEvidence: ExternalEvidenceBundle;
+  candidateResearch: {
+    source: "gemini" | "fallback_catalog" | "product_input";
+    validCandidateCount: number;
+    detail: string;
+  };
 };
 
 export type FeedbackSentiment = "helpful" | "not_helpful" | "unsure";

@@ -21,6 +21,28 @@ export type AnalyzeSneakerResult = {
   visualAnalysis?: SneakerVisualAnalysis;
 };
 
+export type AuthUser = { userId: string; email?: string; displayName?: string };
+
+export function getAuthSession(): Promise<ApiResult<{
+  configured: boolean;
+  status: "signed_out" | "user";
+  user?: AuthUser;
+}>> {
+  return requestJson("/api/auth/session", { cache: "no-store" });
+}
+
+export function signIn(input: { email: string; password: string }): Promise<ApiResult<{ user: AuthUser }>> {
+  return requestJson("/api/auth/sign-in", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+}
+
+export function signUp(input: { displayName: string; email: string; password: string }): Promise<ApiResult<{ user: AuthUser; sessionCreated: boolean; emailConfirmationRequired: boolean }>> {
+  return requestJson("/api/auth/sign-up", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+}
+
+export function signOut(): Promise<ApiResult<{ signedOut: true }>> {
+  return requestJson("/api/auth/logout", { method: "POST" });
+}
+
 export async function registerUser(input: {
   userId: string;
   displayName: string;

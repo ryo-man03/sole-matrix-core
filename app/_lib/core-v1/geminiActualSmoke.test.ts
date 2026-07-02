@@ -69,7 +69,7 @@ describe("Gemini actual generation smoke", () => {
       networkAttempted: true,
       shapeValid: true,
       summaryNonEmpty: true,
-      reasonsCount: 1,
+      reasonsCount: 2,
       cautionsIsArray: true,
       source: "gemini",
       decisionSource: "typescript",
@@ -121,7 +121,7 @@ describe("Gemini actual generation smoke", () => {
       });
       expect(result.reasonsCount).toBeGreaterThanOrEqual(1);
     }
-  });
+  }, 30_000);
 });
 
 function jsonResponse(body: unknown): Response {
