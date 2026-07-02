@@ -1,58 +1,15 @@
 import type { ProviderReadiness } from "./types";
 
-export type RakutenProviderStatus =
-  | "ready"
-  | "missing_config"
-  | "blocked_forbidden"
-  | "blocked_rate_limit"
-  | "network_or_http_error"
-  | "invalid_response";
+export type RakutenProviderStatus = "ready" | "missing_config" | "blocked_forbidden" | "blocked_rate_limit" | "network_or_http_error" | "invalid_response";
 
-export function createRakutenProviderReadiness(
-  status: RakutenProviderStatus,
-): ProviderReadiness {
-  switch (status) {
-    case "ready":
-      return {
-        provider: "rakuten",
-        status: "ready",
-        detail:
-          "楽天APIから取得し、安全に正規化できた商品候補を含めて判定しています。",
-      };
-    case "missing_config":
-      return {
-        provider: "rakuten",
-        status: "missing_config",
-        detail:
-          "楽天APIが未設定のため、診断結果とローカル候補をもとに判定しています。",
-      };
-    case "blocked_forbidden":
-      return {
-        provider: "rakuten",
-        status: "blocked_forbidden",
-        detail:
-          "楽天APIは現在利用を許可していないため、ローカル候補で判定しています。credentialや利用元設定の確認が必要です。",
-      };
-    case "blocked_rate_limit":
-      return {
-        provider: "rakuten",
-        status: "blocked_rate_limit",
-        detail:
-          "楽天APIの利用回数制限により、今回はローカル候補で判定しています。",
-      };
-    case "invalid_response":
-      return {
-        provider: "rakuten",
-        status: "invalid_response",
-        detail:
-          "楽天APIの応答を安全な商品候補へ変換できなかったため、ローカル候補で判定しています。",
-      };
-    case "network_or_http_error":
-      return {
-        provider: "rakuten",
-        status: "network_or_http_error",
-        detail:
-          "楽天APIへ接続できないため、診断結果とローカル候補をもとに判定しています。",
-      };
-  }
+export function createRakutenProviderReadiness(status: RakutenProviderStatus): ProviderReadiness {
+  const details: Record<RakutenProviderStatus, string> = {
+    ready: "楽天APIから安全に正規化できたlistingを外部参考情報として表示します。Core scoreには使いません。",
+    missing_config: "楽天APIは未設定です。具体モデル名から検索リンクfallbackを表示します。",
+    blocked_forbidden: "楽天APIは現在利用許可を確認できません。Application ID・Access Key・利用API・楽天側設定を確認してください。検索リンクfallbackは利用できます。",
+    blocked_rate_limit: "楽天APIの利用回数制限に達しました。検索リンクfallbackを利用します。",
+    network_or_http_error: "楽天APIへ接続できませんでした。検索リンクfallbackを利用します。",
+    invalid_response: "楽天API応答を安全に正規化できませんでした。検索リンクfallbackを利用します。",
+  };
+  return { provider: "rakuten", status, detail: details[status] };
 }

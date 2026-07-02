@@ -22,13 +22,14 @@ function memoryStorage(): SessionStorage & { values: Map<string, string> } {
 }
 
 describe("auth and guest session boundary", () => {
-  it("allows one guest diagnosis and restores the UX state", () => {
+  it("allows repeated guest diagnosis and restores the reusable state", () => {
     const storage = memoryStorage();
     const guest = beginGuestSession(storage, () => "guest_abcdef12");
 
     expect(canGuestDiagnose(guest)).toBe(true);
     const completed = completeGuestDiagnosis(guest, storage);
-    expect(canGuestDiagnose(completed)).toBe(false);
+    expect(canGuestDiagnose(completed)).toBe(true);
+    expect(completed.hasCompletedDiagnosis).toBe(false);
     expect(readGuestSession(storage)).toEqual(completed);
     expect(beginGuestSession(storage, () => "guest_unused0")).toEqual(completed);
   });
@@ -44,7 +45,7 @@ describe("auth and guest session boundary", () => {
     expect(JSON.parse(persisted)).toEqual({
       kind: "guest",
       guestId: "guest_abcdef12",
-      hasCompletedDiagnosis: true,
+      hasCompletedDiagnosis: false,
     });
     expect(persisted).not.toContain("history");
     expect(persisted).not.toContain("displayName");

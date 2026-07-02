@@ -9,6 +9,7 @@ export type RecommendationProductLinkSource = {
   candidate: {
     name: string;
     source: string;
+    researchSource?: string;
   };
   externalEvidence: {
     listings: Array<{ listingName?: string }>;
@@ -38,9 +39,10 @@ export function resolveRecommendationProductName(
 ): string | null {
   const candidates = [
     recommendation.analysis?.sneakerName,
-    recommendation.analysis?.urlAnalysis?.title,
     recommendation.analysis?.visualAnalysis?.detectedModelName,
+    recommendation.candidate.name,
     recommendation.externalEvidence.listings[0]?.listingName,
+    recommendation.analysis?.urlAnalysis?.title,
     recommendation.candidate.source === "rakuten"
       ? recommendation.candidate.name
       : undefined,
@@ -64,5 +66,10 @@ function normalizeProductName(value: string | undefined | null): string | null {
     .trim()
     .slice(0, maxRecommendationProductNameLength);
 
-  return normalized.length ? normalized : null;
+  if (!normalized.length || isAbstractName(normalized)) return null;
+  return normalized;
+}
+
+function isAbstractName(value: string): boolean {
+  return ["型", "タイプ", "系", "おすすめ", "クラシック・デイリー", "ストリート・ボリューム", "コンフォート・ランナー"].some((pattern) => value.includes(pattern));
 }

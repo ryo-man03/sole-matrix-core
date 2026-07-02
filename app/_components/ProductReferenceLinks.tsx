@@ -25,8 +25,8 @@ export function ProductReferenceLinks({
       <p className="diagnosis-summary-kicker">External reference</p>
       <h4 id="diagnosis-product-links-title">商品参考リンク</h4>
       <p className="product-links-boundary">
-        参考リンクはCore score・Decision・budgetFitを変更しません。
-        価格・在庫・サイズ・購入可能性は保証しません。
+        参考リンクはCore score・Decision・budgetFitを変更しません。検索リンクは直接商品URLとは限りません。
+        価格・在庫・サイズ・購入可能性は保証しないため、購入前に販売元・状態・返品条件を確認してください。
       </p>
 
       {isLoading ? (
@@ -43,8 +43,8 @@ export function ProductReferenceLinks({
               </div>
               <small>
                 {link.verificationStatus === "search_fallback"
-                  ? "検索リンク（直接商品URLではありません）"
-                  : "存在確認済みの参考URL"}
+                  ? "未検証の検索入口（直接商品URLではありません）"
+                  : "URL応答を確認した参考ページ"}
               </small>
               <small>{link.note}</small>
               <a href={link.href} rel="noopener noreferrer" target="_blank">

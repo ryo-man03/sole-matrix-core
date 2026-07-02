@@ -1,162 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
-import type { DiagnosisAnswerId } from "../_data/preferenceDiagnosisQuestions";
-import { preferenceDiagnosisQuestions } from "../_data/preferenceDiagnosisQuestions";
-
+import { type DiagnosisAnswerId, preferenceDiagnosisQuestions } from "../_data/preferenceDiagnosisQuestions";
 import { DiagnosisProgress } from "./DiagnosisProgress";
 import { DiagnosisQuestionCard } from "./DiagnosisQuestionCard";
 import { CoreV1RecommendationPanel } from "./CoreV1RecommendationPanel";
 import { PreferenceDiagnosisSummary } from "./PreferenceDiagnosisSummary";
 
-type PreferenceDiagnosisFlowProps = {
-  isRecommendationDisabled?: boolean;
-  onComplete?: ((answers: Record<string, DiagnosisAnswerId>) => void) | undefined;
-  onOpenProductJudgement?: (() => void) | undefined;
-  onRecommendationComplete?: (() => void) | undefined;
-};
+type Props = { isRecommendationDisabled?: boolean; onComplete?: (answers: Record<string, DiagnosisAnswerId>) => void; onOpenProductJudgement?: () => void; onRecommendationComplete?: () => void };
 
-export function PreferenceDiagnosisFlow({
-  isRecommendationDisabled = false,
-  onComplete,
-  onOpenProductJudgement,
-  onRecommendationComplete,
-}: PreferenceDiagnosisFlowProps = {}) {
+export function PreferenceDiagnosisFlow({ onComplete, onOpenProductJudgement, onRecommendationComplete }: Props = {}) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswerByQuestionId, setSelectedAnswerByQuestionId] = useState<
-    Record<string, DiagnosisAnswerId | undefined>
-  >({});
-  const [isSummaryVisible, setIsSummaryVisible] = useState(false);
-
-  const currentQuestion = preferenceDiagnosisQuestions[currentQuestionIndex]!;
-  const selectedAnswerId = selectedAnswerByQuestionId[currentQuestion.id];
-  const isFirstQuestion = currentQuestionIndex === 0;
-  const isLastQuestion =
-    currentQuestionIndex === preferenceDiagnosisQuestions.length - 1;
-  const answeredCount = useMemo(
-    () =>
-      preferenceDiagnosisQuestions.filter(
-        (question) => selectedAnswerByQuestionId[question.id],
-      ).length,
-    [selectedAnswerByQuestionId],
-  );
-
-  function handleSelectAnswer(answerId: DiagnosisAnswerId) {
-    setSelectedAnswerByQuestionId((currentAnswers) => ({
-      ...currentAnswers,
-      [currentQuestion.id]: answerId,
-    }));
-  }
-
-  function handleBack() {
-    if (isSummaryVisible) {
-      setIsSummaryVisible(false);
-      return;
-    }
-
-    setCurrentQuestionIndex((index) => Math.max(index - 1, 0));
-  }
-
-  function handleNext() {
-    if (isLastQuestion) {
-      const completedAnswers = Object.fromEntries(
-        preferenceDiagnosisQuestions.map((question) => [
-          question.id,
-          selectedAnswerByQuestionId[question.id] ?? "neutral",
-        ]),
-      ) as Record<string, DiagnosisAnswerId>;
-      onComplete?.(completedAnswers);
-      setIsSummaryVisible(true);
-      return;
-    }
-
-    setCurrentQuestionIndex((index) => index + 1);
-  }
-
-  return (
-    <section
-      id="core-v1"
-      className="preference-diagnosis-section"
-      aria-labelledby="preference-diagnosis-title"
-    >
-      <div className="diagnosis-intro">
-        <p className="diagnosis-kicker">好み診断</p>
-        <h2 id="preference-diagnosis-title">好みを8つの質問で整理する</h2>
-        <p>
-          正解を当てるテストではありません。直感に近い回答を選ぶと、Core
-          v1が診断ベクトル・二つのスコア・Decisionへ整理します。
-        </p>
-      </div>
-
-      {!isSummaryVisible ? (
-        <>
-          <DiagnosisProgress
-            currentIndex={currentQuestionIndex}
-            totalCount={preferenceDiagnosisQuestions.length}
-            answeredCount={answeredCount}
-          />
-          <DiagnosisQuestionCard
-            currentIndex={currentQuestionIndex}
-            totalCount={preferenceDiagnosisQuestions.length}
-            question={currentQuestion}
-            selectedAnswerId={selectedAnswerId}
-            onSelectAnswer={handleSelectAnswer}
-          />
-          <p className="diagnosis-answer-hint" aria-live="polite">
-            {selectedAnswerId
-              ? "回答はいつでも変更できます。"
-              : "この質問は未回答のまま進めます。迷う場合は「普通」を選んでも構いません。"}
-          </p>
-          <div className="diagnosis-actions">
-            <button
-              className="diagnosis-secondary-button"
-              disabled={isFirstQuestion}
-              onClick={handleBack}
-              type="button"
-            >
-              前へ
-            </button>
-            <button
-              className="diagnosis-primary-button"
-              onClick={handleNext}
-              type="button"
-            >
-              {isLastQuestion ? "診断内容を確認する" : "次へ"}
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <PreferenceDiagnosisSummary
-            questions={preferenceDiagnosisQuestions}
-            selectedAnswerByQuestionId={selectedAnswerByQuestionId}
-          />
-          <CoreV1RecommendationPanel
-            disabled={isRecommendationDisabled}
-            onRecommendationComplete={onRecommendationComplete}
-            selectedAnswerByQuestionId={selectedAnswerByQuestionId}
-          />
-          <div className="diagnosis-actions">
-            <button
-              className="diagnosis-secondary-button"
-              onClick={handleBack}
-              type="button"
-            >
-              前へ
-            </button>
-            {onOpenProductJudgement ? (
-              <button
-                className="diagnosis-primary-button"
-                onClick={onOpenProductJudgement}
-                type="button"
-              >
-                この好みを使って商品判断へ
-              </button>
-            ) : null}
-          </div>
-        </>
-      )}
-    </section>
-  );
+  const [answers, setAnswers] = useState<Record<string, DiagnosisAnswerId | undefined>>({});
+  const [summaryVisible, setSummaryVisible] = useState(false);
+  const question = preferenceDiagnosisQuestions[currentQuestionIndex]!;
+  const isLast = currentQuestionIndex === preferenceDiagnosisQuestions.length - 1;
+  const answeredCount = useMemo(() => preferenceDiagnosisQuestions.filter((item) => answers[item.id]).length, [answers]);
+  function next() { if (!isLast) { setCurrentQuestionIndex((index) => index + 1); return; } const completed = Object.fromEntries(preferenceDiagnosisQuestions.map((item) => [item.id, answers[item.id] ?? "neutral"])) as Record<string, DiagnosisAnswerId>; onComplete?.(completed); setSummaryVisible(true); }
+  function restart() { setAnswers({}); setCurrentQuestionIndex(0); setSummaryVisible(false); }
+  return <section id="core-v1" className="preference-diagnosis-section" aria-labelledby="preference-diagnosis-title"><div className="diagnosis-intro"><p className="diagnosis-kicker">好み診断</p><h2 id="preference-diagnosis-title">8つの質問で好みを整理する</h2><p>正解を当てるテストではありません。直感に近い回答から、具体的なスニーカーモデルを提案します。</p></div>{!summaryVisible ? <><DiagnosisProgress currentIndex={currentQuestionIndex} totalCount={preferenceDiagnosisQuestions.length} answeredCount={answeredCount} /><DiagnosisQuestionCard currentIndex={currentQuestionIndex} totalCount={preferenceDiagnosisQuestions.length} question={question} selectedAnswerId={answers[question.id]} onSelectAnswer={(answer) => setAnswers((current) => ({ ...current, [question.id]: answer }))} /><p className="diagnosis-answer-hint">{answers[question.id] ? "回答はいつでも変更できます。" : "迷う場合は「普通」を選べます。"}</p><div className="diagnosis-actions"><button className="diagnosis-secondary-button" disabled={currentQuestionIndex === 0} onClick={() => setCurrentQuestionIndex((index) => Math.max(0, index - 1))} type="button">前へ</button><button className="diagnosis-primary-button" onClick={next} type="button">{isLast ? "回答を確認する" : "次へ"}</button></div></> : <><PreferenceDiagnosisSummary questions={preferenceDiagnosisQuestions} selectedAnswerByQuestionId={answers} /><CoreV1RecommendationPanel onRecommendationComplete={onRecommendationComplete} selectedAnswerByQuestionId={answers} /><div className="diagnosis-actions"><button className="diagnosis-secondary-button" onClick={restart} type="button">もう一度8問診断する</button>{onOpenProductJudgement ? <button className="diagnosis-primary-button" onClick={onOpenProductJudgement} type="button">この好みで商品判断へ</button> : null}</div></>}</section>;
 }

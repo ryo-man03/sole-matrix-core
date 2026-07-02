@@ -1,9 +1,3 @@
 export function FooterNotice() {
-  return (
-    <footer className="footer-notice">
-      <p>
-        SOLE//MATRIX Core v1は診断と検証済み候補による判断支援です。表示価格・在庫・真贋を保証するものではありません。
-      </p>
-    </footer>
-  );
+  return <footer className="footer-notice"><p>SOLE//MATRIXは購入判断を補助します。価格・在庫・サイズ・真贋・購入可能性は保証しません。</p></footer>;
 }
