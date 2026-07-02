@@ -54,7 +54,8 @@ export function ExternalEvidencePanel({
       <div className="workspace-provider-readiness">
         <span>Readiness / fallback status</span>
         <div><strong>Rakuten</strong><em data-status={result?.readiness.rakuten.status ?? "not_checked"}>{result?.readiness.rakuten.status ?? "not_checked"}</em></div>
-        <div><strong>Gemini</strong><em data-status={result?.readiness.gemini.status ?? "not_checked"}>{result ? `${result.readiness.gemini.status} / ${result.explanation.source}` : "not_checked"}</em></div>
+        <div><strong>Gemini候補調査</strong><em data-status={result?.readiness.geminiResearch.status ?? "not_checked"}>{result?.readiness.geminiResearch.status ?? "not_checked"}</em></div>
+        <div><strong>Gemini補助説明</strong><em data-status={result?.readiness.geminiExplanation.status ?? "not_checked"}>{result?.readiness.geminiExplanation.status ?? "not_checked"}</em></div>
       </div>
     </section>
   );

@@ -161,6 +161,7 @@ describe("Core v1 Gemini structured explanation", () => {
       },
       {
         env: { GEMINI_API_KEY: "configured" },
+        geminiFetcher: async () => new Response("forbidden", { status: 403 }),
         explanationProvider: async () => ({
           source: "gemini",
           summary: "要約",
@@ -173,7 +174,9 @@ describe("Core v1 Gemini structured explanation", () => {
       },
     );
 
-    expect(result.readiness.gemini.status).toBe("ready");
+    expect(result.readiness.geminiResearch.status).toBe("error");
+    expect(result.readiness.geminiResearch.reasonCode).toBe("http_403");
+    expect(result.readiness.geminiExplanation.status).toBe("ready");
     expect(result.explanation.source).toBe("gemini");
   });
 });

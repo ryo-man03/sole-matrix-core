@@ -32,10 +32,14 @@ describe("Gemini sneaker research actual smoke", () => {
       }
       return response;
     } });
-    expect(result).not.toBeNull();
-    expect(result!.candidates.length).toBeGreaterThan(0);
-    expect(result?.candidates.every((candidate) => !isAbstractSneakerName(candidate.modelName))).toBe(true);
-    expect(result?.candidates.every((candidate) => candidate.evidenceUrls.length > 0)).toBe(true);
+    if (result.status !== "ready") {
+      console.log(`Gemini sneaker research actual smoke: ${result.status} / ${result.reasonCode}`);
+    }
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.result.candidates.length).toBeGreaterThan(0);
+    expect(result.result.candidates.every((candidate) => !isAbstractSneakerName(candidate.modelName))).toBe(true);
+    expect(result.result.candidates.every((candidate) => candidate.evidenceUrls.length > 0)).toBe(true);
     console.log("Gemini sneaker research actual smoke: passed");
   }, 40_000);
 });
