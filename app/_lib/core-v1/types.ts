@@ -1,6 +1,7 @@
 import type { SneakerVector } from "../../../src/domain/sneaker/sneakerVector";
 import type { SneakerTag } from "../../../src/domain/sneaker/sneakerTag";
 import type { ExternalEvidenceBundle } from "../external-evidence/types";
+import type { GeminiResearchReasonCode } from "../ai/gemini-sneaker-research";
 
 export type DiagnosisAnswerValue = "like" | "neutral" | "dislike";
 
@@ -118,6 +119,20 @@ export type ProviderReadiness = {
   detail: string;
 };
 
+export type GeminiCapabilityStatus =
+  | "ready"
+  | "fallback"
+  | "error"
+  | "not_configured"
+  | "not_checked";
+
+export type GeminiCapabilityReadiness = {
+  capability: "candidate_research" | "explanation";
+  status: GeminiCapabilityStatus;
+  detail: string;
+  reasonCode: GeminiResearchReasonCode | null;
+};
+
 export type RecommendationResult = {
   recommendationId: string;
   preferenceVector: PreferenceVector;
@@ -127,12 +142,15 @@ export type RecommendationResult = {
   decision: Decision;
   explanation: RecommendationExplanation;
   readiness: {
-    gemini: ProviderReadiness;
+    geminiResearch: GeminiCapabilityReadiness;
+    geminiExplanation: GeminiCapabilityReadiness;
     rakuten: ProviderReadiness;
   };
   externalEvidence: ExternalEvidenceBundle;
   candidateResearch: {
     source: "gemini" | "fallback_catalog" | "product_input";
+    status: GeminiCapabilityStatus;
+    reasonCode: GeminiResearchReasonCode | null;
     validCandidateCount: number;
     detail: string;
   };

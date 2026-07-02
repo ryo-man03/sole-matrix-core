@@ -14,7 +14,10 @@ import {
   type RakutenCandidateProviderResult,
 } from "./rakutenProvider";
 import { createRakutenProviderReadiness } from "./rakutenReadiness";
-import { createGeminiFallbackReadiness } from "./readiness";
+import {
+  createGeminiExplanationReadiness,
+  createGeminiResearchReadiness,
+} from "./readiness";
 import {
   calculateLocalBudgetFit,
   mockCandidateRepository,
@@ -89,24 +92,34 @@ export async function recommendCoreV1(
     candidates = [createProductInputCandidate(input)];
     candidateResearch = {
       source: "product_input",
-      validCandidateCount: 1,
-      detail: "入力された商品をCore評価の対象に固定し、AIは補助説明だけに使用します。",
+      status: "not_checked",
+      reasonCode: null,
+      validCandidateCount: 0,
+      detail: "商品判断では入力商品をCore評価の対象に固定するため、Gemini候補調査は実行していません。",
     };
-  } else if (geminiResearch?.candidates.length) {
-    candidates = geminiResearch.candidates.map((candidate, index) =>
+  } else if (geminiResearch?.status === "ready") {
+    candidates = geminiResearch.result.candidates.map((candidate, index) =>
       mapGeminiCandidate(candidate, index, input.budgetYen),
     );
     candidateResearch = {
       source: "gemini",
+      status: "ready",
+      reasonCode: null,
       validCandidateCount: candidates.length,
-      detail: "Gemini候補をschema・抽象名・参考URLで検証し、Coreで再スコアリングしました。",
+      detail: "Gemini候補調査を検証し、Core再評価後の結果を表示しています。",
     };
   } else {
     candidates = fallbackCandidates;
+    const reasonCode = geminiResearch?.reasonCode ?? "unknown_error";
+    const status = geminiResearch?.status ?? "error";
     candidateResearch = {
       source: "fallback_catalog",
-      validCandidateCount: candidates.length,
-      detail: "AI調査結果を安全に確認できなかったため、アプリ内の確認済み候補から推薦しています。",
+      status,
+      reasonCode,
+      validCandidateCount: 0,
+      detail: status === "not_configured"
+        ? "Gemini候補調査は未設定のため、アプリ内の確認済み候補から推薦しています。"
+        : `Gemini候補調査は利用できなかったため、アプリ内の確認済み候補から推薦しています。（理由: ${reasonCode}）`,
     };
   }
 
@@ -149,7 +162,7 @@ export async function recommendCoreV1(
         ...(dependencies.geminiFetcher ? { fetcher: dependencies.geminiFetcher } : {}),
       });
   const explanation = addResearchContext(generatedExplanation, best.candidate);
-  const geminiReady = candidateResearch.source === "gemini" || explanation.source === "gemini";
+  const geminiConfigured = Boolean(env["GEMINI_API_KEY"]);
 
   return {
     recommendationId: `core-v1:${best.candidate.id}`,
@@ -158,15 +171,8 @@ export async function recommendCoreV1(
     explanation,
     candidateResearch,
     readiness: {
-      gemini: geminiReady
-        ? {
-            provider: "gemini",
-            status: "ready",
-            detail: candidateResearch.source === "gemini"
-              ? "Gemini候補調査を検証し、Core再評価後の結果を表示しています。"
-              : "Geminiの補助説明を検証して表示しています。最終DecisionはCoreが決定します。",
-          }
-        : createGeminiFallbackReadiness(Boolean(env["GEMINI_API_KEY"])),
+      geminiResearch: createGeminiResearchReadiness(candidateResearch),
+      geminiExplanation: createGeminiExplanationReadiness(explanation, geminiConfigured),
       rakuten: rakutenResult.readiness,
     },
     externalEvidence: {

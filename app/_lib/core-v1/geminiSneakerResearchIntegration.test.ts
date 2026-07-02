@@ -1,4 +1,5 @@
 import { recommendCoreV1 } from "./service";
+import { isGeminiResearchShowcaseReady } from "./readiness";
 
 describe("Gemini candidate research and Core re-evaluation", () => {
   it("validates Gemini candidates and keeps the final decision in Core", async () => {
@@ -19,6 +20,14 @@ describe("Gemini candidate research and Core re-evaluation", () => {
     expect(result.candidate.researchSource).toBe("gemini");
     expect(result.candidate.evidenceUrls).toHaveLength(1);
     expect(result.candidateResearch).toMatchObject({ source: "gemini", validCandidateCount: 1 });
+    expect(result.readiness.geminiResearch.status).toBe("ready");
+    expect(result.readiness.geminiExplanation.status).toBe("ready");
+    expect(result.candidateResearch.detail).toBe("Gemini候補調査を検証し、Core再評価後の結果を表示しています。");
+    expect(isGeminiResearchShowcaseReady(result)).toBe(true);
+    expect(isGeminiResearchShowcaseReady({
+      ...result,
+      candidate: { ...result.candidate, evidenceUrls: [] },
+    })).toBe(false);
     expect(result.decision).toMatch(/strong_buy|consider|wait|avoid|unknown/);
     expect(result.explanation).not.toHaveProperty("decision");
   });
@@ -26,8 +35,45 @@ describe("Gemini candidate research and Core re-evaluation", () => {
   it("falls back to a concrete catalog model when Gemini is unavailable", async () => {
     const result = await recommendCoreV1({ diagnosisAnswers: [{ questionId: "walking-comfort", value: "like" }], preferenceTags: [], mode: "balanced" }, { env: {}, rakutenCandidateProvider: async () => ({ status: "missing_config", candidates: [], evidence: [], readiness: { provider: "rakuten", status: "missing_config", detail: "missing" }, networkAttempted: false, responseOk: false, shapeValid: false }) });
     expect(result.candidateResearch.source).toBe("fallback_catalog");
+    expect(result.candidateResearch).toMatchObject({ status: "not_configured", reasonCode: "missing_env" });
+    expect(result.readiness.geminiResearch.status).toBe("not_configured");
+    expect(result.readiness.geminiExplanation.status).toBe("not_configured");
     expect(result.candidate.name).toMatch(/adidas|New Balance|Nike|PUMA|Vans|Converse|ASICS/);
     expect(result.candidate.evidenceUrls?.length).toBeGreaterThan(0);
+    expect(isGeminiResearchShowcaseReady(result)).toBe(false);
+  });
+
+  it("does not mark candidate research ready when only Gemini explanation succeeds", async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("forbidden", { status: 403 }))
+      .mockResolvedValueOnce(geminiResponse(JSON.stringify({
+        summary: "補助説明",
+        reasons: ["補助理由"],
+        cautions: ["補助注意"],
+        balancedView: "balanced",
+        ryoView: "ryo",
+        finalTone: "balanced",
+      })));
+
+    const result = await recommendCoreV1(
+      { diagnosisAnswers: [{ questionId: "walking-comfort", value: "like" }], preferenceTags: [], mode: "balanced" },
+      {
+        env: { GEMINI_API_KEY: "test-key" },
+        geminiFetcher: fetcher,
+        rakutenCandidateProvider: async () => ({ status: "missing_config", candidates: [], evidence: [], readiness: { provider: "rakuten", status: "missing_config", detail: "missing" }, networkAttempted: false, responseOk: false, shapeValid: false }),
+      },
+    );
+
+    expect(result.candidateResearch).toMatchObject({
+      source: "fallback_catalog",
+      status: "error",
+      reasonCode: "http_403",
+    });
+    expect(result.explanation.source).toBe("gemini");
+    expect(result.readiness.geminiResearch.status).toBe("error");
+    expect(result.readiness.geminiExplanation.status).toBe("ready");
+    expect(result.candidateResearch.detail).not.toContain("Gemini候補調査を検証");
+    expect(isGeminiResearchShowcaseReady(result)).toBe(false);
   });
 });
 
