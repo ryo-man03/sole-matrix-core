@@ -174,8 +174,8 @@ describe("Core v1 Gemini structured explanation", () => {
       },
     );
 
-    expect(result.readiness.geminiResearch.status).toBe("error");
-    expect(result.readiness.geminiResearch.reasonCode).toBe("http_403");
+    expect(result.readiness.geminiResearch.status).toBe("fallback");
+    expect(result.readiness.geminiResearch.reasonCode).toBe("api_error");
     expect(result.readiness.geminiExplanation.status).toBe("ready");
     expect(result.explanation.source).toBe("gemini");
   });

@@ -1,7 +1,11 @@
 import type { SneakerVector } from "../../../src/domain/sneaker/sneakerVector";
 import type { SneakerTag } from "../../../src/domain/sneaker/sneakerTag";
 import type { ExternalEvidenceBundle } from "../external-evidence/types";
-import type { GeminiResearchReasonCode } from "../ai/gemini-sneaker-research";
+import type {
+  GeminiResearchReasonCode,
+  GeminiResearchStages,
+} from "../ai/gemini-sneaker-research";
+import type { EvidenceUrlType } from "../ai/gemini-sneaker-research-schema";
 
 export type DiagnosisAnswerValue = "like" | "neutral" | "dislike";
 
@@ -35,6 +39,8 @@ export type CandidateReadiness =
   | "degraded"
   | "not_ready";
 export type CandidateSource = "mock" | "local" | "fallback" | "rakuten";
+export type RecommendationSource = "gemini" | "fallback_catalog" | "product_input";
+export type CandidateEvidenceLink = { url: string; type: EvidenceUrlType };
 
 export type CandidateProfile = {
   id: string;
@@ -55,9 +61,10 @@ export type CandidateProfile = {
   modelType?: string;
   searchKeywords?: string[];
   evidenceUrls?: string[];
+  evidenceLinks?: CandidateEvidenceLink[];
   researchReason?: string;
   researchCautions?: string[];
-  researchSource?: "gemini" | "fallback_catalog" | "product_input";
+  researchSource?: RecommendationSource;
 };
 
 export type BalancedScore = {
@@ -148,10 +155,14 @@ export type RecommendationResult = {
   };
   externalEvidence: ExternalEvidenceBundle;
   candidateResearch: {
-    source: "gemini" | "fallback_catalog" | "product_input";
+    source: RecommendationSource;
     status: GeminiCapabilityStatus;
     reasonCode: GeminiResearchReasonCode | null;
     validCandidateCount: number;
+    coreReevaluated: boolean;
+    modelUsed: string | null;
+    usedFallbackModel: boolean;
+    stages: GeminiResearchStages;
     detail: string;
   };
 };

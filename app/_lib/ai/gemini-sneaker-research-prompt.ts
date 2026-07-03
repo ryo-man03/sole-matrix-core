@@ -1,36 +1,23 @@
-export function buildGeminiSneakerResearchPrompt(input: {
+export type GeminiSneakerResearchInput = {
   answersSummary: string;
   preferenceVector: unknown;
   budget: string | null;
   mode: "ryo" | "balanced";
-}) {
+};
+
+export function buildGeminiSneakerResearchPrompt(input: GeminiSneakerResearchInput): string {
   return `
-あなたはスニーカー購入判断アプリ SOLE//MATRIX の調査補助AIです。
+あなたはスニーカー購入判断アプリ SOLE//MATRIX の候補調査担当です。
+Google検索を必ず使い、8問診断に合う実在スニーカーを3件だけ調査してください。
 
-あなたの役割:
-- ユーザーの8問診断結果をもとに、実在するスニーカー候補を調査する
-- ユーザーの好み、予算、重視点に合う候補を選ぶ
-- 各候補について、実在確認に使える証拠URLを必ず付ける
-- 推薦理由、注意点、検索キーワードを整理する
+要件:
+- ブランド名だけ、カテゴリ名だけではなく、販売・紹介ページで実在確認できる具体モデル名を書く
+- 各モデル名を、そのモデルを裏付ける検索結果の引用が付く文章中に明記する
+- 診断回答に結びつく理由と、購入前に確認すべき一般的な注意点を書く
+- 価格、在庫、サイズ、真贋、購入可能性を保証しない
+- URLを推測して本文へ書かない。出典はGoogle Search Groundingの引用機能に任せる
+- JSON化は後段で行うため、この回答では読みやすい短い調査メモにする
 
-最重要ルール:
-- 実在確認できないモデルを出してはいけません
-- 証拠URLのない候補を出してはいけません
-- 架空のURLや推測したURLを作ってはいけません
-- modelNameには具体的なスニーカーモデル名だけを書く
-- 「クラシック・デイリー型」のような抽象タイプ名をmodelNameにしない
-- 価格、在庫、サイズ、購入可能性を保証しない
-- JSON以外の文章を返さない
-
-証拠URLとして望ましいもの:
-- ブランド公式ページ、正規販売店ページ
-- 楽天、atmos、ABC-MART、SNKRDUNK、StockXなどの商品ページまたは検索ページ
-- スニーカー情報サイトの記事ページ
-- Google検索URLなど、実在確認の入口になる検索URL
-
-証拠URLは実在確認・比較検討のための参考リンクです。URLがあるだけで在庫や購入可能性を保証してはいけません。
-
-ユーザー情報:
 mode: ${input.mode}
 budget: ${input.budget ?? "未入力"}
 
@@ -39,32 +26,29 @@ ${input.answersSummary}
 
 PreferenceVector:
 ${JSON.stringify(input.preferenceVector, null, 2)}
-
-出力形式:
-{
-  "candidates": [
-    {
-      "brand": "ブランド名",
-      "modelName": "具体的なスニーカーモデル名",
-      "modelType": "タイプ名",
-      "reason": "ユーザーの回答と結びつけた推薦理由を日本語で120字以内",
-      "cautions": ["注意点1", "注意点2"],
-      "searchKeywords": ["検索語1", "検索語2"],
-      "evidenceUrls": ["実在確認に使えるURL1", "実在確認に使えるURL2"],
-      "confidence": 0.0
-    }
-  ]
+`.trim();
 }
 
-出力ルール:
-- candidates は3件から5件
-- modelName は具体的な商品名にする
-- evidenceUrls は各候補1件以上必須
-- confidence は0から1の数値
-- reason はユーザー回答と候補特徴を結びつける
-- cautions は2個まで
-- searchKeywords はmodelNameを含める
-- 価格、在庫、サイズ、購入可能性は保証しない
-- JSONのみを返す
+export function buildGeminiSneakerNormalizationPrompt(groundedResearch: string): string {
+  return `
+次のGoogle Search Grounding済み調査メモだけを、指定されたJSON schemaへ整形してください。
+意味、候補、事実を追加しないでください。URLは出力しないでください。
+modelNameは調査メモに明記された具体的なスニーカーモデル名に限定してください。
+ブランド名だけ、抽象カテゴリ、一般名称は候補にしないでください。
+候補は最大3件です。JSON以外を出力しないでください。
+
+調査メモ:
+${groundedResearch}
+`.trim();
+}
+
+export function buildGeminiSneakerRepairPrompt(malformedJson: string): string {
+  return `
+次の出力について、意味やfieldや候補を追加・削除せず、JSON構文だけを修復してください。
+修復不能、または必須fieldが不足している場合は元の構造を保ってください。
+JSON以外を出力しないでください。
+
+修復対象:
+${malformedJson}
 `.trim();
 }

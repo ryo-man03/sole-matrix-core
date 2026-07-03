@@ -22,6 +22,14 @@ describe("Core v1 UI integration", () => {
     expect(readinessSource).toContain("rule-based説明");
     expect(componentSource).toContain("Gemini候補調査:");
     expect(componentSource).toContain("Gemini補助説明:");
+    expect(componentSource).toContain("Google Search Grounding:");
+    expect(componentSource).toContain("JSON整形・schema検証:");
+    expect(componentSource).toContain('data-research-stage="grounding"');
+    expect(componentSource).toContain('data-research-stage="normalization"');
+    expect(componentSource).toContain("推薦元:");
+    expect(componentSource).toContain("Gemini調査");
+    expect(componentSource).toContain("引用URL");
+    expect(componentSource).toContain("検索入口");
     expect(componentSource).toContain("result.readiness.geminiResearch.detail");
     expect(componentSource).toContain("result.readiness.geminiExplanation.detail");
     expect(componentSource).not.toContain("Gemini: {result.readiness.gemini.status}");
