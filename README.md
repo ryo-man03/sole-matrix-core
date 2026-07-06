@@ -24,9 +24,32 @@ SOLE//MATRIXは、8問の好み診断と商品情報からスニーカー選び�
 
 ### Actual result — Gemini候補調査 + Core再評価
 
-![実APIから得たNike Air Force 1 Low Retroの診断結果](docs/product/screenshots/readme/desktop-result.png)
+![実APIから得たASICS GEL-KAYANO 14の診断結果](docs/product/screenshots/readme/desktop-result.png)
 
-2026-07-03に実APIと実画面で確認した例です。Gemini候補調査をschema検証し、Coreで再評価した結果として `Nike Air Force 1 Low Retro` を表示しています。画面上で推薦元、引用URL／検索入口、Core Decisionを区別できます。候補は診断回答や外部APIの応答によって変わります。
+2026-07-06に実APIと実画面で確認した例です。Gemini候補調査をschema検証し、Coreで再評価した結果として `ASICS GEL-KAYANO 14` を表示しています。画面上で推薦元、引用URL／検索入口、Core Decisionを区別できます。候補は診断回答や外部APIの応答によって変わります。
+
+### Product judgement — 入力商品を固定したCore判断
+
+`ASICS GEL-KAYANO 14` と予算25,000円を入力し、ゲストモードで購入判断まで進めた実画面です。商品判断では入力商品を評価対象に固定し、Geminiに商品選定を任せず、TypeScript CoreがスコアとDecisionを計算します。
+
+<table>
+  <tr>
+    <th>商品情報の入力</th>
+    <th>Coreによる購入判断</th>
+  </tr>
+  <tr>
+    <td><img src="docs/product/screenshots/readme/desktop-product-input.png" alt="ASICS GEL-KAYANO 14と予算を入力した商品判断画面" /></td>
+    <td><img src="docs/product/screenshots/readme/desktop-product-decision.png" alt="ASICS GEL-KAYANO 14をCoreで購入判断した結果画面" /></td>
+  </tr>
+</table>
+
+この例では `BUY`、Balanced Score `74.7`、Ryo Score `86.4` を表示しています。`BUY` は購入可能性や在庫の保証ではなく、入力情報と評価ルールに基づく比較用のDecisionです。外部リンクやGemini補助説明は、Core scoreとDecisionを変更しません。
+
+| 体験 | AIの役割 | Coreの役割 |
+| --- | --- | --- |
+| 8問診断からの推薦 | 候補調査、Grounding、説明補助 | 候補の再評価、スコア、最終Decision |
+| 商品名・URL・画像からの判断 | 入力商品の説明補助 | 入力商品を固定してスコア、最終Decision |
+| 外部API失敗時 | fallback状態を明示 | 確認済み候補とルールで処理を継続 |
 
 ## このプロジェクトの思想
 
