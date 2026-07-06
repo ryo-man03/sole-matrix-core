@@ -40,6 +40,7 @@ export type CandidateReadiness =
   | "not_ready";
 export type CandidateSource = "mock" | "local" | "fallback" | "rakuten";
 export type RecommendationSource = "gemini" | "fallback_catalog" | "product_input";
+export type CandidateResearchSource = RecommendationSource | "ryo_anchor";
 export type CandidateEvidenceLink = { url: string; type: EvidenceUrlType };
 
 export type CandidateProfile = {
@@ -64,7 +65,7 @@ export type CandidateProfile = {
   evidenceLinks?: CandidateEvidenceLink[];
   researchReason?: string;
   researchCautions?: string[];
-  researchSource?: RecommendationSource;
+  researchSource?: CandidateResearchSource;
 };
 
 export type BalancedScore = {
@@ -164,6 +165,15 @@ export type RecommendationResult = {
     usedFallbackModel: boolean;
     stages: GeminiResearchStages;
     detail: string;
+  };
+  ryoReranking: {
+    applied: boolean;
+    strength: "balanced" | "light" | "standard" | "strong" | "beginner";
+    existingCoreWeight: number;
+    recommendationWeight: number;
+    candidatePoolSize: number;
+    selectedSource: CandidateResearchSource;
+    selectedRecommendationScore: number;
   };
 };
 

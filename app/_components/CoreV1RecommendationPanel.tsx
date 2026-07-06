@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { DiagnosisAnswerId } from "../_data/preferenceDiagnosisQuestions";
-import type { FeedbackSentiment, PreferenceVector, RecommendationResult } from "../_lib/core-v1/types";
+import type { CandidateResearchSource, FeedbackSentiment, PreferenceVector, RecommendationResult } from "../_lib/core-v1/types";
 import { buildRyoModeContextForRecommendation } from "../_lib/ryo-mode-v4/integration";
 import type { RyoPreferenceVector } from "../_lib/ryo-mode-v4/types";
 import { resolveRecommendationProductLinks } from "../_lib/apiClient";
@@ -47,6 +47,13 @@ const recommendationSourceLabels: Record<RecommendationResult["candidateResearch
   product_input: "入力商品",
 };
 
+const candidateSourceLabels: Record<CandidateResearchSource, string> = {
+  gemini: "Gemini調査候補",
+  fallback_catalog: "fallback catalog",
+  product_input: "入力商品",
+  ryo_anchor: "Ryo candidate anchor",
+};
+
 export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPreferenceVector, selectedAnswerByQuestionId }: Props) {
   const [result, setResult] = useState<RecommendationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -74,6 +81,7 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
         body: JSON.stringify({
           diagnosisAnswers: ryoContext.diagnosisAnswers,
           preferenceTags: ryoContext.preferenceTags,
+          ryoModeAnswers: ryoContext.answers,
           mode: ryoContext.mode,
           ...(ryoContext.budgetYen === undefined ? {} : { budgetYen: ryoContext.budgetYen }),
         }),
@@ -136,11 +144,12 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
         <div className="core-v1-result-heading"><div><p className="diagnosis-summary-kicker">おすすめ</p><h4>{result.candidate.name}</h4>{result.candidate.modelType ? <p>タイプ: {result.candidate.modelType}</p> : null}<p>{result.candidate.description}</p></div><strong data-decision={result.decision}>{decisionLabels[result.decision]}</strong></div>
         <p className="core-v1-decision-note">最終DecisionはBalanced / Ryo score、budgetFit、リスク、情報充足度を使ってCoreが決定します。GeminiやURLは上書きできません。</p>
         <p className="core-v1-local-notice" data-source={result.candidate.researchSource}>{result.candidateResearch.detail}</p>
-        <p className="core-v1-provider-note" data-recommendation-source={result.candidateResearch.source}>推薦元: {recommendationSourceLabels[result.candidateResearch.source]}</p>
+        <p className="core-v1-provider-note" data-recommendation-source={result.candidateResearch.source}>候補調査: {recommendationSourceLabels[result.candidateResearch.source]} / 選択候補元: {candidateSourceLabels[result.candidate.researchSource ?? "fallback_catalog"]}</p>
+        <p className="core-v1-provider-note" data-ryo-reranking={result.ryoReranking.applied ? "applied" : "not-applied"}>Ryo再ランキング: {result.ryoReranking.applied ? `適用済み（候補${result.ryoReranking.candidatePoolSize}足 / Core ${Math.round(result.ryoReranking.existingCoreWeight * 100)}% + recommendationScore ${Math.round(result.ryoReranking.recommendationWeight * 100)}%）` : "未適用"}</p>
         <p className="core-v1-provider-note">参考リンク: {formatEvidenceKinds(result.candidate.evidenceLinks)}</p>
         <ProductReferenceLinks isLoading={isResolvingProductLinks} links={productLinks} message={productLinksMessage} />
         <div className="core-v1-score-grid"><ScoreCard label="Balanced Score" description="汎用性・予算・情報の確かさを含む一般向け評価" value={result.balancedScore.total} /><ScoreCard label="Ryo Score" description="カルチャーやスタイルの好みを含む評価" value={result.ryoScore.total} /></div>
-        <RyoModeResultPanel candidate={result.candidate} vector={ryoPreferenceVector} />
+        <RyoModeResultPanel candidate={result.candidate} rerankingApplied={result.ryoReranking.applied} vector={ryoPreferenceVector} />
         <section className="core-v1-explanation" aria-labelledby="core-v1-explanation-title"><p className="diagnosis-summary-kicker">Explanation</p><h4 id="core-v1-explanation-title">判断の理由</h4><p>{result.explanation.summary}</p><p className="core-v1-provider-note">{result.readiness.geminiExplanation.detail}</p><div className="core-v1-explanation-columns"><ExplanationList title="理由" items={result.explanation.reasons} /><ExplanationList title="注意点" items={result.explanation.cautions} /></div></section>
         <section className="core-v1-vector" aria-labelledby="core-v1-vector-title"><p className="diagnosis-summary-kicker">PreferenceVector</p><h4 id="core-v1-vector-title">診断ベクトル</h4><dl>{(Object.keys(vectorLabels) as (keyof PreferenceVector)[]).map((axis) => <div key={axis}><dt>{vectorLabels[axis]}</dt><dd>{result.preferenceVector[axis]}</dd></div>)}</dl></section>
         <section className="core-v1-readiness" aria-labelledby="core-v1-readiness-title"><p className="diagnosis-summary-kicker">Readiness</p><h4 id="core-v1-readiness-title">外部APIの状態</h4><div><strong data-status={result.readiness.geminiResearch.status}>Gemini候補調査: {result.readiness.geminiResearch.status}</strong><p>{result.readiness.geminiResearch.detail}</p></div><div><strong data-research-stage="grounding" data-status={result.candidateResearch.stages.grounding.status}>Google Search Grounding: {result.candidateResearch.stages.grounding.status}</strong><p>Grounding由来の引用URL: {result.candidateResearch.stages.grounding.evidenceUrlCount}件</p></div><div><strong data-research-stage="normalization" data-status={result.candidateResearch.stages.normalization.status}>JSON整形・schema検証: {result.candidateResearch.stages.normalization.status}</strong><p>検証済み候補: {result.candidateResearch.stages.normalization.candidateCount}件 / JSON repair: {result.candidateResearch.stages.normalization.repairAttempted ? "実行" : "未実行"}</p></div><div><strong data-status={result.readiness.geminiExplanation.status}>Gemini補助説明: {result.readiness.geminiExplanation.status}</strong><p>{result.readiness.geminiExplanation.detail}</p></div><div><strong data-status={result.readiness.rakuten.status}>Rakuten: {result.readiness.rakuten.status}</strong><p>{result.readiness.rakuten.detail}</p></div></section>

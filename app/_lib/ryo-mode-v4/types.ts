@@ -152,6 +152,7 @@ export type RyoSneakerFeatures = {
     workPantsGood?: boolean;
     slimPantsGood?: boolean;
     rareWearableColor?: boolean;
+    blackWhite?: boolean;
     tooCommon?: boolean;
     tooTechnical?: boolean;
     overlyFuturistic?: boolean;

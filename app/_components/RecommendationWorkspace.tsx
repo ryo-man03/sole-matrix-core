@@ -133,6 +133,7 @@ export function RecommendationWorkspace({
       const recommendationResponse = await searchRecommendations({
         diagnosisAnswers: ryoContext.diagnosisAnswers,
         preferenceTags: [...new Set([...ryoContext.preferenceTags, ...(onboardingHint?.preferenceTags ?? [])])].slice(0, 5),
+        ryoModeAnswers: ryoContext.answers,
         mode,
         ...(budgetYen === undefined && ryoContext.budgetYen === undefined ? {} : { budgetYen: budgetYen ?? ryoContext.budgetYen }),
         ...(currentUser ? { userId: currentUser.profile.userId } : {}),
@@ -279,9 +280,9 @@ export function RecommendationWorkspace({
         <section className="workspace-panel workspace-result-panel" aria-labelledby="workspace-result-title" data-mobile-step="3" id="mobile-step-3">
           <div className="workspace-panel-heading"><span>02 / RESULT</span><h3 id="workspace-result-title">購入判断</h3><p>{selectedMode.description}</p></div>
           <div className="workspace-decision-placeholder" data-decision={result?.modeRecommendation.decision ?? "pending"}><span>Decision</span><strong>{result ? decisionLabels[result.modeRecommendation.decision] : isAnalyzing ? "分析中…" : "入力待ち"}</strong><p>{result ? result.explanation.summary : "最終DecisionはAIではなくTypeScript Coreが決定します。"}</p></div>
-          {result ? <div className="workspace-candidate-summary"><span>{result.candidate.researchSource === "product_input" ? "入力商品" : result.candidate.researchSource === "gemini" ? "Gemini調査候補 / Core再評価済み" : "fallback catalog"}</span><h4>{result.candidate.name}</h4>{result.candidate.modelType ? <small>タイプ: {result.candidate.modelType}</small> : null}<p>{result.candidate.description}</p></div> : null}
+          {result ? <div className="workspace-candidate-summary"><span>{result.candidate.researchSource === "product_input" ? "入力商品" : result.candidate.researchSource === "gemini" ? "Gemini調査候補 / Core再評価済み" : result.candidate.researchSource === "ryo_anchor" ? "Ryo candidate anchor / Core再ランキング済み" : "fallback catalog"}</span><h4>{result.candidate.name}</h4>{result.candidate.modelType ? <small>タイプ: {result.candidate.modelType}</small> : null}<p>{result.candidate.description}</p></div> : null}
           <div className="workspace-score-preview"><div><span>Balanced Score</span><strong>{result ? result.modeRecommendation.balancedScore : "--"}</strong></div><div><span>Ryo Score</span><strong>{result ? result.modeRecommendation.ryoScore : "--"}</strong></div></div>
-          {result ? <RyoModeResultPanel candidate={result.candidate} vector={ryoPreferenceVector} /> : null}
+          {result ? <><p className="core-v1-provider-note" data-ryo-reranking={result.ryoReranking.applied ? "applied" : "not-applied"}>Ryo再ランキング: {result.ryoReranking.applied ? `適用済み（候補${result.ryoReranking.candidatePoolSize}足 / recommendationScore ${result.ryoReranking.selectedRecommendationScore}）` : "商品単体判断のため未適用"}</p><RyoModeResultPanel candidate={result.candidate} rerankingApplied={result.ryoReranking.applied} vector={ryoPreferenceVector} /></> : null}
           <dl className="workspace-result-list"><div><dt>Core判断理由</dt><dd>{result ? `${selectedMode.description}。Coreが候補特徴・予算適合度・リスクから判定しました。` : selectedMode.description}</dd></div><div><dt>Gemini補助</dt><dd>{result ? `${result.candidateResearch.detail} 説明: ${result.explanation.source}` : "結果生成後に表示します。"}</dd></div><div><dt>注意点</dt><dd>{allCautions.length ? allCautions.join(" / ") : "価格・在庫・サイズ・購入可能性は保証しません。"}</dd></div></dl>
           <div data-mobile-step="4" id="mobile-step-4"><ExternalEvidencePanel result={result} productLinks={productLinks} productLinksMessage={productLinksMessage} isProductLinksLoading={isResolvingProductLinks} manualProductUrl={manualProductUrl} isResolvingManualUrl={isResolvingManualUrl} onManualProductUrlChange={setManualProductUrl} onAddManualProductUrl={handleAddManualProductUrl} /></div>
         </section>

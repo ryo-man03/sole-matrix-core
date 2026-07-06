@@ -3,6 +3,7 @@ import type { CandidateProfile, DiagnosisAnswer, DiagnosisAnswerValue, Recommend
 import { buildRyoOpinion } from "./opinion";
 import { RYO_MODE_V4_QUESTIONS } from "./questions";
 import { scoreRyoModeCandidate } from "./scoring";
+import { normalizeOfficialSneakerName } from "./names";
 import type { RyoModeAnswers, RyoModeQuestionId, RyoModeScoreResult, RyoOpinion, RyoPreferenceVector, RyoSneakerFeatures } from "./types";
 import { hasJapaneseText, isAbstractRecommendationName, isOfficialEnglishDisplayName, validateRyoDisplayName } from "./validation";
 import { buildRyoPreferenceVector, summarizeRyoPreferenceVector } from "./vector";
@@ -13,6 +14,7 @@ export type RyoModeRecommendationContext = {
   budgetYen?: number;
   mode: RecommendationMode;
   vector: RyoPreferenceVector;
+  answers: RyoModeAnswers;
 };
 
 export type RyoModeCandidateEvaluation = {
@@ -60,11 +62,12 @@ export function buildRyoModeContextForRecommendation(answers: RyoModeAnswers): R
     ...(summary.budgetCeilingYen === undefined ? {} : { budgetYen: summary.budgetCeilingYen }),
     mode: summary.ryoInfluence === "balanced" ? "balanced" : "ryo",
     vector,
+    answers: normalizeAnswers(answers),
   };
 }
 
 export function buildRyoSneakerFeaturesFromCandidate(candidate: CandidateProfile): RyoSneakerFeatures {
-  const displayNameOfficial = candidate.name.trim();
+  const displayNameOfficial = normalizeOfficialSneakerName(candidate.name);
   const { brandOfficial, modelOfficial } = splitOfficialName(displayNameOfficial);
   const knownTraits = inferSafeCandidateTraits(displayNameOfficial, candidate.tags);
   const isAbstractName = isAbstractRecommendationName(displayNameOfficial);
@@ -93,6 +96,9 @@ export function buildRyoModeCandidateEvaluation(vector: RyoPreferenceVector, can
     ...displayValidation.penalties,
     ...(featureCount === 0 ? ["候補の確定的な特徴情報が不足しています"] : []),
     ...(features.estimatedPriceYen === undefined ? ["推定価格が不明なため予算適合は加点していません"] : []),
+    ...(isStrongOffAxisCandidate(vector, features.displayNameOfficial)
+      ? ["SambaやNew Balanceが悪いのではなく、今回のwork pants・leather aging・basketball・tied silhouette条件では中心から少し外れます"]
+      : []),
   ];
   const score = { ...rawScore, cautionSignals: [...new Set(cautionSignals)] };
   return { features, score, opinion: buildRyoOpinion(vector, score, features) };
@@ -126,11 +132,30 @@ function inferSafeCandidateTraits(displayName: string, tags: readonly SneakerTag
   const traits: RyoSneakerFeatures["traits"] = {};
   const set = (condition: boolean, values: Partial<RyoSneakerFeatures["traits"]>) => { if (condition) Object.assign(traits, values); };
   set(tags.includes("canvas"), { canvas: true });
-  set(/Nike\s+Air\s+Force\s+1\s+Low/i.test(displayName), { leather: true });
-  set(/Air\s+Jordan\s+1\s+High/i.test(displayName), { leather: true, tiedSilhouetteGood: true });
-  set(/PUMA\s+(?:Suede|Clyde)/i.test(displayName), { suede: true });
-  set(/adidas\s+Superstar/i.test(displayName), { leather: true, oldShape: true });
-  set(/adidas\s+Samba\s+OG/i.test(displayName), { oldShape: true });
-  set(/New\s+Balance\s+991/i.test(displayName), { oldShape: true });
+  set(/black\s*[/ -]\s*white|white\s*[/ -]\s*white/i.test(displayName), { blackWhite: true });
+  set(/Nike\s+Air\s+Force\s+1\s+Low/i.test(displayName), { leather: true, oldShape: true, lowCut: true, tiedSilhouetteGood: true });
+  set(/Air\s+Jordan\s+1\s+High/i.test(displayName), { leather: true, oldShape: true, highCut: true, tiedSilhouetteGood: true });
+  set(/Air\s+Jordan\s+1\s+Low/i.test(displayName), { leather: true, oldShape: true, lowCut: true, tiedSilhouetteGood: true });
+  set(/Converse\s+Jack\s+Purcell\s+Leather/i.test(displayName), { leather: true, oldShape: true, lowCut: true, oxCut: true, tiedSilhouetteGood: true });
+  set(/Converse\s+One\s+Star/i.test(displayName), { suede: true, oldShape: true, oxCut: true, tiedSilhouetteGood: true, madeInJapan: /\bJ\b|Made in Japan/i.test(displayName), vintage: /VTG|Vintage/i.test(displayName) });
+  set(/PUMA\s+(?:Suede|Clyde)/i.test(displayName), { suede: true, oldShape: true, lowCut: true, tiedSilhouetteGood: true });
+  set(/adidas\s+Superstar/i.test(displayName), { leather: true, oldShape: true, lowCut: true, tiedSilhouetteGood: true, vintage: /Vintage/i.test(displayName), madeInGermany: /Made in Germany/i.test(displayName) });
+  set(/Converse\s+(?:Pro\s+Leather|Weapon)/i.test(displayName), { leather: true, oldShape: true, tiedSilhouetteGood: true });
+  set(/Nike\s+(?:Terminator|Blazer)/i.test(displayName), { leather: true, oldShape: true, tiedSilhouetteGood: true, highCut: /High|Mid/i.test(displayName), lowCut: /Low/i.test(displayName) });
+  set(/Reebok\s+Classic\s+Leather/i.test(displayName), { leather: true, oldShape: true, lowCut: true });
+  set(/Vans\s+Half\s+Cab/i.test(displayName), { suede: true, oldShape: true, midCut: true, tiedSilhouetteGood: true });
+  set(/Last\s+Resort\s+AB\s+VM001/i.test(displayName), { suede: true, lowCut: true, tiedSilhouetteGood: true });
+  set(/adidas\s+Samba\s+OG/i.test(displayName), { oldShape: true, lowCut: true, sportOrigin: "football", betterRyoAlternativeExists: true });
+  set(/New\s+Balance\s+CM996/i.test(displayName), { oldShape: true, lowCut: true, sportOrigin: "running", betterRyoAlternativeExists: true });
+  set(/New\s+Balance\s+(?:991|993|998)/i.test(displayName), { oldShape: true, sportOrigin: "running" });
+  set(/ASICS\s+GEL-KAYANO\s+14|Nike\s+Shox|\bHOKA\b|PUMA\s+Speedcat/i.test(displayName), { tooTechnical: true, ryoDiscouragedModel: true });
   return traits;
+}
+
+function isStrongOffAxisCandidate(vector: RyoPreferenceVector, displayName: string): boolean {
+  return vector.ryoStrength.ryoStrong > 0
+    && vector.pantsFit.workPants > 0
+    && vector.sportOrigin.basketball > 0
+    && vector.materialAging.leatherSinking > 0
+    && (/adidas\s+Samba\s+OG/i.test(displayName) || /New\s+Balance\s+CM996/i.test(displayName));
 }

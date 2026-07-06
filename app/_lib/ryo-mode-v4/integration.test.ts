@@ -41,6 +41,7 @@ describe("Ryo Mode v4 Phase 2 integration", () => {
     expect(context.mode).toBe("ryo");
     expect(context.preferenceTags).toContain("classic");
     expect(context.diagnosisAnswers).toHaveLength(8);
+    expect(context.answers).toMatchObject(baseAnswers);
     expect(mapRyoV4AnswersToLegacyDiagnosisInput({})).toHaveLength(8);
     expect(mapRyoV4AnswersToLegacyDiagnosisInput({ materialAging: "unknown_option" })
       .find((answer) => answer.questionId === "long-use")?.value).toBe("neutral");
@@ -66,7 +67,7 @@ describe("Ryo Mode v4 Phase 2 integration", () => {
     const candidate = createCandidate();
     const features = buildRyoSneakerFeaturesFromCandidate(candidate);
     const evaluation = buildRyoModeCandidateEvaluation(buildRyoPreferenceVector(baseAnswers), candidate);
-    expect(features.displayNameOfficial).toBe("Nike Air Force 1 Low White/White");
+    expect(features.displayNameOfficial).toBe('Nike Air Force 1 Low "White/White"');
     expect(features.brandOfficial).toBe("Nike");
     expect(features.verified).toBe(true);
     expect(evaluation.score.cautionSignals).toContain("推定価格が不明なため予算適合は加点していません");

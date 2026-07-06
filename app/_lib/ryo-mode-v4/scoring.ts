@@ -96,7 +96,7 @@ function buildProductBreakdown(features: RyoSneakerFeatures): RyoModeScoreBreakd
   );
   const pantsCount = pantsTraitCount(t);
   const pantsCompatibility = pantsCount === 0 ? 0 : capped(6 + pantsCount * 2, CAPS.pantsCompatibility);
-  const colorTaste = capped((t.rareWearableColor ? 9 : 0) + (t.tooCommon === false ? 3 : 0), CAPS.colorTaste);
+  const colorTaste = capped((t.rareWearableColor ? 9 : 0) + (t.blackWhite ? 8 : 0) + (t.tooCommon === false ? 3 : 0), CAPS.colorTaste);
   const styleSportContext = capped(
     (t.sportOrigin && t.sportOrigin !== "none" ? 5 : 0) + (t.vintage || t.oldShape ? 3 : 0),
     CAPS.styleSportContext,
@@ -141,7 +141,9 @@ function buildRecommendationBreakdown(
     : vector.sportOrigin.noSportPreference;
   const colorPreference = t.rareWearableColor
     ? max(vector.taste.rareColor, vector.color.rareColor, vector.color.oddColor, vector.color.warmAccent)
-    : max(vector.taste.classic, vector.taste.simple, vector.color.blackWhite, vector.color.earthTone, vector.color.creamGum);
+    : t.blackWhite
+      ? max(vector.taste.classic, vector.taste.simple, vector.color.blackWhite)
+      : max(vector.taste.classic, vector.taste.simple, vector.color.earthTone, vector.color.creamGum);
 
   pushMatch(materialPreference, "preferred material and aging behavior", matchedSignals);
   pushMatch(max(cutPreference, wearingPreference), "preferred cut and wearing silhouette", matchedSignals);
@@ -184,11 +186,12 @@ function collectRecommendationDeductions(
   deduction += recordPenalty(features.isAbstractName, 20, "abstract recommendation name", penalties, cautions);
   deduction += recordPenalty(features.hasLocalizedMainName, 18, "localized Japanese display name as main title", penalties, cautions);
   deduction += recordPenalty(t.resaleTooExpensiveForBeginner, 12, "resale too expensive for beginner", penalties, cautions);
-  deduction += recordPenalty(t.betterRyoAlternativeExists, 8, "better Ryo alternative exists", penalties, cautions);
   deduction += recordPenalty(t.popularityOnlyReason, 6, "Air Force 1 recommended only because it is popular", penalties, cautions);
   deduction += recordPenalty(t.flashyColorWithoutWearability, 5, "flashy colorway without wearability", penalties, cautions);
 
   const strengthFactor = ryoPenaltyStrength(vector);
+  const alternativePenalty = Math.round(18 * strengthFactor);
+  deduction += recordPenalty(t.betterRyoAlternativeExists, alternativePenalty, "better Ryo alternative exists for this answer", penalties, cautions);
   const techToleranceFactor = vector.techTolerance.pureCoolOk > 0 ? 0.25
     : t.techAllowedModel && vector.techTolerance.airMaxNbOk > 0 ? 0
       : vector.techTolerance.heritageTechOk > 0 || vector.techTolerance.oldTechLookOk > 0 ? 0.55 : 1;

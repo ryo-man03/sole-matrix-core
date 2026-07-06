@@ -28,7 +28,7 @@ describe("Core v1 UI integration", () => {
     expect(componentSource).toContain("JSON整形・schema検証:");
     expect(componentSource).toContain('data-research-stage="grounding"');
     expect(componentSource).toContain('data-research-stage="normalization"');
-    expect(componentSource).toContain("推薦元:");
+    expect(componentSource).toContain("候補調査:");
     expect(componentSource).toContain("Gemini調査");
     expect(componentSource).toContain("引用URL");
     expect(componentSource).toContain("検索入口");
@@ -45,16 +45,18 @@ describe("Core v1 UI integration", () => {
     expect(componentSource).toContain('source === "rakuten"');
   });
 
-  it("connects the 11-question Ryo Mode v4 flow without replacing Core Decision", () => {
+  it("connects the 11-question Ryo Mode v4 flow to candidate reranking", () => {
     expect(diagnosisDataSource).toContain("RYO_MODE_V4_QUESTIONS.map");
     expect(diagnosisFlowSource).toContain("11の質問で好みを整理する");
     expect(diagnosisFlowSource).toContain("buildRyoPreferenceVector");
     expect(componentSource).toContain("buildRyoModeContextForRecommendation");
+    expect(componentSource).toContain("ryoModeAnswers");
+    expect(componentSource).toContain("data-ryo-reranking");
     expect(componentSource).toContain("RyoModeResultPanel");
     expect(ryoResultSource).toContain("productScore");
     expect(ryoResultSource).toContain("recommendationScore");
     expect(ryoResultSource).toContain("totalRyoScore");
     expect(ryoResultSource).toContain("RyoOpinion");
-    expect(ryoResultSource).toContain("Core Decisionは変更せず");
+    expect(ryoResultSource).toContain("候補プールを作り");
   });
 });
