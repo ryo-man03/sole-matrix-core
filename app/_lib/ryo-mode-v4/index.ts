@@ -1,4 +1,5 @@
 export * from "./features";
+export * from "./integration";
 export * from "./mappings";
 export * from "./opinion";
 export * from "./questions";

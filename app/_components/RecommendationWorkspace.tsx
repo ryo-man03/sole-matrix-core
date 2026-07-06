@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type DiagnosisAnswerId, preferenceDiagnosisQuestions } from "../_data/preferenceDiagnosisQuestions";
+import type { CompletedPreferenceDiagnosisAnswers, PreferenceDiagnosisAnswers } from "../_data/preferenceDiagnosisQuestions";
 import {
   analyzeSneaker as analyzeSneakerApi,
   getUserProfile,
@@ -16,10 +16,13 @@ import type { AuthState, UserSession } from "../_lib/auth-session/types";
 import type { IntegratedRecommendationResult } from "../_lib/integrated-recommendation/types";
 import type { OnboardingPreferenceHint } from "../_lib/onboarding/types";
 import type { LiveProductUrl } from "../_lib/product-links/types";
+import { buildRyoModeContextForRecommendation } from "../_lib/ryo-mode-v4/integration";
+import { buildRyoPreferenceVector } from "../_lib/ryo-mode-v4/vector";
 import type { SatisfactionEvaluation } from "../_lib/satisfaction-feedback/types";
 import type { UserMemorySummary } from "../_lib/user-memory/types";
 import { ExternalEvidencePanel } from "./ExternalEvidencePanel";
 import { createLatestRequestGate, resolveRecommendationProductName } from "./productLinkResolution";
+import { RyoModeResultPanel } from "./RyoModeResultPanel";
 
 const workspaceModes = [
   { id: "ryo", label: "Ryo Mode", description: "文化的背景とコレクションとの関係を深く見る" },
@@ -35,7 +38,7 @@ const decisionLabels: Record<IntegratedRecommendationResult["modeRecommendation"
 
 type RecommendationWorkspaceProps = {
   authState?: AuthState;
-  diagnosisAnswers?: Record<string, DiagnosisAnswerId> | null;
+  diagnosisAnswers?: CompletedPreferenceDiagnosisAnswers | null;
   onGuestDiagnosisCompleted?: () => void;
   onUserSession?: (session: UserSession) => void;
   onboardingHint?: OnboardingPreferenceHint | null;
@@ -53,7 +56,7 @@ export function RecommendationWorkspace({
   const [productUrl, setProductUrl] = useState("");
   const [budgetText, setBudgetText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [answers, setAnswers] = useState<Record<string, DiagnosisAnswerId>>(() => diagnosisAnswers ?? createNeutralDiagnosisAnswers());
+  const [answers, setAnswers] = useState<PreferenceDiagnosisAnswers>(() => diagnosisAnswers ?? {});
   const [result, setResult] = useState<IntegratedRecommendationResult | null>(null);
   const [currentUser, setCurrentUser] = useState<UserMemorySummary | null>(null);
   const [productLinks, setProductLinks] = useState<LiveProductUrl[]>([]);
@@ -70,12 +73,13 @@ export function RecommendationWorkspace({
   const requestGateRef = useRef(createLatestRequestGate());
 
   const selectedMode = workspaceModes.find((item) => item.id === mode)!;
+  const ryoPreferenceVector = useMemo(() => buildRyoPreferenceVector(answers), [answers]);
   const allCautions = useMemo(() => result ? [...new Set([
     ...(result.candidate.researchCautions ?? []),
     ...result.explanation.cautions,
   ])] : [], [result]);
 
-  useEffect(() => { setAnswers(diagnosisAnswers ?? createNeutralDiagnosisAnswers()); }, [diagnosisAnswers]);
+  useEffect(() => { setAnswers(diagnosisAnswers ?? {}); }, [diagnosisAnswers]);
   useEffect(() => {
     if (onboardingHint?.preferredBudgetYen) setBudgetText((current) => current || String(onboardingHint.preferredBudgetYen));
   }, [onboardingHint]);
@@ -117,6 +121,7 @@ export function RecommendationWorkspace({
     requestGateRef.current.invalidate();
     setWorkspaceStatus("商品情報を安全に分析しています…");
     try {
+      const ryoContext = buildRyoModeContextForRecommendation(answers);
       const analysisResponse = await analyzeSneakerApi({
         ...(sneakerName.trim() ? { sneakerName: sneakerName.trim() } : {}),
         ...(productUrl.trim() ? { url: productUrl.trim() } : {}),
@@ -126,10 +131,10 @@ export function RecommendationWorkspace({
 
       setWorkspaceStatus("CoreでスコアとDecisionを計算しています…");
       const recommendationResponse = await searchRecommendations({
-        diagnosisAnswers: preferenceDiagnosisQuestions.map((question) => ({ questionId: question.id, value: answers[question.id] ?? "neutral" })),
-        preferenceTags: onboardingHint?.preferenceTags ?? [],
+        diagnosisAnswers: ryoContext.diagnosisAnswers,
+        preferenceTags: [...new Set([...ryoContext.preferenceTags, ...(onboardingHint?.preferenceTags ?? [])])].slice(0, 5),
         mode,
-        ...(budgetYen === undefined ? {} : { budgetYen }),
+        ...(budgetYen === undefined && ryoContext.budgetYen === undefined ? {} : { budgetYen: budgetYen ?? ryoContext.budgetYen }),
         ...(currentUser ? { userId: currentUser.profile.userId } : {}),
         analysis: analysisResponse.data,
       });
@@ -213,7 +218,8 @@ export function RecommendationWorkspace({
       const globalResult = await saveGlobalRecommendationFeedback({
         sessionType: "user",
         recommendationMode: result.modeRecommendation.mode,
-        eightQuestionAnswers: preferenceDiagnosisQuestions.map((question) => answers[question.id] ?? "neutral"),
+        // Preserve the existing feedback storage contract until that schema is versioned.
+        eightQuestionAnswers: buildRyoModeContextForRecommendation(answers).diagnosisAnswers.map((answer) => answer.value),
         userContextSummary: "authenticated user",
         inputSneakerName: result.candidate.name,
         importantTags: result.candidate.tags,
@@ -266,7 +272,7 @@ export function RecommendationWorkspace({
             <label><span>予算（円・任意）</span><input inputMode="numeric" min="1" onChange={(event) => setBudgetText(event.target.value)} placeholder="例: 20000" type="number" value={budgetText} /></label>
             <div data-mobile-step="2" id="mobile-step-2"><label><span>商品URL</span><input inputMode="url" onChange={(event) => setProductUrl(event.target.value)} placeholder="https://example.com/item" type="url" value={productUrl} /><small>URLは外部参考情報として扱い、Core scoreには混ぜません。</small></label><div className="workspace-image-field"><label><span>画像</span><input accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} type="file" /><small>{imageFile ? `${imageFile.name} / ${formatFileSize(imageFile.size)}` : "JPEG / PNG / WebP・5MBまで"}</small></label><button onClick={handleUseDemoImage} type="button">デモ画像を使う</button></div></div>
           </div>
-          <p className="workspace-preference-context">{diagnosisAnswers ? "このセッションの8問診断結果を好みの参考に使います。" : "8問診断結果がないため、中立回答を使います。"}</p>
+          <p className="workspace-preference-context">{diagnosisAnswers ? "このセッションの11問診断結果を好みの参考に使います。" : "11問診断結果がないため、Ryo Mode v4は未指定の軸を中立として扱います。"}</p>
           <button className="workspace-primary-button" disabled={isAnalyzing || (requireSessionSelection && (authState.status === "loading" || authState.status === "signed_out"))} onClick={handleRecommend} type="button">{isAnalyzing ? "分析・推薦中…" : "分析して購入判断を実行する"}</button>
         </section>
 
@@ -275,6 +281,7 @@ export function RecommendationWorkspace({
           <div className="workspace-decision-placeholder" data-decision={result?.modeRecommendation.decision ?? "pending"}><span>Decision</span><strong>{result ? decisionLabels[result.modeRecommendation.decision] : isAnalyzing ? "分析中…" : "入力待ち"}</strong><p>{result ? result.explanation.summary : "最終DecisionはAIではなくTypeScript Coreが決定します。"}</p></div>
           {result ? <div className="workspace-candidate-summary"><span>{result.candidate.researchSource === "product_input" ? "入力商品" : result.candidate.researchSource === "gemini" ? "Gemini調査候補 / Core再評価済み" : "fallback catalog"}</span><h4>{result.candidate.name}</h4>{result.candidate.modelType ? <small>タイプ: {result.candidate.modelType}</small> : null}<p>{result.candidate.description}</p></div> : null}
           <div className="workspace-score-preview"><div><span>Balanced Score</span><strong>{result ? result.modeRecommendation.balancedScore : "--"}</strong></div><div><span>Ryo Score</span><strong>{result ? result.modeRecommendation.ryoScore : "--"}</strong></div></div>
+          {result ? <RyoModeResultPanel candidate={result.candidate} vector={ryoPreferenceVector} /> : null}
           <dl className="workspace-result-list"><div><dt>Core判断理由</dt><dd>{result ? `${selectedMode.description}。Coreが候補特徴・予算適合度・リスクから判定しました。` : selectedMode.description}</dd></div><div><dt>Gemini補助</dt><dd>{result ? `${result.candidateResearch.detail} 説明: ${result.explanation.source}` : "結果生成後に表示します。"}</dd></div><div><dt>注意点</dt><dd>{allCautions.length ? allCautions.join(" / ") : "価格・在庫・サイズ・購入可能性は保証しません。"}</dd></div></dl>
           <div data-mobile-step="4" id="mobile-step-4"><ExternalEvidencePanel result={result} productLinks={productLinks} productLinksMessage={productLinksMessage} isProductLinksLoading={isResolvingProductLinks} manualProductUrl={manualProductUrl} isResolvingManualUrl={isResolvingManualUrl} onManualProductUrlChange={setManualProductUrl} onAddManualProductUrl={handleAddManualProductUrl} /></div>
         </section>
@@ -292,10 +299,6 @@ export function RecommendationWorkspace({
 
 function formatFileSize(bytes: number): string {
   return bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)}KB` : `${(bytes / 1024 / 1024).toFixed(1)}MB`;
-}
-
-function createNeutralDiagnosisAnswers(): Record<string, DiagnosisAnswerId> {
-  return Object.fromEntries(preferenceDiagnosisQuestions.map((question) => [question.id, "neutral"])) as Record<string, DiagnosisAnswerId>;
 }
 
 async function createDemoSneakerFile(): Promise<File> {

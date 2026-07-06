@@ -3,15 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import type { DiagnosisAnswerId } from "../_data/preferenceDiagnosisQuestions";
 import type { FeedbackSentiment, PreferenceVector, RecommendationResult } from "../_lib/core-v1/types";
+import { buildRyoModeContextForRecommendation } from "../_lib/ryo-mode-v4/integration";
+import type { RyoPreferenceVector } from "../_lib/ryo-mode-v4/types";
 import { resolveRecommendationProductLinks } from "../_lib/apiClient";
 import type { LiveProductUrl } from "../_lib/product-links/types";
 import { ProductReferenceLinks } from "./ProductReferenceLinks";
+import { RyoModeResultPanel } from "./RyoModeResultPanel";
 import { createLatestRequestGate } from "./productLinkResolution";
 
 type Props = {
   disabled?: boolean;
   onRecommendationComplete?: (() => void) | undefined;
   selectedAnswerByQuestionId: Record<string, DiagnosisAnswerId | undefined>;
+  ryoPreferenceVector: RyoPreferenceVector;
 };
 
 type RecommendApiResponse =
@@ -43,8 +47,7 @@ const recommendationSourceLabels: Record<RecommendationResult["candidateResearch
   product_input: "入力商品",
 };
 
-export function CoreV1RecommendationPanel({ onRecommendationComplete, selectedAnswerByQuestionId }: Props) {
-  const [budgetText, setBudgetText] = useState("");
+export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPreferenceVector, selectedAnswerByQuestionId }: Props) {
   const [result, setResult] = useState<RecommendationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -57,8 +60,7 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, selectedAn
   useEffect(() => () => gateRef.current.invalidate(), []);
 
   async function handleRecommend() {
-    const budgetYen = normalizeBudget(budgetText);
-    if (budgetYen === null) { setErrorMessage("予算は1円以上の整数で入力してください。"); return; }
+    const ryoContext = buildRyoModeContextForRecommendation(selectedAnswerByQuestionId);
     setIsLoading(true);
     setErrorMessage("");
     setResult(null);
@@ -70,10 +72,10 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, selectedAn
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          diagnosisAnswers: selectedAnswerByQuestionId,
-          preferenceTags: [],
-          mode: "balanced",
-          ...(budgetYen === undefined ? {} : { budgetYen }),
+          diagnosisAnswers: ryoContext.diagnosisAnswers,
+          preferenceTags: ryoContext.preferenceTags,
+          mode: ryoContext.mode,
+          ...(ryoContext.budgetYen === undefined ? {} : { budgetYen: ryoContext.budgetYen }),
         }),
       });
       const payload = await response.json() as RecommendApiResponse;
@@ -125,10 +127,10 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, selectedAn
   return (
     <section className="core-v1-panel" aria-labelledby="core-v1-recommendation-title">
       <div className="core-v1-panel-heading"><p className="diagnosis-summary-kicker">Recommendation</p><h3 id="core-v1-recommendation-title">具体的なおすすめモデルを見る</h3><p>Gemini候補はschema・抽象名・参考URLを検証し、Coreが再スコアリングします。失敗時は具体モデルのfallback catalogを使います。</p></div>
-      <label className="core-v1-budget-field"><span>予算（任意・円）</span><input inputMode="numeric" min="1" onChange={(event) => setBudgetText(event.target.value)} placeholder="例: 20000" type="number" value={budgetText} /><small>価格・在庫を保証するものではなく、Core内の予算適合度の参考にだけ使います。</small></label>
+      <p className="core-v1-provider-note">Q9で選んだ予算をCoreの候補選定とRyo Mode補助評価へ反映します。価格・在庫・購入可能性は保証しません。</p>
       <button className="diagnosis-primary-button core-v1-submit" disabled={isLoading} onClick={handleRecommend} type="button">{isLoading ? "候補を検証・再評価しています…" : "推薦結果を見る"}</button>
       {errorMessage ? <p className="core-v1-error" role="alert">{errorMessage}</p> : null}
-      {!result && !isLoading && !errorMessage ? <p className="core-v1-empty">予算は空欄でも推薦できます。</p> : null}
+      {!result && !isLoading && !errorMessage ? <p className="core-v1-empty">11問の回答を使って推薦候補を検証します。</p> : null}
 
       {result ? <div className="core-v1-result">
         <div className="core-v1-result-heading"><div><p className="diagnosis-summary-kicker">おすすめ</p><h4>{result.candidate.name}</h4>{result.candidate.modelType ? <p>タイプ: {result.candidate.modelType}</p> : null}<p>{result.candidate.description}</p></div><strong data-decision={result.decision}>{decisionLabels[result.decision]}</strong></div>
@@ -138,6 +140,7 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, selectedAn
         <p className="core-v1-provider-note">参考リンク: {formatEvidenceKinds(result.candidate.evidenceLinks)}</p>
         <ProductReferenceLinks isLoading={isResolvingProductLinks} links={productLinks} message={productLinksMessage} />
         <div className="core-v1-score-grid"><ScoreCard label="Balanced Score" description="汎用性・予算・情報の確かさを含む一般向け評価" value={result.balancedScore.total} /><ScoreCard label="Ryo Score" description="カルチャーやスタイルの好みを含む評価" value={result.ryoScore.total} /></div>
+        <RyoModeResultPanel candidate={result.candidate} vector={ryoPreferenceVector} />
         <section className="core-v1-explanation" aria-labelledby="core-v1-explanation-title"><p className="diagnosis-summary-kicker">Explanation</p><h4 id="core-v1-explanation-title">判断の理由</h4><p>{result.explanation.summary}</p><p className="core-v1-provider-note">{result.readiness.geminiExplanation.detail}</p><div className="core-v1-explanation-columns"><ExplanationList title="理由" items={result.explanation.reasons} /><ExplanationList title="注意点" items={result.explanation.cautions} /></div></section>
         <section className="core-v1-vector" aria-labelledby="core-v1-vector-title"><p className="diagnosis-summary-kicker">PreferenceVector</p><h4 id="core-v1-vector-title">診断ベクトル</h4><dl>{(Object.keys(vectorLabels) as (keyof PreferenceVector)[]).map((axis) => <div key={axis}><dt>{vectorLabels[axis]}</dt><dd>{result.preferenceVector[axis]}</dd></div>)}</dl></section>
         <section className="core-v1-readiness" aria-labelledby="core-v1-readiness-title"><p className="diagnosis-summary-kicker">Readiness</p><h4 id="core-v1-readiness-title">外部APIの状態</h4><div><strong data-status={result.readiness.geminiResearch.status}>Gemini候補調査: {result.readiness.geminiResearch.status}</strong><p>{result.readiness.geminiResearch.detail}</p></div><div><strong data-research-stage="grounding" data-status={result.candidateResearch.stages.grounding.status}>Google Search Grounding: {result.candidateResearch.stages.grounding.status}</strong><p>Grounding由来の引用URL: {result.candidateResearch.stages.grounding.evidenceUrlCount}件</p></div><div><strong data-research-stage="normalization" data-status={result.candidateResearch.stages.normalization.status}>JSON整形・schema検証: {result.candidateResearch.stages.normalization.status}</strong><p>検証済み候補: {result.candidateResearch.stages.normalization.candidateCount}件 / JSON repair: {result.candidateResearch.stages.normalization.repairAttempted ? "実行" : "未実行"}</p></div><div><strong data-status={result.readiness.geminiExplanation.status}>Gemini補助説明: {result.readiness.geminiExplanation.status}</strong><p>{result.readiness.geminiExplanation.detail}</p></div><div><strong data-status={result.readiness.rakuten.status}>Rakuten: {result.readiness.rakuten.status}</strong><p>{result.readiness.rakuten.detail}</p></div></section>
@@ -153,12 +156,6 @@ function ScoreCard({ label, description, value }: { label: string; description: 
 
 function ExplanationList({ title, items }: { title: string; items: string[] }) {
   return <div><h5>{title}</h5><ul>{items.map((item) => <li key={item}>{item}</li>)}</ul></div>;
-}
-
-function normalizeBudget(value: string): number | null | undefined {
-  if (!value.trim()) return undefined;
-  const budget = Number(value);
-  return Number.isInteger(budget) && budget > 0 ? budget : null;
 }
 
 function formatEvidenceKinds(evidenceLinks: RecommendationResult["candidate"]["evidenceLinks"]): string {

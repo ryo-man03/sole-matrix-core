@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 describe("Core v1 UI integration", () => {
   const componentSource = readFileSync(new URL("../../_components/CoreV1RecommendationPanel.tsx", import.meta.url), "utf8");
   const diagnosisFlowSource = readFileSync(new URL("../../_components/PreferenceDiagnosisFlow.tsx", import.meta.url), "utf8");
+  const diagnosisDataSource = readFileSync(new URL("../../_data/preferenceDiagnosisQuestions.ts", import.meta.url), "utf8");
+  const ryoResultSource = readFileSync(new URL("../../_components/RyoModeResultPanel.tsx", import.meta.url), "utf8");
   const readinessSource = readFileSync(new URL("./readiness.ts", import.meta.url), "utf8");
 
   it("connects diagnosis answers to the recommendation API", () => {
@@ -41,5 +43,18 @@ describe("Core v1 UI integration", () => {
     expect(readinessSource).toContain("最終DecisionはCoreが決定します");
     expect(componentSource).not.toContain("href={result.candidate.url}");
     expect(componentSource).toContain('source === "rakuten"');
+  });
+
+  it("connects the 11-question Ryo Mode v4 flow without replacing Core Decision", () => {
+    expect(diagnosisDataSource).toContain("RYO_MODE_V4_QUESTIONS.map");
+    expect(diagnosisFlowSource).toContain("11の質問で好みを整理する");
+    expect(diagnosisFlowSource).toContain("buildRyoPreferenceVector");
+    expect(componentSource).toContain("buildRyoModeContextForRecommendation");
+    expect(componentSource).toContain("RyoModeResultPanel");
+    expect(ryoResultSource).toContain("productScore");
+    expect(ryoResultSource).toContain("recommendationScore");
+    expect(ryoResultSource).toContain("totalRyoScore");
+    expect(ryoResultSource).toContain("RyoOpinion");
+    expect(ryoResultSource).toContain("Core Decisionは変更せず");
   });
 });

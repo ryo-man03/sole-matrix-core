@@ -1,25 +1,38 @@
-export type DiagnosisAnswerId = "like" | "neutral" | "dislike";
+import { RYO_MODE_V4_QUESTIONS } from "../_lib/ryo-mode-v4/questions";
+import type { RyoModeQuestionId } from "../_lib/ryo-mode-v4/types";
+
+export type DiagnosisAnswerId = string;
 
 export type DiagnosisQuestion = {
-  id: string;
+  id: RyoModeQuestionId;
   question: string;
   helperText: string;
-  options: { id: DiagnosisAnswerId; label: "好き" | "普通" | "苦手"; description: string }[];
+  options: { id: DiagnosisAnswerId; label: string; description: string }[];
 };
 
-const answerOptions: DiagnosisQuestion["options"] = [
-  { id: "like", label: "好き", description: "この方向を強めに見たい" },
-  { id: "neutral", label: "普通", description: "大きくは重視しない" },
-  { id: "dislike", label: "苦手", description: "この方向は控えめにしたい" },
-];
+export type PreferenceDiagnosisAnswers = Partial<Record<RyoModeQuestionId, DiagnosisAnswerId>>;
+export type CompletedPreferenceDiagnosisAnswers = Record<RyoModeQuestionId, DiagnosisAnswerId>;
 
-export const preferenceDiagnosisQuestions: DiagnosisQuestion[] = [
-  { id: "trusted-classic", question: "長く親しまれてきた定番感のあるスニーカーに惹かれますか？", helperText: "歴史や背景のあるクラシックなモデルを好むか確認します。", options: answerOptions },
-  { id: "simple-daily", question: "シンプルで毎日の服に合わせやすい靴が好きですか？", helperText: "装飾を抑えた汎用性の高いデザインを好むか確認します。", options: answerOptions },
-  { id: "street-presence", question: "街の服装になじみながら、少し存在感のある靴が好きですか？", helperText: "ストリート寄りの主張や文化的背景を重視するか確認します。", options: answerOptions },
-  { id: "soft-volume", question: "足元にほどよいボリュームがある靴が好きですか？", helperText: "細身よりも立体感のあるシルエットを楽しむか確認します。", options: answerOptions },
-  { id: "walking-comfort", question: "履き心地や歩きやすさを重視しますか？", helperText: "通学・通勤・休日の外出で足への負担を抑えたいか確認します。", options: answerOptions },
-  { id: "long-use", question: "長く履けることや扱いやすさを重視しますか？", helperText: "手入れのしやすさと耐久性を重視するか確認します。", options: answerOptions },
-  { id: "sporty-mood", question: "ランニング系やスポーティーな雰囲気が好きですか？", helperText: "軽快で動きやすそうな印象を好むか確認します。", options: answerOptions },
-  { id: "premium-detail", question: "上質感や特別感のあるディテールを重視しますか？", helperText: "素材や細部の作りに魅力を感じるか確認します。", options: answerOptions },
-];
+const helperTextByQuestionId: Record<RyoModeQuestionId, string> = {
+  style: "今日の服装や気分に最も近い方向を選びます。",
+  pantsFit: "実際に合わせるパンツとのバランスを確認します。",
+  taste: "定番感、色、限定感のどこに惹かれるかを確認します。",
+  sportOrigin: "競技の背景やカルチャーとの接点を確認します。",
+  cut: "足首まわりを含むシルエットの好みを確認します。",
+  wearingStyle: "紐の締め方や足元の見え方を確認します。",
+  materialAging: "履き込んだ素材の変化をどの程度楽しみたいか確認します。",
+  color: "普段の服に合わせたい配色を選びます。",
+  budget: "候補を絞るための現実的な予算上限を選びます。",
+  techTolerance: "機能的な見た目をどこまで許容するか確認します。",
+  ryoStrength: "ユーザーの好みとRyo Modeの判断軸の配分を選びます。",
+};
+
+export const preferenceDiagnosisQuestions: DiagnosisQuestion[] = RYO_MODE_V4_QUESTIONS.map((question) => ({
+  id: question.id,
+  question: question.title,
+  helperText: helperTextByQuestionId[question.id],
+  options: question.options.map((option) => ({
+    ...option,
+    description: "この方向を診断に反映する",
+  })),
+}));
