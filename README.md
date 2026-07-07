@@ -1,240 +1,143 @@
 # SOLE//MATRIX
 
-**好みを言葉にし、気になる一足を「なんとなく」ではなく比較できる形にする。**
+スニーカーを、流行や価格だけでなく、歴史・素材・服との相性・文化背景まで含めて整理し、購入判断を補助する Web アプリです。
 
-SOLE//MATRIXは、8問の好み診断と商品情報からスニーカー選びを補助するNext.jsアプリです。Geminiは実在候補の調査と説明を担当し、スコア・予算適合度・最終Decisionは決定論的なTypeScript Coreが担当します。
+商品名・URL・画像からの単体判断と、11問診断にもとづく推薦を分けて扱い、Gemini の候補調査と TypeScript Core の最終判断を明確に分離しています。価格、在庫、サイズ、購入可能性は販売元での確認を前提にしています。
 
-> AIは候補を広げる。Coreは判断を固定する。外部リンクは確かめる入口であって、購入可能性の保証ではない。
+## 1. Overview
 
-## Screenshots
+SOLE//MATRIX は、好みを言語化しにくい人でも、服装・パンツ・素材・予算・カルチャーの軸でスニーカー選びを整理できるように設計したアプリです。
 
-### PC — 目的から選ぶワークスペース
+- 11問診断から `RyoPreferenceVector v4` を生成できる
+- 商品名・URL・画像から個別の商品判断ができる
+- Gemini を候補調査と補助説明に使い、Core が schema 検証・fallback・再ランキング・最終判断を担う
+- Ryo Mode v4 で文化背景、素材の育ち、パンツ相性を強く反映する
+- 価格・在庫・サイズ・購入可能性は販売元で要確認
 
-![PCで表示したSOLE//MATRIXのモード選択画面](docs/product/screenshots/readme/desktop-overview.png)
+## 2. Screenshots
 
-8問診断と、商品名・URL・画像を使う購入判断を最初から分けています。ログインなしのゲストモードでも、主要な体験を何度でも試せます。
+以下は、2026-07-07 にローカル環境で確認した画面です。実 API に依存しない確認用キャプチャを含みます。
 
-### Smartphone — 1問ずつ進む8問診断
+### 11問診断の開始画面
 
-<p align="center">
-  <img src="docs/product/screenshots/readme/mobile-diagnosis.png" width="390" alt="スマートフォンで表示したSOLE//MATRIXの8問診断画面" />
-</p>
+![Ryo Mode v4 start](docs/product/screenshots/ryo-mode-v4-start.png)
 
-スマホでは質問、回答、進捗を縦方向に集約します。「好き・普通・苦手」だけで進められ、商品名を知らなくても診断を始められます。
+### 回答サマリー
 
-### Actual result — Gemini候補調査 + Core再評価
+![Ryo Mode v4 summary](docs/product/screenshots/ryo-mode-v4-summary.png)
 
-![実APIから得たASICS GEL-KAYANO 14の診断結果](docs/product/screenshots/readme/desktop-result.png)
+### 推薦結果のメイン画面
 
-2026-07-06に実APIと実画面で確認した例です。Gemini候補調査をschema検証し、Coreで再評価した結果として `ASICS GEL-KAYANO 14` を表示しています。画面上で推薦元、引用URL／検索入口、Core Decisionを区別できます。候補は診断回答や外部APIの応答によって変わります。
+![Ryo Mode v4 result](docs/product/screenshots/ryo-mode-v4-result.png)
 
-### Product judgement — 入力商品を固定したCore判断
+### Ryo Mode v4 の score 表示
 
-`ASICS GEL-KAYANO 14` と予算25,000円を入力し、ゲストモードで購入判断まで進めた実画面です。商品判断では入力商品を評価対象に固定し、Geminiに商品選定を任せず、TypeScript CoreがスコアとDecisionを計算します。
+![Ryo Mode v4 scores](docs/product/screenshots/ryo-mode-v4-scores.png)
 
-<table>
-  <tr>
-    <th>商品情報の入力</th>
-    <th>Coreによる購入判断</th>
-  </tr>
-  <tr>
-    <td><img src="docs/product/screenshots/readme/desktop-product-input.png" alt="ASICS GEL-KAYANO 14と予算を入力した商品判断画面" /></td>
-    <td><img src="docs/product/screenshots/readme/desktop-product-decision.png" alt="ASICS GEL-KAYANO 14をCoreで購入判断した結果画面" /></td>
-  </tr>
-</table>
+### フィードバック保存 UI
 
-この例では `BUY`、Balanced Score `74.7`、Ryo Score `86.4` を表示しています。`BUY` は購入可能性や在庫の保証ではなく、入力情報と評価ルールに基づく比較用のDecisionです。外部リンクやGemini補助説明は、Core scoreとDecisionを変更しません。
+![Ryo Mode v4 feedback](docs/product/screenshots/ryo-mode-v4-feedback.png)
 
-| 体験 | AIの役割 | Coreの役割 |
-| --- | --- | --- |
-| 8問診断からの推薦 | 候補調査、Grounding、説明補助 | 候補の再評価、スコア、最終Decision |
-| 商品名・URL・画像からの判断 | 入力商品の説明補助 | 入力商品を固定してスコア、最終Decision |
-| 外部API失敗時 | fallback状態を明示 | 確認済み候補とルールで処理を継続 |
+## 3. Why I built this
 
-## このプロジェクトの思想
+私は中学生の頃からスニーカーが好きで、ただ新しいモデルや高いモデルを追うよりも、「なぜその靴が生まれたのか」「どんな人や文化に履かれてきたのか」「履き込んだ後にどう育つのか」を考えて選ぶことが多くありました。
 
-### 1. AIを「決定者」にしない
+一方で、スニーカー選びは情報量が多く、流行・価格・ブランド名だけで判断すると、自分の服装や履き方に合わないことがあります。そこで、感覚だけで終わらせず、歴史・素材・服装・予算・文化背景から判断を整理できるアプリを作りたいと考えました。
 
-生成AIは、実在候補の探索や自然な説明を得意とします。一方で、同じ入力に常に同じ判断を返すことや、アプリ固有の評価ルールを厳密に守ることは別の問題です。
+SOLE//MATRIX は、AI におすすめを丸投げするためのアプリではありません。Gemini で候補調査や補助説明を行いつつ、最終的な評価や再ランキングは Core 側で制御し、ユーザーの好みと実際の購入判断に近づけることを目指しています。
 
-SOLE//MATRIXでは役割を分けています。
+## 4. Main features
 
-- Gemini: 候補調査、根拠となるcitation、推薦理由・注意点の補助説明
-- TypeScript Core: PreferenceVector、Balanced / Ryo score、budgetFit、リスク、最終Decision
-- UI: どの処理が成功し、何がfallbackしたかを隠さず表示
+- 11問診断
+- 商品判断（商品名 / URL / 画像）
+- `RyoPreferenceVector v4`
+- `productScore` / `recommendationScore` / `totalRyoScore`
+- cultural recommendation metadata
+- retro running taxonomy
+- Gemini candidate research readiness
+- fallback catalog
+- feedback localStorage persistence
 
-Geminiの文章、URL、confidenceだけでCoreのスコアやDecisionが変わることはありません。
+## 5. Ryo Mode v4
 
-### 2. 「証拠」と「判断」を混ぜない
+Ryo Mode v4 は、古い型、復刻、素材の育ち方、パンツ相性、文化背景を重視する推薦補助レイヤーです。
 
-楽天listing、URL metadata、画像解析、Gemini citationは、確認や比較に使う外部証拠です。これらを直接スコアへ加点すると、APIの応答有無で判断が揺れたり、リンクがあるだけで高評価になったりします。
+- `parent model`
+  Converse One Star、All Star J / VTG、Jack Purcell、PUMA Suede / Clyde、Vans、New Balance 991 / 998 / 1500 などの親モデル軸を持つ
+- `style template`
+  アメカジ、ノームコア、きれいめ、ストリートなどの服装文脈を反映する
+- `pants template`
+  デニム、ワークパンツ、ストレート、ワイド、スラックスなどとの相性を見る
+- `material template`
+  レザーのシワ、スエードの毛並み、キャンバスの退色など、履き込んだ後の表情を評価に入れる
+- `retro-running`
+  70s / 80s / premium retro runner / modern retro / high-tech running を分けて扱う
 
-そのため外部証拠は表示と説明に使い、Core scoreへの影響は `none` に固定しています。
+`productScore` は靴単体の魅力、`recommendationScore` は今回の回答条件との適合、`totalRyoScore` はその総合です。
 
-### 3. fallbackを成功に見せない
+AF1 は完全に排除していません。白レザー定番として機能する文脈では残しつつ、アメカジ Ryo Strong の主軸としては扱わない設計です。ハイテク系も別軸として評価し、Ryo classic と同一視しないようにしています。
 
-Gemini候補調査とGemini補助説明は別々の機能です。補助説明だけが成功しても、候補調査成功とは表示しません。
+## 6. Gemini and Core responsibilities
 
-- 候補調査成功: `candidateResearch.source === "gemini"`
-- 候補調査失敗: 具体モデルを持つアプリ内catalogへfallback
-- 補助説明失敗: rule-based説明へfallback
+Gemini は候補調査と補助説明の担当です。Core は schema 検証、fallback、Ryo Mode 再ランキング、最終判断を担当します。Gemini の出力はそのまま採用せず、Core 側で検証します。fallback catalog は Gemini 成功扱いにしません。
 
-Coreが具体モデル名から作る検索入口URLは参考リンクとして利用できますが、そのURLだけでGemini調査成功にはしません。
+| Role | Responsibility |
+| --- | --- |
+| Candidate research | Gemini |
+| Grounding / citation gathering | Gemini / Google Search Grounding |
+| Validation / schema / fallback | Core |
+| Ryo Mode reranking | Core |
+| Final decision | Core |
+| Feedback persistence | UI / localStorage |
 
-### 4. 購入を断定しない
+## 7. Scoring structure
 
-Decisionは比較のための判断材料です。価格、在庫、サイズ、真贋、購入可能性は保証しません。検索リンクも直接商品URLとは限らないため、購入前に販売元、状態、返品条件を確認する前提で設計しています。
+| Field | Meaning |
+| --- | --- |
+| `productScore` | 靴単体の歴史・素材・形の評価 |
+| `recommendationScore` | 今回の回答条件との適合 |
+| `totalRyoScore` | 単体評価と推薦適合の総合 |
+| `parentModelAffinity` | 親モデルとの文化的な軸の近さ |
+| `templateAffinity` | 服装テンプレートとの一致度 |
+| `retroRunningAffinity` | レトロランニング文脈との一致度 |
+| `materialAffinity` | 素材の育ち方や経年変化との相性 |
+| `pantsAffinity` | パンツとの合わせやすさ |
 
-## 体験できること
+## 8. Tech stack
 
-- 8問診断から8軸のPreferenceVectorを作成
-- 実在する具体的なスニーカーモデルをGemini + Google Search Groundingで調査
-- Ryo Mode / Balanced Modeの2視点でCore再評価
-- 商品名・URL・画像から一足の購入判断を整理
-- Gemini候補調査とGemini補助説明のreadinessを個別表示
-- Google・楽天・SNKRDUNKの具体モデル検索入口を生成
-- Geminiや外部APIの失敗時も、具体モデルcatalogとrule-based説明で継続
-- Supabase設定時のsignup / signin / session / logout
-- 保存しない無制限ゲストモード
-
-## 推薦ができるまで
-
-```mermaid
-flowchart LR
-    A["8問の回答"] --> B["PreferenceVector"]
-    B --> C["Gemini + Google Search Grounding"]
-    C --> D["citation / grounding metadata"]
-    C --> E["structured output"]
-    D --> F["schema・具体モデル・証拠を検証"]
-    E --> F
-    F -->|valid| G["TypeScript Coreで再評価"]
-    F -->|invalid / API error| H["fallback catalog"]
-    H --> G
-    G --> I["Balanced / Ryo score + Decision"]
-    I --> J["推薦元・readiness・参考リンクを分離表示"]
-```
-
-### Gemini candidate research
-
-Gemini 2.5では、調査とJSON整形を2段階に分けています。
-
-1. Google Search Groundingで実在候補と `groundingMetadata` を取得
-2. 調査メモを `responseMimeType: application/json` + `responseSchema` で整形
-3. JSON parseとアプリ側schema validationを実行
-4. 具体モデル名とcitationの対応を確認
-5. Core候補へ変換し、再スコアリング
-
-JSON本文にGeminiが書いただけのURLは証拠として採用しません。採用するのはGrounding metadata由来のcitationと、表示補助としてCoreが生成した具体モデル検索入口です。JSONが壊れた場合は、意味やfieldを追加しない構文repairを1回だけ許可します。
-
-`candidateResearch.source === "gemini"` になるのは、API呼び出し、JSON parse、schema validation、具体モデル判定、citation確認、Core再評価をすべて通過した場合だけです。
-
-### Readiness表示
-
-UIでは次を独立して表示します。
-
-- Gemini候補調査: `ready / fallback / error`
-- Google Search Grounding: `ready / fallback / error / not_checked`
-- JSON整形・schema検証: `ready / fallback / error / not_checked`
-- Gemini補助説明: `ready / fallback / error`
-- 推薦元: `gemini / fallback_catalog`
-- 参考リンク: `gemini_citation_url / direct_product_url / search_entry_url`
-
-主なfallback reasonCodeは `missing_api_key`、`rate_limited`、`api_error`、`timeout`、`invalid_json`、`schema_invalid`、`no_candidates`、`no_evidence_url`、`model_name_too_abstract`、`core_reevaluation_failed` です。
-
-## 使い方
-
-1. `/login`でログイン、新規登録、または「ゲストで試す」を選びます。
-2. `/app`で「8問診断」または「商品・URL・画像から購入判断」を選びます。
-3. 8問診断では各質問に「好き・普通・苦手」で回答します。
-4. 任意で予算を入力し、推薦結果を生成します。
-5. 具体モデル、Decision、理由、注意点、推薦元、外部API状態、参考リンクを確認します。
-
-ゲストの診断、商品入力、画像、履歴は保存しません。
-
-## セットアップ
-
-```powershell
-npx --yes pnpm@11.5.2 install
-Copy-Item .env.local.example .env.local
-npx --yes pnpm@11.5.2 web:dev
-```
-
-`.env.local`へ必要なサービスだけ設定します。実際のAPIキーはREADME、ログ、commitへ残さないでください。
-
-```env
-GEMINI_API_KEY=
-GEMINI_RESEARCH_MODEL=gemini-2.5-flash
-GEMINI_RESEARCH_FALLBACK_MODEL=
-RAKUTEN_APPLICATION_ID=
-RAKUTEN_ACCESS_KEY=
-RUN_EXTERNAL_SMOKE=
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-```
-
-外部サービスが未設定でもゲスト主動線は動作します。Gemini未設定時は候補catalogとrule-based説明、Rakuten失敗時は具体モデル検索入口へ切り替わります。
-
-## 検証
-
-```powershell
-npx --yes pnpm@11.5.2 typecheck
-npx --yes pnpm@11.5.2 test
-npx --yes pnpm@11.5.2 web:build
-```
-
-実API smokeは明示的にopt-inした場合だけ実行します。
-
-```powershell
-$env:RUN_EXTERNAL_SMOKE = "1"
-npx --yes pnpm@11.5.2 exec vitest run app/_lib/ai/geminiSneakerResearchActual.test.ts app/_lib/external-smoke app/_lib/core-v1/geminiActualSmoke.test.ts --disableConsoleIntercept --reporter=verbose
-Remove-Item Env:RUN_EXTERNAL_SMOKE -ErrorAction SilentlyContinue
-```
-
-直近の検証（2026-07-02）:
-
-- `typecheck`: 成功
-- `test`: 55 files / 395 tests 成功
-- `web:build`: 成功
-- Gemini candidate research実API smoke: 成功
-- PC 1280×720 / mobile 390×844の実画面確認: 成功
-- 実画面でGemini候補調査 `ready`、Gemini補助説明 `ready`、推薦元 `Gemini調査` を確認
-
-実API未実行、missing config、network error、rate limit、fallback状態を成功として報告しない方針です。キー値、生レスポンス、secretを含むURLは出力しません。
-
-## 技術スタック
-
-- Next.js 16 / React 19 / TypeScript
-- Gemini GenerateContent REST API
-- Google Search Grounding + structured output
+- Next.js 16
+- React 19
+- TypeScript
 - Vitest
-- Supabase Auth（optional）
-- Rakuten Product Search（optional）
+- Gemini GenerateContent REST API
+- Google Search Grounding
 
-## 主要ディレクトリ
+## 9. What I focused on
 
-```text
-app/_lib/ai/                          Gemini候補調査・schema・fallback catalog
-app/_lib/core-v1/                     Core score・Decision・Gemini説明・readiness
-app/_lib/external-evidence/           外部証拠の正規化境界
-app/_lib/product-links/               具体モデル名ベースの参考リンク
-app/_lib/auth-session/                guest session・Supabase Auth境界
-app/_components/                      診断・商品判断・結果UI
-app/api/                              server-side API routes
-src/                                  ドメイン・Coreロジック・CLI demo
-docs/product/SUBMISSION_READINESS.md   提出前の検証境界
-docs/product/screenshots/readme/       README掲載スクリーンショット
-```
+- AI 出力を鵜呑みにしないこと
+- Gemini と Core の責務分離を README 上でも明確にすること
+- 11問診断を構造化して `RyoPreferenceVector v4` へ変換すること
+- 歴史・文化・素材・パンツ相性を recommendation logic に落とし込むこと
+- feedback をブラウザ側で保存し、見返せる導線を用意すること
+- 実装されている内容と README の説明を一致させること
 
-## 現在の制約
+## 10. Verification
 
-- 価格・在庫・サイズ・真贋・購入可能性は保証しません。
-- Gemini、Rakuten、Supabaseの可用性は環境と外部サービスに依存します。
-- Supabase未設定時は認証を無効化し、ゲストモードを維持します。
-- ログインユーザーの診断メモとfeedbackは現時点ではローカルuser-memory APIが保存入口で、Supabase DB永続化ではありません。
-- 検索入口は未検証リンクであり、直接商品URLではありません。
+2026-07-07 時点で、以下をローカルで確認しました。
 
----
+- TypeScript: passed
+- Tests: 65 files / 461 tests passed
+- Production build: passed
+- Browser check: passed（`localhost:3000` の guest flow、実 API なしで 11問開始・回答サマリー・結果・score・feedback UI を確認）
 
-SOLE//MATRIXは「AIに選んでもらう」ためではなく、自分の好みと判断理由を見える形にして、納得できる一足を比較するためのプロジェクトです。
+## 11. Future improvements
+
+- 価格や在庫確認への導線をより分かりやすくする
+- 画像理解と URL 解析の精度を上げる
+- cultural rules と curated seed の拡張
+- feedback の活用範囲を広げる
+- モバイル UI の読みやすさをさらに改善する
+
+## 12. Developer note
+
+このプロジェクトでは、「AI を使うこと」よりも「AI をどう制御して、購入判断に近い形へ落とし込むか」を重視しました。Gemini の便利さを活かしつつ、最後は Core が責任を持って判断する構成にしたことが、今回もっとも大きな学びです。
