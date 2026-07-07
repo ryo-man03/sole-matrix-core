@@ -240,6 +240,10 @@ export async function recommendCoreV1(
     recommendationId: `core-v1:${best.candidate.id}`,
     preferenceVector,
     ...best,
+    candidate: {
+      ...best.candidate,
+      ryoMetadata: selectedRyoEvaluation.culture.metadata,
+    },
     explanation,
     candidateResearch,
     ryoReranking: {

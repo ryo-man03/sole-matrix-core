@@ -6,6 +6,7 @@ import type {
   GeminiResearchStages,
 } from "../ai/gemini-sneaker-research";
 import type { EvidenceUrlType } from "../ai/gemini-sneaker-research-schema";
+import type { RyoCandidateMetadata } from "../ryo-mode-v4/types";
 
 export type DiagnosisAnswerValue = "like" | "neutral" | "dislike";
 
@@ -66,6 +67,7 @@ export type CandidateProfile = {
   researchReason?: string;
   researchCautions?: string[];
   researchSource?: CandidateResearchSource;
+  ryoMetadata?: RyoCandidateMetadata;
 };
 
 export type BalancedScore = {

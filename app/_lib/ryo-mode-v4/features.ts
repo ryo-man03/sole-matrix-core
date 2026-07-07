@@ -14,6 +14,8 @@ const explicitlyAllowedTechPatterns = [
   /nike\s+air\s+max\s+95/i,
   /new\s+balance\s+2002r/i,
   /new\s+balance\s+2010/i,
+  /new\s+balance\s+1906/i,
+  /new\s+balance\s+9060/i,
 ];
 
 export function normalizeRyoSneakerFeatures(features: RyoSneakerFeatures): RyoSneakerFeatures {

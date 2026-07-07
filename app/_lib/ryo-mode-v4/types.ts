@@ -31,6 +31,112 @@ export type RyoModeAnswers =
   | Readonly<Partial<Record<RyoModeQuestionId, string>>>
   | readonly RyoModeAnswer[];
 
+export type RyoParentModelId =
+  | "converse_one_star"
+  | "converse_all_star_j"
+  | "converse_jack_purcell"
+  | "adidas_archive"
+  | "puma_suede_clyde"
+  | "nike_jordan_heritage"
+  | "nike_retro_running_archive"
+  | "vans_skate"
+  | "new_balance_premium_runner"
+  | "reebok_prokeds_lastresort";
+
+export type RyoParentModelProfile = {
+  id: RyoParentModelId;
+  label: string;
+  priority: "S_PLUS" | "S" | "A" | "B";
+  coreModels: string[];
+  preferredVariants: string[];
+  conditionalVariants: string[];
+  downrankVariants: string[];
+  originSignals: string[];
+  cultureSignals: string[];
+  musicSignals: string[];
+  styleSignals: string[];
+  materialAgingSignals: string[];
+  pantsSignals: string[];
+  ryoReasons: string[];
+  cautions: string[];
+};
+
+export type RyoTemplateId =
+  | "amekaji_denim_canvas"
+  | "amekaji_denim_leather"
+  | "amekaji_work_suede"
+  | "clean_slim_leather"
+  | "normcore_straight_value"
+  | "premium_runner"
+  | "street_high_tech"
+  | "amekaji_avoid_tech";
+
+export type RyoStyleTemplate = {
+  id: RyoTemplateId;
+  label: string;
+  genre: string;
+  answerSignals: string[];
+  materialSignals: string[];
+  pantsSignals: string[];
+  reasons: string[];
+};
+
+export type RetroRunningSubgenre =
+  | "seventies_thin_runner"
+  | "seventies_nylon_suede_runner"
+  | "eighties_leather_runner"
+  | "premium_retro_runner"
+  | "modern_retro_budget_runner"
+  | "high_tech_running";
+
+export type RetroRunningProfile = {
+  id: RetroRunningSubgenre;
+  label: string;
+  models: string[];
+  genre: string;
+  subgenre: string;
+  pantsSignals: string[];
+  materialSignals: string[];
+  cultureSignals: string[];
+  reasons: string[];
+  cautions: string[];
+  ryoCenter: boolean;
+};
+
+export type RyoCandidateMetadata = {
+  parentModelIds?: RyoParentModelId[];
+  templateIds?: RyoTemplateId[];
+  retroRunningProfiles?: RetroRunningSubgenre[];
+  genre?: string;
+  subgenre?: string;
+  cultureSignals?: string[];
+  musicSignals?: string[];
+  materialSignals?: string[];
+  pantsSignals?: string[];
+  cautionSignals?: string[];
+  verificationStatus: "verified" | "needs_check" | "unverified";
+};
+
+export type RyoAffinityBreakdown = {
+  parentModelAffinity: number;
+  templateAffinity: number;
+  retroRunningAffinity: number;
+  cultureAffinity: number;
+  materialAgingAffinity: number;
+  pantsAffinity: number;
+  cautionPenalty: number;
+};
+
+export type RyoCulturalEvaluation = {
+  affinities: RyoAffinityBreakdown;
+  metadata: RyoCandidateMetadata;
+  parentProfile?: RyoParentModelProfile;
+  templates: RyoStyleTemplate[];
+  retroRunningProfile?: RetroRunningProfile;
+  reasons: string[];
+  cautions: string[];
+};
+
 export type RyoPreferenceVector = {
   style: {
     amekaji: number;
@@ -191,6 +297,7 @@ export type RyoModeScoreResult = {
   penalties: string[];
   matchedSignals: string[];
   cautionSignals: string[];
+  affinities?: RyoAffinityBreakdown;
 };
 
 export type RyoOpinion = {

@@ -1,10 +1,11 @@
 import type { SneakerTag } from "../../../src/domain/sneaker/sneakerTag";
 import type { CandidateProfile, DiagnosisAnswer, DiagnosisAnswerValue, RecommendationMode } from "../core-v1/types";
 import { buildRyoOpinion } from "./opinion";
+import { buildRyoCulturalEvaluation } from "./cultural-evaluation";
 import { RYO_MODE_V4_QUESTIONS } from "./questions";
-import { scoreRyoModeCandidate } from "./scoring";
+import { clampRyoScore, scoreRyoModeCandidate } from "./scoring";
 import { normalizeOfficialSneakerName } from "./names";
-import type { RyoModeAnswers, RyoModeQuestionId, RyoModeScoreResult, RyoOpinion, RyoPreferenceVector, RyoSneakerFeatures } from "./types";
+import type { RyoCulturalEvaluation, RyoModeAnswers, RyoModeQuestionId, RyoModeScoreResult, RyoOpinion, RyoPreferenceVector, RyoSneakerFeatures } from "./types";
 import { hasJapaneseText, isAbstractRecommendationName, isOfficialEnglishDisplayName, validateRyoDisplayName } from "./validation";
 import { buildRyoPreferenceVector, summarizeRyoPreferenceVector } from "./vector";
 
@@ -21,6 +22,7 @@ export type RyoModeCandidateEvaluation = {
   features: RyoSneakerFeatures;
   score: RyoModeScoreResult;
   opinion: RyoOpinion;
+  culture: RyoCulturalEvaluation;
 };
 
 export function mapRyoV4AnswersToLegacyDiagnosisInput(answers: RyoModeAnswers): DiagnosisAnswer[] {
@@ -90,6 +92,17 @@ export function buildRyoModeCandidateEvaluation(vector: RyoPreferenceVector, can
   const features = buildRyoSneakerFeaturesFromCandidate(candidate);
   const displayValidation = validateRyoDisplayName(features);
   const rawScore = scoreRyoModeCandidate(vector, features);
+  const culture = buildRyoCulturalEvaluation(features.displayNameOfficial, vector, features);
+  const culturalFit = averagePositive(
+    culture.affinities.cultureAffinity,
+    culture.affinities.materialAgingAffinity,
+    culture.affinities.pantsAffinity,
+  );
+  const recommendationScore = clampRyoScore(
+    rawScore.recommendationScore * 0.78
+      + culturalFit * 0.22
+      - culture.affinities.cautionPenalty * 0.35,
+  );
   const featureCount = Object.values(features.traits).filter((value) => value === true || typeof value === "string").length;
   const cautionSignals = [
     ...rawScore.cautionSignals,
@@ -98,8 +111,20 @@ export function buildRyoModeCandidateEvaluation(vector: RyoPreferenceVector, can
     ...(features.estimatedPriceYen === undefined ? ["推定価格が不明なため予算適合は加点していません"] : []),
     ...buildContextualCandidateCautions(vector, features.displayNameOfficial),
   ];
-  const score = { ...rawScore, cautionSignals: [...new Set(cautionSignals)] };
-  return { features, score, opinion: buildRyoOpinion(vector, score, features) };
+  const score = {
+    ...rawScore,
+    recommendationScore,
+    totalRyoScore: clampRyoScore(rawScore.productScore * 0.4 + recommendationScore * 0.6),
+    matchedSignals: [...new Set([...rawScore.matchedSignals, ...culture.reasons])],
+    cautionSignals: [...new Set([...cautionSignals, ...culture.cautions])],
+    affinities: culture.affinities,
+  };
+  return { features, score, opinion: buildRyoOpinion(vector, score, features), culture };
+}
+
+function averagePositive(...values: number[]): number {
+  const active = values.filter((value) => value > 0);
+  return active.length ? active.reduce((sum, value) => sum + value, 0) / active.length : 0;
 }
 
 function normalizeAnswers(answers: RyoModeAnswers): Partial<Record<RyoModeQuestionId, string>> {
@@ -135,17 +160,29 @@ function inferSafeCandidateTraits(displayName: string, tags: readonly SneakerTag
   set(/Air\s+Jordan\s+1\s+High/i.test(displayName), { leather: true, oldShape: true, highCut: true, tiedSilhouetteGood: true });
   set(/Air\s+Jordan\s+1\s+Low/i.test(displayName), { leather: true, oldShape: true, lowCut: true, tiedSilhouetteGood: true });
   set(/Converse\s+Jack\s+Purcell\s+Leather/i.test(displayName), { leather: true, oldShape: true, lowCut: true, oxCut: true, tiedSilhouetteGood: true });
+  set(/Converse\s+Jack\s+Purcell(?!.*Leather)/i.test(displayName), { canvas: true, oldShape: true, lowCut: true, oxCut: true, tiedSilhouetteGood: true });
   set(/Converse\s+One\s+Star/i.test(displayName), { suede: true, oldShape: true, oxCut: true, tiedSilhouetteGood: true, madeInJapan: /\bJ\b|Made in Japan/i.test(displayName), vintage: /VTG|Vintage/i.test(displayName) });
+  set(/Converse\s+(?:All\s+Star|Addict\s+Chuck\s+Taylor)/i.test(displayName), { canvas: true, oldShape: true, highCut: /\bHi\b|High/i.test(displayName), oxCut: /\bOX\b/i.test(displayName), tiedSilhouetteGood: true, madeInJapan: /All\s+Star\s+J\b/i.test(displayName), vintage: /VTG|Vintage|Addict/i.test(displayName), timeLine: /TimeLine/i.test(displayName) });
   set(/PUMA\s+(?:Suede|Clyde)/i.test(displayName), { suede: true, oldShape: true, lowCut: true, tiedSilhouetteGood: true });
   set(/adidas\s+Superstar/i.test(displayName), { leather: true, oldShape: true, lowCut: true, tiedSilhouetteGood: true, vintage: /Vintage/i.test(displayName), madeInGermany: /Made in Germany/i.test(displayName) });
   set(/Converse\s+(?:Pro\s+Leather|Weapon)/i.test(displayName), { leather: true, oldShape: true, tiedSilhouetteGood: true });
   set(/Nike\s+(?:Terminator|Blazer)/i.test(displayName), { leather: true, oldShape: true, tiedSilhouetteGood: true, highCut: /High|Mid/i.test(displayName), lowCut: /Low/i.test(displayName) });
   set(/Reebok\s+Classic\s+Leather/i.test(displayName), { leather: true, oldShape: true, lowCut: true });
+  set(/Reebok\s+Classic\s+Nylon/i.test(displayName), { suede: true, oldShape: true, lowCut: true, sportOrigin: "running" });
+  set(/Reebok\s+Club\s+C/i.test(displayName), { leather: true, oldShape: true, lowCut: true, sportOrigin: "tennis" });
   set(/Vans\s+Half\s+Cab/i.test(displayName), { suede: true, oldShape: true, midCut: true, tiedSilhouetteGood: true });
+  set(/Vans\s+(?:Authentic|Era)/i.test(displayName), { canvas: true, oldShape: true, lowCut: true, tiedSilhouetteGood: true, sportOrigin: "skate" });
   set(/Last\s+Resort\s+AB\s+VM001/i.test(displayName), { suede: true, lowCut: true, tiedSilhouetteGood: true });
   set(/adidas\s+Samba\s+OG/i.test(displayName), { oldShape: true, lowCut: true, sportOrigin: "football", betterRyoAlternativeExists: true });
   set(/New\s+Balance\s+CM996/i.test(displayName), { oldShape: true, lowCut: true, sportOrigin: "running", betterRyoAlternativeExists: true });
-  set(/New\s+Balance\s+(?:991|993|998)/i.test(displayName), { oldShape: true, sportOrigin: "running" });
+  set(/Nike\s+(?:Cortez|LD-?1000|Astro\s+Grabber|Waffle\s+Trainer|Daybreak|Field\s+General)/i.test(displayName), { oldShape: true, lowCut: true, sportOrigin: "running", leather: /Leather/i.test(displayName), suede: !/Leather/i.test(displayName) });
+  set(/adidas\s+(?:SL\s*72|Dragon)/i.test(displayName), { oldShape: true, lowCut: true, sportOrigin: "running", suede: true });
+  set(/adidas\s+(?:Tobacco|London|Hamburg|Spezial|Handball\s+Spezial|Gazelle)/i.test(displayName), { oldShape: true, lowCut: true, suede: true, sportOrigin: "football" });
+  set(/adidas\s+(?:Japan|Country|BW\s+Army)/i.test(displayName), { oldShape: true, lowCut: true, leather: true });
+  set(/New\s+Balance\s+(?:990v[34]|991|993|998|1500|1300|1400|576)/i.test(displayName), { oldShape: true, suede: true, sportOrigin: "running" });
+  set(/New\s+Balance\s+(?:2002R|2010|574|327|237)/i.test(displayName), { suede: true, sportOrigin: "running", techAllowedModel: true });
+  set(/Nike\s+Air\s+Max\s+95|New\s+Balance\s+(?:1906|9060|1000)/i.test(displayName), { tooTechnical: true, sportOrigin: "running", techAllowedModel: true });
+  set(/PRO-Keds\s+Royal\s+Plus/i.test(displayName), { suede: /Suede/i.test(displayName), leather: !/Suede/i.test(displayName), oldShape: true, sportOrigin: "basketball" });
   set(/ASICS\s+GEL-KAYANO\s+14|Nike\s+Shox|\bHOKA\b|PUMA\s+Speedcat/i.test(displayName), { tooTechnical: true, ryoDiscouragedModel: true });
   return traits;
 }
