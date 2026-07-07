@@ -36,15 +36,40 @@ describe("Ryo Mode v4 candidate pool and reranking", () => {
     expect(anchors.every((candidate) => candidate.researchSource === "ryo_anchor")).toBe(true);
   });
 
-  it("gives Air Force 1 a stronger recommendation fit than Samba and CM996", () => {
+  it("keeps AF1 above off-axis Samba and CM996 but below the amekaji core anchors", () => {
     const vector = buildRyoPreferenceVector(strongAnswers);
     const af1 = buildRyoModeCandidateEvaluation(vector, candidate('Nike Air Force 1 Low "White/White"', ["basketball", "classic", "street", "durable"]));
     const samba = buildRyoModeCandidateEvaluation(vector, candidate("adidas Samba OG", ["classic", "low_tech", "heritage"]));
     const cm996 = buildRyoModeCandidateEvaluation(vector, candidate("New Balance cm996", ["running", "comfortable", "retro"]));
+    const amekajiCore = [
+      candidate("Converse One Star J VTG Black", ["classic", "low_tech", "street", "heritage"]),
+      candidate("PUMA Clyde Black/White", ["basketball", "classic", "low_tech", "heritage"]),
+      candidate("adidas Superstar Vintage", ["basketball", "classic", "low_tech", "heritage"]),
+      candidate("Converse Pro Leather", ["basketball", "classic", "low_tech", "heritage"]),
+      candidate("Nike Blazer Mid '77", ["basketball", "classic", "street", "heritage"]),
+      candidate("Nike Terminator Low Black/White", ["basketball", "classic", "street", "heritage"]),
+      candidate("Vans Half Cab Black", ["classic", "low_tech", "street", "heritage"]),
+    ].map((value) => buildRyoModeCandidateEvaluation(vector, value));
     expect(af1.score.recommendationScore).toBeGreaterThan(samba.score.recommendationScore);
     expect(af1.score.recommendationScore).toBeGreaterThan(cm996.score.recommendationScore);
+    expect(amekajiCore.filter((evaluation) => evaluation.score.recommendationScore > af1.score.recommendationScore).length).toBeGreaterThanOrEqual(5);
+    expect(af1.opinion.caution).toContain("汎用白レザーの条件付き候補");
     expect(samba.opinion.caution).toContain("中心から少し外れます");
     expect(cm996.features.displayNameOfficial).toBe("New Balance CM996");
+  });
+
+  it("keeps AF1 strong for normcore and beginner white-leather context", () => {
+    const vector = buildRyoPreferenceVector({
+      ...strongAnswers,
+      style: "normcore",
+      pantsFit: "straight_pants",
+      taste: "simple",
+      ryoStrength: "beginner_ryo",
+    });
+    const af1 = buildRyoModeCandidateEvaluation(vector, candidate('Nike Air Force 1 Low "White/White"', ["basketball", "classic", "street", "durable"]));
+    const oneStar = buildRyoModeCandidateEvaluation(vector, candidate("Converse One Star J VTG Black", ["classic", "low_tech", "street", "heritage"]));
+    expect(af1.score.recommendationScore).toBeGreaterThan(oneStar.score.recommendationScore);
+    expect(af1.score.penalties).not.toContain(expect.stringContaining("conditional staple"));
   });
 
   it("uses strength-specific weights and lets recommendationScore control strong reranking", () => {
@@ -53,10 +78,10 @@ describe("Ryo Mode v4 candidate pool and reranking", () => {
     expect(getRerankingWeights(summarizeRyoPreferenceVector(strongVector))).toEqual({ existingCoreWeight: 0.35, recommendationWeight: 0.65 });
     expect(getRerankingWeights(summarizeRyoPreferenceVector(balancedVector))).toEqual({ existingCoreWeight: 0.9, recommendationWeight: 0.1 });
 
-    const samba = scored(candidate("adidas Samba OG", ["classic", "low_tech", "heritage"]), 96);
-    const af1 = scored(candidate('Nike Air Force 1 Low "White/White"', ["basketball", "classic", "street", "durable"]), 75);
-    expect(rerankRyoModeCandidates([samba, af1], strongVector, "ryo")[0]?.candidate.name).toBe('Nike Air Force 1 Low "White/White"');
-    expect(rerankRyoModeCandidates([samba, af1], balancedVector, "balanced")[0]?.candidate.name).toBe("adidas Samba OG");
+    const af1 = scored(candidate('Nike Air Force 1 Low "White/White"', ["basketball", "classic", "street", "durable"]), 92);
+    const oneStar = scored(candidate("Converse One Star J VTG Black", ["classic", "low_tech", "street", "heritage"]), 82);
+    expect(rerankRyoModeCandidates([af1, oneStar], strongVector, "ryo")[0]?.candidate.name).toBe("Converse One Star J VTG Black");
+    expect(rerankRyoModeCandidates([af1, oneStar], balancedVector, "balanced")[0]?.candidate.name).toBe('Nike Air Force 1 Low "White/White"');
   });
 
   it("integrates fallback and anchors without treating an anchor as Gemini research", async () => {
@@ -73,6 +98,8 @@ describe("Ryo Mode v4 candidate pool and reranking", () => {
     expect(result.ryoReranking).toMatchObject({ applied: true, strength: "strong", existingCoreWeight: 0.35, recommendationWeight: 0.65 });
     expect(result.ryoReranking.candidatePoolSize).toBeGreaterThan(10);
     expect(result.candidate.name).not.toMatch(/Samba|CM996/i);
+    expect(result.candidate.name).not.toBe('Nike Air Force 1 Low "White/White"');
+    expect(result.candidate.name).toMatch(/One Star|Jack Purcell|PUMA|Superstar|Pro Leather|Blazer|Terminator|Vans|Reebok/i);
     expect(result.candidate.researchSource).toBe("ryo_anchor");
     expect(result.candidateResearch.source).toBe("fallback_catalog");
     expect(result.readiness.geminiResearch.status).toBe("fallback");

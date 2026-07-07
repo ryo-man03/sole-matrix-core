@@ -34,7 +34,7 @@ export type RyoRerankedCandidate = CoreScoredCandidate & {
 };
 
 const anchorCatalog: readonly AnchorDefinition[] = [
-  anchor("nike-af1-low-white-white", "Nike Air Force 1 Low \"White/White\"", "クラシック・バスケットボール", "白レザーの沈みとワークパンツへの汎用性を持つ定番です。", ["basketball", "classic", "street", "durable", "heritage"], ["wide_pants", "work_pants", "basketball", "leather_sinking", "black_white"], 18_000),
+  anchor("nike-af1-low-white-white", "Nike Air Force 1 Low \"White/White\"", "汎用白レザー・バスケットボール", "歴史ある白レザー定番です。アメカジの主軸ではなく、ストリート・ノームコア・初心者向けの条件付き候補として扱います。", ["basketball", "classic", "street", "durable", "heritage"], ["basketball", "black_white"], 18_000),
   anchor("converse-jack-purcell-leather-black", "Converse Jack Purcell Leather Black", "レザー・テニス", "黒レザーを締めて履く形とワークパンツの相性を見込めます。", ["classic", "low_tech", "minimal", "heritage"], ["work_pants", "leather_sinking", "black_white"], 16_500),
   anchor("converse-one-star-j-vtg-black", "Converse One Star J VTG Black", "スエード・スケート", "毛並みの変化と低いシルエットを楽しめる日本製の候補です。", ["classic", "low_tech", "street", "heritage", "premium"], ["wide_pants", "suede_fading_nap", "black_white"], 25_000),
   anchor("puma-suede-black-white", "PUMA Suede Black/White", "クラシック・スエード", "黒白配色とスエードの変化を、ワークパンツにも合わせやすい候補です。", ["classic", "low_tech", "street", "heritage"], ["wide_pants", "work_pants", "suede_fading_nap", "black_white"], 13_000),

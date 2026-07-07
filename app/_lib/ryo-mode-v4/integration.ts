@@ -96,9 +96,7 @@ export function buildRyoModeCandidateEvaluation(vector: RyoPreferenceVector, can
     ...displayValidation.penalties,
     ...(featureCount === 0 ? ["候補の確定的な特徴情報が不足しています"] : []),
     ...(features.estimatedPriceYen === undefined ? ["推定価格が不明なため予算適合は加点していません"] : []),
-    ...(isStrongOffAxisCandidate(vector, features.displayNameOfficial)
-      ? ["SambaやNew Balanceが悪いのではなく、今回のwork pants・leather aging・basketball・tied silhouette条件では中心から少し外れます"]
-      : []),
+    ...buildContextualCandidateCautions(vector, features.displayNameOfficial),
   ];
   const score = { ...rawScore, cautionSignals: [...new Set(cautionSignals)] };
   return { features, score, opinion: buildRyoOpinion(vector, score, features) };
@@ -152,10 +150,16 @@ function inferSafeCandidateTraits(displayName: string, tags: readonly SneakerTag
   return traits;
 }
 
-function isStrongOffAxisCandidate(vector: RyoPreferenceVector, displayName: string): boolean {
-  return vector.ryoStrength.ryoStrong > 0
-    && vector.pantsFit.workPants > 0
-    && vector.sportOrigin.basketball > 0
-    && vector.materialAging.leatherSinking > 0
-    && (/adidas\s+Samba\s+OG/i.test(displayName) || /New\s+Balance\s+CM996/i.test(displayName));
+function buildContextualCandidateCautions(vector: RyoPreferenceVector, displayName: string): string[] {
+  const strongWorkwearContext = vector.ryoStrength.ryoStrong > 0
+    && vector.style.amekaji > 0
+    && vector.pantsFit.workPants > 0;
+  if (!strongWorkwearContext) return [];
+  if (/Nike\s+Air\s+Force\s+1\s+Low/i.test(displayName)) {
+    return ["AF1は歴史ある白レザー定番ですが、Ryo Strongのアメカジ文脈では主軸ではなく、汎用白レザーの条件付き候補です"];
+  }
+  if (/adidas\s+Samba\s+OG/i.test(displayName) || /New\s+Balance\s+CM996/i.test(displayName)) {
+    return ["SambaやNew Balanceが悪いのではなく、今回のwork pants・leather aging・basketball・tied silhouette条件では中心から少し外れます"];
+  }
+  return [];
 }

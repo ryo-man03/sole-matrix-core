@@ -190,6 +190,8 @@ function collectRecommendationDeductions(
   deduction += recordPenalty(t.flashyColorWithoutWearability, 5, "flashy colorway without wearability", penalties, cautions);
 
   const strengthFactor = ryoPenaltyStrength(vector);
+  const airForceContextPenalty = calculateAirForce1ContextPenalty(vector, features, strengthFactor);
+  deduction += recordPenalty(airForceContextPenalty > 0, airForceContextPenalty, "AF1 is a conditional staple outside the amekaji core", penalties, cautions);
   const alternativePenalty = Math.round(18 * strengthFactor);
   deduction += recordPenalty(t.betterRyoAlternativeExists, alternativePenalty, "better Ryo alternative exists for this answer", penalties, cautions);
   const techToleranceFactor = vector.techTolerance.pureCoolOk > 0 ? 0.25
@@ -204,6 +206,19 @@ function collectRecommendationDeductions(
     deduction += recordPenalty(value > 0, value, "model sits outside the classic Ryo axis", penalties, cautions);
   }
   return deduction;
+}
+
+function calculateAirForce1ContextPenalty(
+  vector: RyoPreferenceVector,
+  features: RyoSneakerFeatures,
+  strengthFactor: number,
+): number {
+  if (!features.traits.airForce1WhiteWhite || vector.style.amekaji <= 0) return 0;
+  let penalty = 8;
+  if (vector.pantsFit.workPants > 0) penalty += 6;
+  if (vector.ryoStrength.ryoStrong > 0) penalty += 8;
+  if (vector.taste.mutedColor > 0 || vector.taste.rareColor > 0 || vector.materialAging.suedeFadingNap > 0) penalty += 4;
+  return Math.round(penalty * strengthFactor);
 }
 
 function fitAxis(base: number, preference: number, cap: number): number {
