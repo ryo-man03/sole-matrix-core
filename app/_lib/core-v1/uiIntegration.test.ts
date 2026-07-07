@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 describe("Core v1 UI integration", () => {
   const componentSource = readFileSync(new URL("../../_components/CoreV1RecommendationPanel.tsx", import.meta.url), "utf8");
   const diagnosisFlowSource = readFileSync(new URL("../../_components/PreferenceDiagnosisFlow.tsx", import.meta.url), "utf8");
+  const diagnosisDataSource = readFileSync(new URL("../../_data/preferenceDiagnosisQuestions.ts", import.meta.url), "utf8");
+  const ryoResultSource = readFileSync(new URL("../../_components/RyoModeResultPanel.tsx", import.meta.url), "utf8");
   const readinessSource = readFileSync(new URL("./readiness.ts", import.meta.url), "utf8");
 
   it("connects diagnosis answers to the recommendation API", () => {
@@ -26,7 +28,7 @@ describe("Core v1 UI integration", () => {
     expect(componentSource).toContain("JSON整形・schema検証:");
     expect(componentSource).toContain('data-research-stage="grounding"');
     expect(componentSource).toContain('data-research-stage="normalization"');
-    expect(componentSource).toContain("推薦元:");
+    expect(componentSource).toContain("候補調査:");
     expect(componentSource).toContain("Gemini調査");
     expect(componentSource).toContain("引用URL");
     expect(componentSource).toContain("検索入口");
@@ -35,11 +37,35 @@ describe("Core v1 UI integration", () => {
     expect(componentSource).not.toContain("Gemini: {result.readiness.gemini.status}");
     expect(componentSource).toContain("result.readiness.rakuten.detail");
     expect(componentSource).toContain("/api/core-v1/feedback");
+    expect(componentSource).toContain("saveRecommendationFeedback(window.localStorage");
+    expect(componentSource).toContain("フィードバックをこの端末に保存しました。");
+    expect(componentSource).toContain("保存した内容:");
+    expect(componentSource).toContain("保存日時:");
+    expect(componentSource).toContain("評価ボタンを選んでください。");
+    expect(componentSource).toContain("フィードバックを保存できませんでした。もう一度試してください。");
   });
 
   it("keeps Gemini and URL evidence outside the final Decision", () => {
     expect(readinessSource).toContain("最終DecisionはCoreが決定します");
     expect(componentSource).not.toContain("href={result.candidate.url}");
     expect(componentSource).toContain('source === "rakuten"');
+  });
+
+  it("connects the 11-question Ryo Mode v4 flow to candidate reranking", () => {
+    expect(diagnosisDataSource).toContain("RYO_MODE_V4_QUESTIONS.map");
+    expect(diagnosisFlowSource).toContain("11の質問で好みを整理する");
+    expect(diagnosisFlowSource).toContain("buildRyoPreferenceVector");
+    expect(componentSource).toContain("buildRyoModeContextForRecommendation");
+    expect(componentSource).toContain("ryoModeAnswers");
+    expect(componentSource).toContain("data-ryo-reranking");
+    expect(componentSource).toContain("RyoModeResultPanel");
+    expect(ryoResultSource).toContain("productScore");
+    expect(ryoResultSource).toContain("recommendationScore");
+    expect(ryoResultSource).toContain("totalRyoScore");
+    expect(ryoResultSource).toContain("RyoOpinion");
+    expect(ryoResultSource).toContain("候補プールを作り");
+    expect(ryoResultSource).toContain("data-ryo-affinities");
+    expect(ryoResultSource).toContain("Ryo親モデル");
+    expect(ryoResultSource).toContain("サブジャンル");
   });
 });

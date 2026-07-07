@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { getAuthSession, signOut } from "../_lib/apiClient";
 import { beginGuestSession, createUserAuthState } from "../_lib/auth-session/guestSession";
 import type { AuthState, SessionStorage, UserSession } from "../_lib/auth-session/types";
-import type { DiagnosisAnswerId } from "../_data/preferenceDiagnosisQuestions";
+import type { CompletedPreferenceDiagnosisAnswers } from "../_data/preferenceDiagnosisQuestions";
 import { readTemporaryOnboardingHint } from "../_lib/onboarding/onboardingProfile";
 import type { OnboardingPreferenceHint } from "../_lib/onboarding/types";
 import { ExperienceModeSelector, type ExperienceMode } from "./ExperienceModeSelector";
@@ -16,7 +16,7 @@ export function ProductSessionBoundary() {
   const [providerConfigured, setProviderConfigured] = useState(false);
   const [onboardingHint, setOnboardingHint] = useState<OnboardingPreferenceHint | null>(null);
   const [experienceMode, setExperienceMode] = useState<ExperienceMode | null>(null);
-  const [diagnosisAnswers, setDiagnosisAnswers] = useState<Record<string, DiagnosisAnswerId> | null>(null);
+  const [diagnosisAnswers, setDiagnosisAnswers] = useState<CompletedPreferenceDiagnosisAnswers | null>(null);
 
   useEffect(() => {
     setOnboardingHint(readTemporaryOnboardingHint(getBrowserSessionStorage()));

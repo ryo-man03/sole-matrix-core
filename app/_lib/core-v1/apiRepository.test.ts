@@ -51,6 +51,36 @@ describe("Core v1 recommend API", () => {
     expect(payload.data.explanation.source).toBe("rule_based");
     expect(payload.data.readiness.rakuten.status).toBe("missing_config");
   });
+
+  it("validates and applies the 11-question Ryo Mode payload", async () => {
+    const response = await postRecommendation(
+      jsonRequest("http://localhost/api/core-v1/recommend", {
+        diagnosisAnswers: [{ questionId: "trusted-classic", value: "like" }],
+        preferenceTags: ["classic", "basketball", "low_tech"],
+        mode: "ryo",
+        ryoModeAnswers: {
+          pantsFit: "work_pants",
+          sportOrigin: "basketball",
+          materialAging: "leather_sinking",
+          color: "black_white",
+          ryoStrength: "ryo_strong",
+        },
+      }),
+    );
+    const payload = (await response.json()) as { ok: boolean; data: { ryoReranking: { applied: boolean; strength: string } } };
+    expect(response.status).toBe(200);
+    expect(payload.ok).toBe(true);
+    expect(payload.data.ryoReranking).toMatchObject({ applied: true, strength: "strong" });
+
+    const invalid = await postRecommendation(
+      jsonRequest("http://localhost/api/core-v1/recommend", {
+        diagnosisAnswers: [{ questionId: "trusted-classic", value: "like" }],
+        preferenceTags: ["classic"],
+        ryoModeAnswers: { pantsFit: "not-an-option" },
+      }),
+    );
+    expect(invalid.status).toBe(400);
+  });
 });
 
 describe("Core v1 feedback API and repository", () => {

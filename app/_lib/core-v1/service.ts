@@ -3,6 +3,15 @@ import type { SneakerVector } from "../../../src/domain/sneaker/sneakerVector";
 import { researchSneakerCandidatesWithGemini } from "../ai/gemini-sneaker-research";
 import type { GeminiSneakerResearchCandidate } from "../ai/gemini-sneaker-research-schema";
 import type { UntrustedUserMemoryContext } from "../user-memory/types";
+import {
+  createRyoModeCandidateAnchors,
+  getRerankingWeights,
+  mergeRyoModeCandidatePool,
+  normalizeCandidateOfficialName,
+  rerankRyoModeCandidates,
+} from "../ryo-mode-v4/candidates";
+import { buildRyoModeCandidateEvaluation } from "../ryo-mode-v4/integration";
+import { buildRyoPreferenceVector, summarizeRyoPreferenceVector } from "../ryo-mode-v4/vector";
 import { decideRecommendation } from "./decision";
 import type { ExplanationInput } from "./explanation";
 import { generateCoreV1Explanation } from "./geminiExplanation";
@@ -53,10 +62,13 @@ export async function recommendCoreV1(
   });
   const candidateInput = input.budgetYen === undefined ? {} : { budgetYen: input.budgetYen };
   const isProductJudgement = hasProductContext(input);
+  const ryoPreferenceVector = buildRyoPreferenceVector(input.ryoModeAnswers ?? {});
+  const ryoSummary = summarizeRyoPreferenceVector(ryoPreferenceVector);
+  const ryoRerankingEnabled = !isProductJudgement && input.ryoModeAnswers !== undefined;
   const rakutenCandidateProvider = dependencies.rakutenCandidateProvider ??
     ((providerInput) => fetchRakutenCandidates(providerInput, { env }));
 
-  const [fallbackCandidates, rakutenResult, geminiResearch] = await Promise.all([
+  const [rawFallbackCandidates, rakutenResult, geminiResearch] = await Promise.all([
     candidateRepository.listCandidates(candidateInput),
     loadRakutenCandidatesSafely(rakutenCandidateProvider, {
       ...candidateInput,
@@ -85,12 +97,16 @@ export async function recommendCoreV1(
           },
         ),
   ]);
+  const fallbackCandidates = rawFallbackCandidates.map(normalizeCandidateOfficialName);
+  const ryoAnchorCandidates = ryoRerankingEnabled
+    ? createRyoModeCandidateAnchors(ryoPreferenceVector, input.budgetYen)
+    : [];
 
   let candidates: CandidateProfile[];
   let candidateResearch: RecommendationResult["candidateResearch"];
 
   if (isProductJudgement) {
-    candidates = [createProductInputCandidate(input)];
+    candidates = [normalizeCandidateOfficialName(createProductInputCandidate(input))];
     candidateResearch = {
       source: "product_input",
       status: "not_checked",
@@ -106,14 +122,17 @@ export async function recommendCoreV1(
       detail: "商品判断では入力商品をCore評価の対象に固定するため、Gemini候補調査は実行していません。",
     };
   } else if (geminiResearch?.status === "ready") {
-    candidates = geminiResearch.result.candidates.map((candidate, index) =>
+    const geminiCandidates = geminiResearch.result.candidates.map((candidate, index) =>
       mapGeminiCandidate(candidate, index, input.budgetYen),
     );
+    candidates = ryoRerankingEnabled
+      ? mergeRyoModeCandidatePool(geminiCandidates, fallbackCandidates, ryoAnchorCandidates)
+      : geminiCandidates.map(normalizeCandidateOfficialName);
     candidateResearch = {
       source: "gemini",
       status: "ready",
       reasonCode: geminiResearch.reasonCode,
-      validCandidateCount: candidates.length,
+      validCandidateCount: geminiCandidates.length,
       coreReevaluated: false,
       modelUsed: geminiResearch.modelUsed,
       usedFallbackModel: geminiResearch.usedFallbackModel,
@@ -121,7 +140,7 @@ export async function recommendCoreV1(
       detail: "Gemini候補調査を検証し、Core再評価後の結果を表示しています。",
     };
   } else {
-    candidates = fallbackCandidates;
+    candidates = mergeRyoModeCandidatePool(fallbackCandidates, ryoAnchorCandidates);
     const reasonCode = geminiResearch?.reasonCode ?? "api_error";
     const status = geminiResearch?.status ?? "error";
     candidateResearch = {
@@ -161,7 +180,8 @@ export async function recommendCoreV1(
   });
 
   if (candidateResearch.source === "gemini") {
-    const coreReevaluated = scoredCandidates.length > 0 && scoredCandidates.every((entry) =>
+    const geminiScoredCandidates = scoredCandidates.filter((entry) => entry.candidate.researchSource === "gemini");
+    const coreReevaluated = geminiScoredCandidates.length === candidateResearch.validCandidateCount && geminiScoredCandidates.every((entry) =>
       Number.isFinite(entry.balancedScore.total) &&
       Number.isFinite(entry.ryoScore.total) &&
       Boolean(entry.decision) &&
@@ -170,7 +190,7 @@ export async function recommendCoreV1(
     if (coreReevaluated) {
       candidateResearch = { ...candidateResearch, coreReevaluated: true };
     } else {
-      candidates = fallbackCandidates;
+      candidates = mergeRyoModeCandidatePool(fallbackCandidates, ryoAnchorCandidates);
       scoredCandidates = candidates.map((candidate) => {
         const balancedScore = calculateBalancedScore({ preferenceVector, candidate, preferredTags: input.preferenceTags });
         const ryoScore = calculateRyoScore({ preferenceVector, candidate });
@@ -189,11 +209,13 @@ export async function recommendCoreV1(
     }
   }
 
-  const best = scoredCandidates.sort((left, right) => {
-    if (input.mode === "ryo") return right.ryoScore.total - left.ryoScore.total;
-    if (input.mode === "balanced") return right.balancedScore.total - left.balancedScore.total;
-    return right.balancedScore.total + right.ryoScore.total - left.balancedScore.total - left.ryoScore.total;
-  })[0];
+  const best = ryoRerankingEnabled
+    ? rerankRyoModeCandidates(scoredCandidates, ryoPreferenceVector, input.mode)[0]
+    : scoredCandidates.sort((left, right) => {
+        if (input.mode === "ryo") return right.ryoScore.total - left.ryoScore.total;
+        if (input.mode === "balanced") return right.balancedScore.total - left.balancedScore.total;
+        return right.balancedScore.total + right.ryoScore.total - left.balancedScore.total - left.ryoScore.total;
+      })[0];
   if (!best) throw new Error("CANDIDATE_UNAVAILABLE");
 
   const explanationInput: ExplanationInput = {
@@ -211,13 +233,28 @@ export async function recommendCoreV1(
       });
   const explanation = addResearchContext(generatedExplanation, best.candidate);
   const geminiConfigured = Boolean(env["GEMINI_API_KEY"]);
+  const selectedRyoEvaluation = buildRyoModeCandidateEvaluation(ryoPreferenceVector, best.candidate);
+  const rerankingWeights = getRerankingWeights(ryoSummary);
 
   return {
     recommendationId: `core-v1:${best.candidate.id}`,
     preferenceVector,
     ...best,
+    candidate: {
+      ...best.candidate,
+      ryoMetadata: selectedRyoEvaluation.culture.metadata,
+    },
     explanation,
     candidateResearch,
+    ryoReranking: {
+      applied: ryoRerankingEnabled,
+      strength: ryoSummary.ryoInfluence,
+      existingCoreWeight: ryoRerankingEnabled ? rerankingWeights.existingCoreWeight : 1,
+      recommendationWeight: ryoRerankingEnabled ? rerankingWeights.recommendationWeight : 0,
+      candidatePoolSize: scoredCandidates.length,
+      selectedSource: best.candidate.researchSource ?? "fallback_catalog",
+      selectedRecommendationScore: selectedRyoEvaluation.score.recommendationScore,
+    },
     readiness: {
       geminiResearch: createGeminiResearchReadiness(candidateResearch),
       geminiExplanation: createGeminiExplanationReadiness(explanation, geminiConfigured),

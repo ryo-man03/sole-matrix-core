@@ -1,4 +1,6 @@
 import type { SneakerTag } from "../../../src/domain/sneaker/sneakerTag";
+import { RYO_MODE_V4_QUESTIONS } from "../ryo-mode-v4/questions";
+import type { RyoModeAnswers, RyoModeQuestionId } from "../ryo-mode-v4/types";
 import { normalizeDiagnosisAnswers } from "./diagnosis";
 import type {
   DiagnosisAnswer,
@@ -46,6 +48,7 @@ export type RecommendRequestInput = {
   brand?: string;
   color?: string;
   urlNameHint?: string;
+  ryoModeAnswers?: RyoModeAnswers;
 };
 
 export function validateRecommendRequest(
@@ -63,6 +66,7 @@ export function validateRecommendRequest(
   const brand = normalizeOptionalString(value["brand"], 80);
   const color = normalizeOptionalString(value["color"], 80);
   const urlNameHint = normalizeOptionalString(value["urlNameHint"], 160);
+  const ryoModeAnswers = normalizeRyoModeAnswers(value["ryoModeAnswers"]);
 
   if (!budgetResult.ok) {
     return budgetResult;
@@ -73,7 +77,8 @@ export function validateRecommendRequest(
     sneakerName === null ||
     brand === null ||
     color === null ||
-    urlNameHint === null
+    urlNameHint === null ||
+    ryoModeAnswers === null
   ) {
     return invalid("recommendationContext");
   }
@@ -95,8 +100,22 @@ export function validateRecommendRequest(
       ...(brand ? { brand } : {}),
       ...(color ? { color } : {}),
       ...(urlNameHint ? { urlNameHint } : {}),
+      ...(ryoModeAnswers ? { ryoModeAnswers } : {}),
     },
   };
+}
+
+function normalizeRyoModeAnswers(value: unknown): RyoModeAnswers | null | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!isRecord(value)) return null;
+  const normalized: Partial<Record<RyoModeQuestionId, string>> = {};
+  for (const question of RYO_MODE_V4_QUESTIONS) {
+    const optionId = value[question.id];
+    if (optionId === undefined) continue;
+    if (typeof optionId !== "string" || !question.options.some((option) => option.id === optionId)) return null;
+    normalized[question.id] = optionId;
+  }
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
 
 function normalizeMode(value: unknown): RecommendationMode | null | undefined {

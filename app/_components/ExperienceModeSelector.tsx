@@ -11,15 +11,15 @@ const modes = [
   {
     id: "diagnosis",
     eyebrow: "A / PREFERENCE",
-    title: "8問診断で好みを整理する",
+    title: "11問診断で好みを整理する",
     description:
-      "商品を決めていなくても始められます。8つの質問を1問ずつ進み、好みの傾向を整理します。",
+      "商品を決めていなくても始められます。11の質問を1問ずつ進み、好みの傾向を整理します。",
     details: [
       "スニーカー名やURLがなくても始められる",
       "戻る / 次へで1問ずつ進める",
       "完了後におすすめモデルと参考リンクを表示する",
     ],
-    cta: "8問診断を始める",
+    cta: "11問診断を始める",
   },
   {
     id: "product",
@@ -53,7 +53,7 @@ export function ExperienceModeSelector({
 
       {hasDiagnosisResult ? (
         <p className="experience-context-note">
-          8問診断の結果があります。商品判断を選ぶと、好みの参考情報として引き継げます。
+          11問診断の結果があります。商品判断を選ぶと、好みの参考情報として引き継げます。
         </p>
       ) : null}
 
