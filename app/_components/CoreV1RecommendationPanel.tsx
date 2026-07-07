@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { DiagnosisAnswerId } from "../_data/preferenceDiagnosisQuestions";
 import type { CandidateResearchSource, FeedbackSentiment, PreferenceVector, RecommendationResult } from "../_lib/core-v1/types";
-import { buildRyoModeContextForRecommendation } from "../_lib/ryo-mode-v4/integration";
+import { buildRyoModeCandidateEvaluation, buildRyoModeContextForRecommendation } from "../_lib/ryo-mode-v4/integration";
+import { createRecommendationFeedbackId, saveRecommendationFeedback, type RecommendationFeedbackUsefulness } from "../_lib/recommendation-feedback/localStorage";
 import type { RyoPreferenceVector } from "../_lib/ryo-mode-v4/types";
 import { resolveRecommendationProductLinks } from "../_lib/apiClient";
 import type { LiveProductUrl } from "../_lib/product-links/types";
@@ -59,7 +60,9 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [feedbackComment, setFeedbackComment] = useState("");
-  const [feedbackState, setFeedbackState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [feedbackState, setFeedbackState] = useState<"idle" | "saving" | "saved" | "needs_usefulness" | "error">("idle");
+  const [feedbackSummary, setFeedbackSummary] = useState("");
+  const [feedbackSavedAt, setFeedbackSavedAt] = useState("");
   const [productLinks, setProductLinks] = useState<LiveProductUrl[]>([]);
   const [productLinksMessage, setProductLinksMessage] = useState("推薦後に具体モデル名から参考リンクを作成します。");
   const [isResolvingProductLinks, setIsResolvingProductLinks] = useState(false);
@@ -127,9 +130,42 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
     if (!result || feedbackState === "saving") return;
     setFeedbackState("saving");
     try {
-      const response = await fetch("/api/core-v1/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recommendationId: result.recommendationId, sentiment, ...(feedbackComment.trim() ? { comment: feedbackComment.trim() } : {}) }) });
-      setFeedbackState(response.ok ? "saved" : "error");
+      const now = new Date();
+      const evaluation = buildRyoModeCandidateEvaluation(ryoPreferenceVector, result.candidate);
+      const usefulness: RecommendationFeedbackUsefulness = sentiment === "not_helpful" ? "needs_improvement" : sentiment;
+      saveRecommendationFeedback(window.localStorage, {
+        id: createRecommendationFeedbackId(now),
+        createdAt: now.toISOString(),
+        resultModelName: result.candidate.name,
+        decision: result.decision,
+        usefulness,
+        comment: feedbackComment.trim(),
+        ryoMode: {
+          ...(evaluation.culture.metadata.templateIds ? { templates: evaluation.culture.metadata.templateIds } : {}),
+          ...(evaluation.culture.metadata.parentModelIds ? { parentModels: evaluation.culture.metadata.parentModelIds } : {}),
+          ...(evaluation.culture.metadata.retroRunningProfiles ? { retroRunningProfiles: evaluation.culture.metadata.retroRunningProfiles } : {}),
+          productScore: evaluation.score.productScore,
+          recommendationScore: evaluation.score.recommendationScore,
+          totalRyoScore: evaluation.score.totalRyoScore,
+          topSignals: evaluation.score.matchedSignals.slice(0, 5),
+        },
+        readiness: {
+          candidateResearch: result.readiness.geminiResearch.status,
+          grounding: result.candidateResearch.stages.grounding.status,
+          jsonSchema: result.candidateResearch.stages.normalization.status,
+          explanation: result.readiness.geminiExplanation.status,
+          source: result.candidate.researchSource ?? result.candidateResearch.source,
+        },
+      });
+      setFeedbackSummary(`${sentimentLabel(sentiment)} / ${feedbackComment.trim() ? "コメントあり" : "コメントなし"}`);
+      setFeedbackSavedAt(now.toLocaleString("ja-JP"));
+      setFeedbackState("saved");
+      void fetch("/api/core-v1/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recommendationId: result.recommendationId, sentiment, ...(feedbackComment.trim() ? { comment: feedbackComment.trim() } : {}) }) }).catch(() => undefined);
     } catch { setFeedbackState("error"); }
+  }
+
+  function handleCommentOnlySave() {
+    setFeedbackState("needs_usefulness");
   }
 
   return (
@@ -153,7 +189,7 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
         <section className="core-v1-explanation" aria-labelledby="core-v1-explanation-title"><p className="diagnosis-summary-kicker">Explanation</p><h4 id="core-v1-explanation-title">判断の理由</h4><p>{result.explanation.summary}</p><p className="core-v1-provider-note">{result.readiness.geminiExplanation.detail}</p><div className="core-v1-explanation-columns"><ExplanationList title="理由" items={result.explanation.reasons} /><ExplanationList title="注意点" items={result.explanation.cautions} /></div></section>
         <section className="core-v1-vector" aria-labelledby="core-v1-vector-title"><p className="diagnosis-summary-kicker">PreferenceVector</p><h4 id="core-v1-vector-title">診断ベクトル</h4><dl>{(Object.keys(vectorLabels) as (keyof PreferenceVector)[]).map((axis) => <div key={axis}><dt>{vectorLabels[axis]}</dt><dd>{result.preferenceVector[axis]}</dd></div>)}</dl></section>
         <section className="core-v1-readiness" aria-labelledby="core-v1-readiness-title"><p className="diagnosis-summary-kicker">Readiness</p><h4 id="core-v1-readiness-title">外部APIの状態</h4><div><strong data-status={result.readiness.geminiResearch.status}>Gemini候補調査: {result.readiness.geminiResearch.status}</strong><p>{result.readiness.geminiResearch.detail}</p></div><div><strong data-research-stage="grounding" data-status={result.candidateResearch.stages.grounding.status}>Google Search Grounding: {result.candidateResearch.stages.grounding.status}</strong><p>Grounding由来の引用URL: {result.candidateResearch.stages.grounding.evidenceUrlCount}件</p></div><div><strong data-research-stage="normalization" data-status={result.candidateResearch.stages.normalization.status}>JSON整形・schema検証: {result.candidateResearch.stages.normalization.status}</strong><p>検証済み候補: {result.candidateResearch.stages.normalization.candidateCount}件 / JSON repair: {result.candidateResearch.stages.normalization.repairAttempted ? "実行" : "未実行"}</p></div><div><strong data-status={result.readiness.geminiExplanation.status}>Gemini補助説明: {result.readiness.geminiExplanation.status}</strong><p>{result.readiness.geminiExplanation.detail}</p></div><div><strong data-status={result.readiness.rakuten.status}>Rakuten: {result.readiness.rakuten.status}</strong><p>{result.readiness.rakuten.detail}</p></div></section>
-        <section className="core-v1-feedback" aria-labelledby="core-v1-feedback-title"><p className="diagnosis-summary-kicker">Feedback</p><h4 id="core-v1-feedback-title">この結果は役に立ちましたか？</h4><textarea maxLength={500} onChange={(event) => setFeedbackComment(event.target.value)} placeholder="任意のコメント" value={feedbackComment} /><div><button onClick={() => handleFeedback("helpful")} type="button">役に立った</button><button onClick={() => handleFeedback("unsure")} type="button">まだ分からない</button><button onClick={() => handleFeedback("not_helpful")} type="button">改善してほしい</button></div><p aria-live="polite">{feedbackState === "saving" ? "保存中…" : feedbackState === "saved" ? "フィードバックを保存しました。" : feedbackState === "error" ? "保存できませんでした。" : null}</p></section>
+        <section className="core-v1-feedback" aria-labelledby="core-v1-feedback-title"><p className="diagnosis-summary-kicker">Feedback</p><h4 id="core-v1-feedback-title">この結果は役に立ちましたか？</h4><textarea maxLength={500} onChange={(event) => { setFeedbackComment(event.target.value); if (feedbackState !== "saving") setFeedbackState("idle"); }} placeholder="任意のコメント" value={feedbackComment} /><div><button onClick={() => handleFeedback("helpful")} type="button">役に立った</button><button onClick={() => handleFeedback("unsure")} type="button">まだ分からない</button><button onClick={() => handleFeedback("not_helpful")} type="button">改善してほしい</button><button onClick={handleCommentOnlySave} type="button">コメントを保存</button></div><p aria-live="polite">{feedbackState === "saving" ? "保存中…" : feedbackState === "saved" ? "フィードバックをこの端末に保存しました。" : feedbackState === "needs_usefulness" ? "評価ボタンを選んでください。" : feedbackState === "error" ? "フィードバックを保存できませんでした。もう一度試してください。" : null}</p>{feedbackState === "saved" && feedbackSummary ? <div data-feedback-saved-summary><p>保存した内容: {feedbackSummary}</p><p>保存日時: {feedbackSavedAt}</p></div> : null}</section>
       </div> : null}
     </section>
   );
@@ -175,4 +211,8 @@ function formatEvidenceKinds(evidenceLinks: RecommendationResult["candidate"]["e
     types.has("search_entry_url") ? "検索入口" : null,
   ].filter((label): label is string => Boolean(label));
   return labels.length ? labels.join(" / ") : "検索入口";
+}
+
+function sentimentLabel(sentiment: FeedbackSentiment): string {
+  return sentiment === "helpful" ? "役に立った" : sentiment === "unsure" ? "まだ分からない" : "改善してほしい";
 }

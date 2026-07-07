@@ -37,6 +37,12 @@ describe("Core v1 UI integration", () => {
     expect(componentSource).not.toContain("Gemini: {result.readiness.gemini.status}");
     expect(componentSource).toContain("result.readiness.rakuten.detail");
     expect(componentSource).toContain("/api/core-v1/feedback");
+    expect(componentSource).toContain("saveRecommendationFeedback(window.localStorage");
+    expect(componentSource).toContain("フィードバックをこの端末に保存しました。");
+    expect(componentSource).toContain("保存した内容:");
+    expect(componentSource).toContain("保存日時:");
+    expect(componentSource).toContain("評価ボタンを選んでください。");
+    expect(componentSource).toContain("フィードバックを保存できませんでした。もう一度試してください。");
   });
 
   it("keeps Gemini and URL evidence outside the final Decision", () => {
@@ -58,5 +64,8 @@ describe("Core v1 UI integration", () => {
     expect(ryoResultSource).toContain("totalRyoScore");
     expect(ryoResultSource).toContain("RyoOpinion");
     expect(ryoResultSource).toContain("候補プールを作り");
+    expect(ryoResultSource).toContain("data-ryo-affinities");
+    expect(ryoResultSource).toContain("Ryo親モデル");
+    expect(ryoResultSource).toContain("サブジャンル");
   });
 });
