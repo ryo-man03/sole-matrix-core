@@ -43,7 +43,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const products = await searchRakutenProducts({ query, ...parsed.input });
+    const requestOrigin = resolveRequestOrigin(request);
+    const products = await searchRakutenProducts({
+      query,
+      ...parsed.input,
+      ...(requestOrigin ? { requestOrigin } : {}),
+    });
     return NextResponse.json({
       source: "rakuten",
       slot: "market_find",
@@ -64,7 +69,12 @@ export async function GET(request: Request) {
     }
     if (error instanceof RakutenApiError) {
       return NextResponse.json(
-        { error: "rakuten_api_error", message: error.message },
+        {
+          error: "rakuten_api_error",
+          message: error.message,
+          code: error.code,
+          ...(error.status ? { upstreamStatus: error.status } : {}),
+        },
         { status: 502 },
       );
     }
@@ -79,7 +89,7 @@ export async function GET(request: Request) {
 }
 
 function parseOptionalParameters(searchParams: URLSearchParams):
-  | { ok: true; input: Omit<SearchRakutenProductsInput, "query"> }
+  | { ok: true; input: Omit<SearchRakutenProductsInput, "query" | "requestOrigin"> }
   | { ok: false; message: string } {
   const minPrice = positiveInteger(searchParams.get("minPrice"), 999_999_998);
   const maxPrice = positiveInteger(searchParams.get("maxPrice"), 999_999_998);
@@ -109,6 +119,43 @@ function parseOptionalParameters(searchParams: URLSearchParams):
         : {}),
     },
   };
+}
+
+function resolveRequestOrigin(request: Request): string | undefined {
+  const configuredOrigin = normalizeHttpOrigin(process.env["RAKUTEN_REQUEST_ORIGIN"]);
+  if (configuredOrigin) return configuredOrigin;
+
+  const originHeader = normalizeHttpOrigin(request.headers.get("origin"));
+  if (originHeader) return originHeader;
+
+  const forwardedProto = firstHeaderValue(request.headers.get("x-forwarded-proto"));
+  const forwardedHost = firstHeaderValue(request.headers.get("x-forwarded-host"));
+  const host = forwardedHost ?? firstHeaderValue(request.headers.get("host"));
+  if ((forwardedProto === "http" || forwardedProto === "https") && host) {
+    const forwardedOrigin = normalizeHttpOrigin(`${forwardedProto}://${host}`);
+    if (forwardedOrigin) return forwardedOrigin;
+  }
+
+  try {
+    return normalizeHttpOrigin(new URL(request.url).origin);
+  } catch {
+    return undefined;
+  }
+}
+
+function firstHeaderValue(value: string | null): string | undefined {
+  return value?.split(",")[0]?.trim() || undefined;
+}
+
+function normalizeHttpOrigin(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length > 512) return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    return url.origin;
+  } catch {
+    return undefined;
+  }
 }
 
 function positiveInteger(

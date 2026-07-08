@@ -30,6 +30,7 @@ export type MarketProductCandidate = {
 
 export type SearchRakutenProductsInput = {
   query: string;
+  requestOrigin?: string;
   minPrice?: number;
   maxPrice?: number;
   hits?: number;
