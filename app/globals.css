@@ -2012,6 +2012,117 @@ h1 {
   font-weight: 700;
 }
 
+.rakuten-market-find {
+  display: grid;
+  gap: 14px;
+  border: 1px solid rgba(35, 43, 55, 0.12);
+  border-radius: 8px;
+  background: #f7f5ef;
+  padding: 16px;
+}
+
+.rakuten-market-find-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.rakuten-market-find-heading h4,
+.rakuten-market-find-heading p {
+  margin: 8px 0 0;
+}
+
+.rakuten-market-find-heading button {
+  flex: 0 0 auto;
+}
+
+.rakuten-market-find-disclaimer,
+.rakuten-market-find-status,
+.rakuten-market-find-error {
+  margin: 0 !important;
+  border-left: 3px solid #8b7042;
+  background: #fffefa;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  line-height: 1.65;
+}
+
+.rakuten-market-find-error {
+  border-left-color: #8a3b2e;
+  color: #8a3b2e !important;
+}
+
+.rakuten-market-find-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.rakuten-product-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(35, 43, 55, 0.12);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.rakuten-product-card > img,
+.rakuten-product-image-placeholder {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  background: #ece9e1;
+  object-fit: contain;
+  color: #8a8275;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+}
+
+.rakuten-product-card-body {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.rakuten-product-card-body h5,
+.rakuten-product-card-body p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.rakuten-product-card-body h5 {
+  font-size: 0.9rem;
+}
+
+.rakuten-product-card-body p,
+.rakuten-product-card-body small {
+  color: #66717f;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.rakuten-product-card-body a {
+  width: fit-content;
+  color: #284d74;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .rakuten-market-find-heading {
+    display: grid;
+  }
+
+  .rakuten-market-find-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .candidate-check-section {
   margin-top: 72px;
 }
