@@ -38,6 +38,20 @@ const highBasketballLeatherAnswers = {
   ryoStrength: "ryo_mode",
 } as const;
 
+const screenshotRegressionAnswers = {
+  style: "amekaji",
+  pantsFit: "wide_pants",
+  taste: "classic",
+  sportOrigin: "basketball",
+  cut: "high",
+  wearingStyle: "tied_silhouette",
+  materialAging: "leather_sinking",
+  color: "black_white",
+  budget: "under_15000",
+  techTolerance: "avoid_tech",
+  ryoStrength: "balanced",
+} as const;
+
 describe("Ryo Mode v4 candidate pool and reranking", () => {
   it("generates the expected anchors for the strong work-pants answer", () => {
     const anchors = createRyoModeCandidateAnchors(buildRyoPreferenceVector(strongAnswers), 25_000);
@@ -89,14 +103,83 @@ describe("Ryo Mode v4 candidate pool and reranking", () => {
 
   it("uses strength-specific weights and lets recommendationScore control strong reranking", () => {
     const strongVector = buildRyoPreferenceVector(strongAnswers);
-    const balancedVector = buildRyoPreferenceVector({ ...strongAnswers, ryoStrength: "balanced" });
-    expect(getRerankingWeights(summarizeRyoPreferenceVector(strongVector))).toEqual({ existingCoreWeight: 0.35, recommendationWeight: 0.65 });
-    expect(getRerankingWeights(summarizeRyoPreferenceVector(balancedVector))).toEqual({ existingCoreWeight: 0.9, recommendationWeight: 0.1 });
+    const balancedVector = buildRyoPreferenceVector({
+      ...strongAnswers,
+      style: "normcore",
+      pantsFit: "straight_pants",
+      taste: "simple",
+      sportOrigin: "no_sport",
+      cut: "low",
+      ryoStrength: "balanced",
+    });
+    expect(getRerankingWeights(summarizeRyoPreferenceVector(strongVector))).toEqual({ existingCoreWeight: 0.3, recommendationWeight: 0.7 });
+    expect(getRerankingWeights(summarizeRyoPreferenceVector(balancedVector))).toEqual({ existingCoreWeight: 0.45, recommendationWeight: 0.55 });
 
     const af1 = scored(candidate('Nike Air Force 1 Low "White/White"', ["basketball", "classic", "street", "durable"]), 92);
     const oneStar = scored(candidate("Converse One Star J VTG Black", ["classic", "low_tech", "street", "heritage"]), 82);
+    const cm996 = scored(candidate("New Balance CM996", ["running", "comfortable", "retro"]), 82);
     expect(rerankRyoModeCandidates([af1, oneStar], strongVector, "ryo")[0]?.candidate.name).toBe("Converse One Star J VTG Black");
-    expect(rerankRyoModeCandidates([af1, oneStar], balancedVector, "balanced")[0]?.candidate.name).toBe('Nike Air Force 1 Low "White/White"');
+    expect(rerankRyoModeCandidates([af1, cm996], balancedVector, "balanced")[0]?.candidate.name).toBe('Nike Air Force 1 Low "White/White"');
+  });
+
+  it("guards the exact screenshot regression in the fallback path", async () => {
+    const result = await recommendCoreV1({
+      diagnosisAnswers: [],
+      preferenceTags: ["classic", "basketball", "heritage", "low_tech"],
+      mode: "balanced",
+      budgetYen: 15_000,
+      ryoModeAnswers: screenshotRegressionAnswers,
+    }, {
+      env: {},
+      rakutenCandidateProvider: async () => ({ status: "missing_config", candidates: [], evidence: [], readiness: { provider: "rakuten", status: "missing_config", detail: "missing" }, networkAttempted: false, responseOk: false, shapeValid: false }),
+    });
+
+    expect(result.candidateResearch.source).toBe("fallback_catalog");
+    expect(result.ryoReranking).toMatchObject({
+      applied: true,
+      strength: "balanced",
+      existingCoreWeight: 0.45,
+      recommendationWeight: 0.55,
+    });
+    expect(result.candidate.name).not.toBe('Nike Air Force 1 Low "White/White"');
+    expect(result.candidate.name).toMatch(/All Star J|Pro Leather|Weapon|Terminator High|Blazer Mid|Air Jordan 1 High/i);
+    expect(result.candidate.description).not.toMatch(/アメカジの主軸ではなく/i);
+    expect(result.ryoReranking.selectedExplicitPreferenceReasons.join(" ")).not.toMatch(/Low専用|White \/ White配色/i);
+  });
+
+  it("prevents a Low-only core favorite from beating a reasonable High or Mid candidate", () => {
+    const vector = buildRyoPreferenceVector(screenshotRegressionAnswers);
+    const af1 = scored(candidate('Nike Air Force 1 Low "White/White"', ["basketball", "classic", "street", "durable"]), 99);
+    const blazer = scored(candidate("Nike Blazer Mid '77 Black/White", ["basketball", "classic", "street", "heritage"]), 65);
+    const ranked = rerankRyoModeCandidates([af1, blazer], vector, "balanced");
+
+    expect(ranked[0]?.candidate.name).toBe("Nike Blazer Mid '77 Black/White");
+    expect(ranked.find((entry) => entry.candidate.name.includes("Air Force"))?.explicitPreferenceReasons).toEqual(expect.arrayContaining([
+      "High指定に対してLow専用モデル",
+      "Black / White指定に対してWhite / White配色",
+    ]));
+  });
+
+  it("treats White/White as weaker than an otherwise close Black/White match", () => {
+    const vector = buildRyoPreferenceVector({
+      style: "normcore",
+      pantsFit: "straight_pants",
+      taste: "simple",
+      sportOrigin: "basketball",
+      cut: "low",
+      wearingStyle: "tied_silhouette",
+      materialAging: "leather_sinking",
+      color: "black_white",
+      budget: "under_20000",
+      techTolerance: "avoid_tech",
+      ryoStrength: "balanced",
+    });
+    const white = scored(candidate('Nike Air Force 1 Low "White/White"', ["basketball", "classic", "street", "durable"]), 90);
+    const black = scored(candidate("Nike Air Force 1 Low Black/White", ["basketball", "classic", "street", "durable"]), 84);
+    const ranked = rerankRyoModeCandidates([white, black], vector, "balanced");
+
+    expect(ranked[0]?.candidate.name).toBe("Nike Air Force 1 Low Black/White");
+    expect(ranked[1]?.explicitPreferenceReasons).toContain("Black / White指定に対してWhite / White配色");
   });
 
   it("integrates fallback and anchors without treating an anchor as Gemini research", async () => {
@@ -110,7 +193,7 @@ describe("Ryo Mode v4 candidate pool and reranking", () => {
       env: {},
       rakutenCandidateProvider: async () => ({ status: "missing_config", candidates: [], evidence: [], readiness: { provider: "rakuten", status: "missing_config", detail: "missing" }, networkAttempted: false, responseOk: false, shapeValid: false }),
     });
-    expect(result.ryoReranking).toMatchObject({ applied: true, strength: "strong", existingCoreWeight: 0.35, recommendationWeight: 0.65 });
+    expect(result.ryoReranking).toMatchObject({ applied: true, strength: "strong", existingCoreWeight: 0.3, recommendationWeight: 0.7 });
     expect(result.ryoReranking.candidatePoolSize).toBeGreaterThan(10);
     expect(result.candidate.name).not.toMatch(/Samba|CM996/i);
     expect(result.candidate.name).not.toBe('Nike Air Force 1 Low "White/White"');
