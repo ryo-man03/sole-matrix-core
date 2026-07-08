@@ -7,6 +7,7 @@ import {
   rerankRyoModeCandidates,
 } from "./candidates";
 import { buildRyoModeCandidateEvaluation } from "./integration";
+import type { RyoModeAnswers } from "./types";
 import { buildRyoPreferenceVector, summarizeRyoPreferenceVector } from "./vector";
 
 const strongAnswers = {
@@ -21,6 +22,20 @@ const strongAnswers = {
   budget: "under_25000",
   techTolerance: "avoid_tech",
   ryoStrength: "ryo_strong",
+} as const;
+
+const highBasketballLeatherAnswers = {
+  style: "amekaji",
+  pantsFit: "denim",
+  taste: "classic",
+  sportOrigin: "basketball",
+  cut: "high",
+  wearingStyle: "volume_look",
+  materialAging: "leather_sinking",
+  color: "black_white",
+  budget: "under_20000",
+  techTolerance: "heritage_tech_ok",
+  ryoStrength: "ryo_mode",
 } as const;
 
 describe("Ryo Mode v4 candidate pool and reranking", () => {
@@ -105,6 +120,99 @@ describe("Ryo Mode v4 candidate pool and reranking", () => {
     expect(result.readiness.geminiResearch.status).toBe("fallback");
     expect(result.candidate.evidenceUrls?.length).toBeGreaterThan(0);
   });
+
+  it("ranks high basketball leather classics above low canvas skate models", async () => {
+    const ranked = rankAnchors(highBasketballLeatherAnswers, 20_000);
+    const vansRank = rankOf(ranked, /Vans Authentic/i);
+    expect(vansRank).toBeGreaterThan(0);
+    expect(countAbove(ranked, vansRank, /Pro Leather|Weapon|Air Jordan 1 High|Terminator High|Blazer Mid|All Star J/i)).toBeGreaterThanOrEqual(3);
+
+    const result = await recommendCoreV1({
+      diagnosisAnswers: [],
+      preferenceTags: ["classic", "basketball", "heritage"],
+      mode: "ryo",
+      budgetYen: 20_000,
+      ryoModeAnswers: highBasketballLeatherAnswers,
+    }, {
+      env: {},
+      rakutenCandidateProvider: async () => ({ status: "missing_config", candidates: [], evidence: [], readiness: { provider: "rakuten", status: "missing_config", detail: "missing" }, networkAttempted: false, responseOk: false, shapeValid: false }),
+    });
+    expect(result.candidate.name).not.toMatch(/Vans Authentic/i);
+    expect(result.candidate.name).toMatch(/Pro Leather|Weapon|Air Jordan 1 High|Terminator High|Blazer Mid|All Star J/i);
+  });
+
+  it("keeps All Star J Hi strong for high amekaji denim with canvas aging", () => {
+    const ranked = rankAnchors({
+      style: "amekaji",
+      pantsFit: "denim",
+      taste: "classic",
+      sportOrigin: "no_sport",
+      cut: "high",
+      wearingStyle: "volume_look",
+      materialAging: "canvas_fading",
+      color: "black_white",
+      budget: "under_20000",
+      techTolerance: "heritage_tech_ok",
+      ryoStrength: "ryo_mode",
+    }, 20_000);
+    const strongestAllStar = highestScore(ranked, /All Star J|TimeLine|Addict Chuck Taylor/i);
+    const strongestVans = highestScore(ranked, /Vans Authentic|Vans Era/i);
+    expect(strongestAllStar).toBeGreaterThanOrEqual(75);
+    expect(strongestAllStar).toBeGreaterThan(strongestVans);
+  });
+
+  it("preserves Vans strength for low skate canvas aging answers", () => {
+    const ranked = rankAnchors({
+      style: "street",
+      pantsFit: "straight_pants",
+      taste: "simple",
+      sportOrigin: "skate",
+      cut: "low",
+      wearingStyle: "loose_fit",
+      materialAging: "canvas_fading",
+      color: "black_white",
+      budget: "under_15000",
+      techTolerance: "avoid_tech",
+      ryoStrength: "ryo_mode",
+    }, 15_000);
+    expect(ranked[0]?.candidate.name).toMatch(/Vans Authentic/i);
+    expect(highestScore(ranked, /Vans Authentic|Vans Era|Vans Half Cab/i)).toBeGreaterThanOrEqual(75);
+  });
+
+  it("keeps leather-aging explanations off canvas-primary Vans and All Star J", () => {
+    const vector = buildRyoPreferenceVector(highBasketballLeatherAnswers);
+    const anchors = createRyoModeCandidateAnchors(vector, 20_000);
+    const vans = evaluateAnchor(anchors, vector, /Vans Authentic/i);
+    const allStar = evaluateAnchor(anchors, vector, /All Star J Hi$/i);
+    const proLeather = evaluateAnchor(anchors, vector, /Pro Leather/i);
+
+    expect(vans.score.matchedSignals.join(" ")).not.toMatch(/革の沈み|革のシワ|leather aging/i);
+    expect(allStar.score.matchedSignals.join(" ")).not.toMatch(/革の沈み|革のシワ|leather aging/i);
+    expect(proLeather.score.matchedSignals.join(" ")).toMatch(/革のシワ|leather/i);
+
+    const canvasVector = buildRyoPreferenceVector({ ...highBasketballLeatherAnswers, sportOrigin: "no_sport", materialAging: "canvas_fading" });
+    const canvasAnchors = createRyoModeCandidateAnchors(canvasVector, 20_000);
+    const canvasAllStar = evaluateAnchor(canvasAnchors, canvasVector, /All Star J Hi$/i);
+    expect(canvasAllStar.score.matchedSignals.join(" ")).toMatch(/Hiカット|デニム|キャンバス|日本製|VTG|TimeLine|Addict/);
+  });
+
+  it("does not force All Star J Hi to first place for low leather amekaji denim", () => {
+    const ranked = rankAnchors({
+      style: "amekaji",
+      pantsFit: "denim",
+      taste: "classic",
+      sportOrigin: "no_sport",
+      cut: "low",
+      wearingStyle: "tied_silhouette",
+      materialAging: "leather_sinking",
+      color: "black_white",
+      budget: "under_20000",
+      techTolerance: "heritage_tech_ok",
+      ryoStrength: "ryo_mode",
+    }, 20_000);
+    expect(ranked[0]?.candidate.name).not.toMatch(/All Star J Hi/i);
+    expect(countAbove(ranked, rankOf(ranked, /All Star J Hi$/i), /One Star Leather|Jack Purcell Leather|Pro Leather/i)).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe("official name normalization", () => {
@@ -144,4 +252,39 @@ function scored(value: CandidateProfile, coreScore: number) {
     ryoScore: { total: coreScore, preferenceFit: coreScore, culturalFit: coreScore, classicRetroFit: coreScore, streetFit: coreScore, calmStyleFit: coreScore, enthusiastValue: coreScore },
     decision: "consider" as const,
   };
+}
+
+type RankedAnchor = {
+  candidate: CandidateProfile;
+  evaluation: ReturnType<typeof buildRyoModeCandidateEvaluation>;
+};
+
+function rankAnchors(answers: RyoModeAnswers, budgetYen: number): RankedAnchor[] {
+  const vector = buildRyoPreferenceVector(answers);
+  return createRyoModeCandidateAnchors(vector, budgetYen)
+    .map((candidate) => ({ candidate, evaluation: buildRyoModeCandidateEvaluation(vector, candidate) }))
+    .sort((left, right) => right.evaluation.score.recommendationScore - left.evaluation.score.recommendationScore);
+}
+
+function rankOf(ranked: readonly RankedAnchor[], pattern: RegExp): number {
+  return ranked.findIndex((item) => pattern.test(item.candidate.name));
+}
+
+function countAbove(ranked: readonly RankedAnchor[], rank: number, pattern: RegExp): number {
+  expect(rank).toBeGreaterThanOrEqual(0);
+  return ranked.slice(0, rank).filter((item) => pattern.test(item.candidate.name)).length;
+}
+
+function highestScore(ranked: readonly RankedAnchor[], pattern: RegExp): number {
+  return Math.max(...ranked.filter((item) => pattern.test(item.candidate.name)).map((item) => item.evaluation.score.recommendationScore));
+}
+
+function evaluateAnchor(
+  anchors: readonly CandidateProfile[],
+  vector: Parameters<typeof buildRyoModeCandidateEvaluation>[0],
+  pattern: RegExp,
+): ReturnType<typeof buildRyoModeCandidateEvaluation> {
+  const candidate = anchors.find((item) => pattern.test(item.name));
+  expect(candidate).toBeDefined();
+  return buildRyoModeCandidateEvaluation(vector, candidate!);
 }

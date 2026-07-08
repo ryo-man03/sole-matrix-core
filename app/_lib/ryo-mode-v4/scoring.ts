@@ -120,6 +120,14 @@ function buildRecommendationBreakdown(
     t.goreTex ? vector.materialAging.goreTexUtility : 0,
     vector.materialAging.overallAgingPotential,
   );
+  const activeMaterialPreference = max(
+    vector.materialAging.leatherSinking,
+    vector.materialAging.leatherCreasing,
+    vector.materialAging.suedeFadingNap,
+    vector.materialAging.canvasFading,
+    vector.materialAging.goreTexUtility,
+    vector.materialAging.overallAgingPotential,
+  );
   const cutPreference = max(
     t.highCut ? vector.cut.high : 0,
     t.lowCut ? vector.cut.low : 0,
@@ -127,7 +135,23 @@ function buildRecommendationBreakdown(
     t.midCut ? vector.cut.mid : 0,
     vector.cut.dependsOnModel,
   );
-  const wearingPreference = t.tiedSilhouetteGood ? vector.wearingStyle.tiedSilhouette : 0;
+  const activeCutWearingPreference = max(
+    vector.cut.high,
+    vector.cut.low,
+    vector.cut.ox,
+    vector.cut.mid,
+    vector.cut.dependsOnModel,
+    vector.wearingStyle.tiedSilhouette,
+    vector.wearingStyle.looseFit,
+    vector.wearingStyle.slimLook,
+    vector.wearingStyle.volumeLook,
+  );
+  const wearingPreference = max(
+    t.tiedSilhouetteGood ? vector.wearingStyle.tiedSilhouette : 0,
+    t.lowCut ? vector.wearingStyle.looseFit : 0,
+    t.slimPantsGood || t.lowCut ? vector.wearingStyle.slimLook : 0,
+    t.highCut || t.midCut ? vector.wearingStyle.volumeLook : 0,
+  );
   const pantsPreference = max(
     t.widePantsGood ? vector.pantsFit.widePants : 0,
     t.straightPantsGood ? vector.pantsFit.straightPants : 0,
@@ -136,14 +160,30 @@ function buildRecommendationBreakdown(
     t.slimPantsGood ? vector.pantsFit.slimPants : 0,
     vector.pantsFit.undecided,
   );
+  const activePantsPreference = max(
+    vector.pantsFit.widePants,
+    vector.pantsFit.straightPants,
+    vector.pantsFit.denim,
+    vector.pantsFit.workPants,
+    vector.pantsFit.slimPants,
+  );
   const sportPreference = t.sportOrigin && t.sportOrigin !== "none"
     ? vector.sportOrigin[t.sportOrigin]
     : vector.sportOrigin.noSportPreference;
+  const activeSportPreference = max(
+    vector.sportOrigin.basketball,
+    vector.sportOrigin.tennis,
+    vector.sportOrigin.football,
+    vector.sportOrigin.skate,
+    vector.sportOrigin.running,
+  );
   const colorPreference = t.rareWearableColor
     ? max(vector.taste.rareColor, vector.color.rareColor, vector.color.oddColor, vector.color.warmAccent)
     : t.blackWhite
       ? max(vector.taste.classic, vector.taste.simple, vector.color.blackWhite)
       : max(vector.taste.classic, vector.taste.simple, vector.color.earthTone, vector.color.creamGum);
+  const styleSportPreference = max(sportPreference, vector.style.normcore, vector.style.street);
+  const activeStyleSportPreference = max(activeSportPreference, vector.style.normcore, vector.style.street);
 
   pushMatch(materialPreference, "preferred material and aging behavior", matchedSignals);
   pushMatch(max(cutPreference, wearingPreference), "preferred cut and wearing silhouette", matchedSignals);
@@ -153,11 +193,11 @@ function buildRecommendationBreakdown(
 
   return {
     historyOrigin: fitAxis(product.historyOrigin, max(vector.taste.classic, vector.style.amekaji), CAPS.historyOrigin),
-    materialAging: fitAxis(product.materialAging, materialPreference, CAPS.materialAging),
-    silhouetteCutWearing: fitAxis(product.silhouetteCutWearing, max(cutPreference, wearingPreference), CAPS.silhouetteCutWearing),
-    pantsCompatibility: fitAxis(product.pantsCompatibility, pantsPreference, CAPS.pantsCompatibility),
+    materialAging: fitPreferenceAxis(product.materialAging, materialPreference, activeMaterialPreference, CAPS.materialAging, 0.45),
+    silhouetteCutWearing: fitPreferenceAxis(product.silhouetteCutWearing, max(cutPreference, wearingPreference), activeCutWearingPreference, CAPS.silhouetteCutWearing, 0.5),
+    pantsCompatibility: fitPreferenceAxis(product.pantsCompatibility, pantsPreference, activePantsPreference, CAPS.pantsCompatibility, 0.35),
     colorTaste: fitAxis(product.colorTaste, colorPreference, CAPS.colorTaste),
-    styleSportContext: fitAxis(product.styleSportContext, max(sportPreference, vector.style.normcore, vector.style.street), CAPS.styleSportContext),
+    styleSportContext: fitPreferenceAxis(product.styleSportContext, styleSportPreference, activeStyleSportPreference, CAPS.styleSportContext, 0.45),
     affordability: recommendationAffordability(features.estimatedPriceYen, vector),
     playfulness: fitAxis(product.playfulness, max(vector.taste.rareColor, vector.taste.limitedCollab, vector.color.oddColor), CAPS.playfulness),
   };
@@ -205,6 +245,22 @@ function collectRecommendationDeductions(
     const value = Math.round(10 * strengthFactor * techToleranceFactor);
     deduction += recordPenalty(value > 0, value, "model sits outside the classic Ryo axis", penalties, cautions);
   }
+  const highCutMismatch = vector.cut.high > 0 && t.lowCut && !t.highCut && !t.midCut;
+  deduction += recordPenalty(highCutMismatch, Math.round(10 * strengthFactor), "high cut selected but candidate is low-cut", penalties, cautions);
+
+  const basketballMismatch = vector.sportOrigin.basketball > 0
+    && t.sportOrigin !== undefined
+    && t.sportOrigin !== "basketball"
+    && t.canvas
+    && t.lowCut;
+  deduction += recordPenalty(basketballMismatch, Math.round(8 * strengthFactor), "basketball origin selected but candidate is from another sport context", penalties, cautions);
+
+  const leatherAgingSelected = vector.materialAging.leatherSinking > 0 || vector.materialAging.leatherCreasing > 0;
+  const canvasPrimaryWithoutCanvasRequest = leatherAgingSelected && t.canvas && !t.leather && !t.suede && vector.materialAging.canvasFading <= 0;
+  deduction += recordPenalty(canvasPrimaryWithoutCanvasRequest, Math.round(8 * strengthFactor), "leather aging selected but candidate is canvas-primary", penalties, cautions);
+
+  const lowCanvasVolumeMismatch = vector.wearingStyle.volumeLook > 0 && t.lowCut && t.canvas && !t.highCut && !t.midCut;
+  deduction += recordPenalty(lowCanvasVolumeMismatch, Math.round(6 * strengthFactor), "volume look selected but candidate is low canvas", penalties, cautions);
   return deduction;
 }
 
@@ -224,6 +280,12 @@ function calculateAirForce1ContextPenalty(
 function fitAxis(base: number, preference: number, cap: number): number {
   if (preference <= 0) return base;
   return capped(base + (cap - base) * (preference / 100) * 0.45, cap);
+}
+
+function fitPreferenceAxis(base: number, matchedPreference: number, activePreference: number, cap: number, mismatchFactor: number): number {
+  if (activePreference <= 0) return base;
+  if (matchedPreference > 0) return fitAxis(base, matchedPreference, cap);
+  return capped(base * mismatchFactor, cap);
 }
 
 function productAffordability(price?: number): number {

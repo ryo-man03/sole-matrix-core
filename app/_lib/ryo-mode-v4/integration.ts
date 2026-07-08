@@ -105,11 +105,11 @@ export function buildRyoModeCandidateEvaluation(vector: RyoPreferenceVector, can
   );
   const featureCount = Object.values(features.traits).filter((value) => value === true || typeof value === "string").length;
   const cautionSignals = [
+    ...buildContextualCandidateCautions(vector, features.displayNameOfficial),
     ...rawScore.cautionSignals,
     ...displayValidation.penalties,
     ...(featureCount === 0 ? ["候補の確定的な特徴情報が不足しています"] : []),
     ...(features.estimatedPriceYen === undefined ? ["推定価格が不明なため予算適合は加点していません"] : []),
-    ...buildContextualCandidateCautions(vector, features.displayNameOfficial),
   ];
   const score = {
     ...rawScore,
