@@ -23,7 +23,7 @@ export function buildRyoCulturalEvaluation(candidateName: string, vector: RyoPre
     ...(retroRunningProfile ? [buildRetroRunningExplanation(candidateName, retroRunningProfile)] : []),
   ];
   const cautions = unique([
-    ...(parentProfile?.cautions ?? []),
+    ...applicableParentCautions(candidateName, parentProfile?.cautions ?? []),
     ...(retroRunningProfile?.cautions ?? []),
     ...(cautionPenalty > 0 ? [cautionFor(candidateName, retroRunningProfile?.ryoCenter)] : []),
   ]);
@@ -83,6 +83,19 @@ function cautionFor(name: string, ryoCenter?: boolean): string {
   return ryoCenter === false || /air max|1906|9060/i.test(name)
     ? "Ryo classic tasteとは別枠です。ハイテク感または現代的ボリュームを許容する場合だけ候補に残します。"
     : "Ryo Modeの中心モデルではないため、服装条件との一致を優先して判断します。";
+}
+
+function applicableParentCautions(candidateName: string, cautions: readonly string[]): string[] {
+  return cautions.filter((caution) => {
+    if (/AF1|Air\s*Force\s*1/i.test(caution)) return /air\s*force\s*1/i.test(candidateName);
+    if (/通常現行All Star/i.test(caution)) return /all\s+star/i.test(candidateName) && !/\b(?:J|VTG|TimeLine|Addict)\b/i.test(candidateName);
+    if (/Samba/i.test(caution)) return /samba/i.test(candidateName);
+    if (/Speedcat/i.test(caution)) return /speedcat/i.test(candidateName);
+    if (/Knu Skool/i.test(caution)) return /knu\s*skool/i.test(candidateName);
+    if (/大きなN|現代感/i.test(caution)) return /990v[5-9]|1906|9060|1000/i.test(candidateName);
+    if (/Club C/i.test(caution)) return /club\s*c/i.test(candidateName);
+    return true;
+  });
 }
 
 function averagePositive(...values: number[]): number {

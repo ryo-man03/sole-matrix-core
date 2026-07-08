@@ -5,8 +5,10 @@ type RyoTraits = RyoSneakerFeatures["traits"];
 export const RYO_PANTS_MODEL_MAPPINGS = {
   widePants: [
     "Nike Air Jordan 1 High", "Nike Air Force 1 Low", "Converse All Star Hi",
-    "Converse One Star", "PUMA Suede", "PUMA Clyde", "Vans Half Cab",
-    "adidas Superstar", "adidas Bern", "New Balance 991", "New Balance 993", "New Balance 998",
+    "Converse All Star J", "Converse Addict Chuck Taylor", "Converse Pro Leather",
+    "Converse Weapon", "Converse One Star", "PUMA Suede", "PUMA Clyde", "Vans Half Cab",
+    "Nike Blazer Mid", "Nike Terminator High", "adidas Superstar", "adidas Bern",
+    "New Balance 991", "New Balance 993", "New Balance 998",
   ],
   straightPants: [
     "Nike Air Force 1 Low", "Converse Jack Purcell", "Vans Authentic", "Vans Era",
@@ -15,11 +17,13 @@ export const RYO_PANTS_MODEL_MAPPINGS = {
   ],
   denim: [
     "Nike Air Jordan 1 High", "Nike Air Force 1 Low", "Converse One Star",
-    "Converse All Star Hi", "PUMA Suede", "adidas Galapagos", "adidas Tobacco",
+    "Converse All Star Hi", "Converse All Star J", "Converse Addict Chuck Taylor",
+    "Converse Pro Leather", "Converse Weapon", "Nike Blazer Mid", "Nike Terminator High",
+    "PUMA Suede", "PUMA Clyde", "adidas Superstar", "adidas Galapagos", "adidas Tobacco",
     "Vans Authentic", "Reebok Classic Leather",
   ],
   workPants: [
-    "Nike Air Force 1 Low", "Converse Jack Purcell", "adidas Bern", "PUMA Suede",
+    "Nike Air Force 1 Low", "Converse Jack Purcell", "Converse One Star", "adidas Bern", "PUMA Suede",
     "PUMA Clyde", "Nike Blazer Mid", "Nike Terminator High", "Vans Half Cab",
     "New Balance 993", "Reebok Classic Leather",
   ],
@@ -52,7 +56,11 @@ export const RYO_SPORT_ORIGIN_MAPPINGS = {
 } as const;
 
 export const RYO_CUT_CORRECTIONS = {
-  highCut: ["Nike Air Jordan 1 High", "Converse All Star Hi", "Nike Terminator High", "Nike Blazer Mid"],
+  highCut: [
+    "Nike Air Jordan 1 High", "Converse All Star Hi", "Converse All Star J",
+    "Converse Addict Chuck Taylor", "Converse Pro Leather", "Converse Weapon",
+    "Nike Terminator High", "Nike Blazer Mid",
+  ],
   lowCut: [
     "Nike Air Force 1 Low", "Converse Jack Purcell", "Vans Authentic", "Vans Era",
     "PUMA Suede", "PUMA Clyde", "adidas Samba", "adidas Tobacco", "adidas Gazelle",
