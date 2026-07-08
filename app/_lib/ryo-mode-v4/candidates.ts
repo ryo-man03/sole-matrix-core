@@ -36,6 +36,13 @@ export type CoreScoredCandidate = {
 export type RyoRerankedCandidate = CoreScoredCandidate & {
   ryoEvaluation: RyoModeCandidateEvaluation;
   finalRecommendationScore: number;
+  explicitPreferencePenalty: number;
+  explicitPreferenceReasons: string[];
+};
+
+export type ExplicitPreferenceGuard = {
+  penalty: number;
+  reasons: string[];
 };
 
 const anchorCatalog: readonly AnchorDefinition[] = [
@@ -129,29 +136,113 @@ export function rerankRyoModeCandidates(
 ): RyoRerankedCandidate[] {
   const summary = summarizeRyoPreferenceVector(vector);
   const weights = getRerankingWeights(summary);
-  return candidates.map((entry) => {
+  let ranked = candidates.map((entry) => {
     const ryoEvaluation = buildRyoModeCandidateEvaluation(vector, entry.candidate);
     const existingCoreScore = mode === "ryo" ? entry.ryoScore.total : entry.balancedScore.total;
+    const guard = evaluateExplicitPreferenceGuards(vector, ryoEvaluation);
     return {
       ...entry,
       ryoEvaluation,
-      finalRecommendationScore: round(existingCoreScore * weights.existingCoreWeight + ryoEvaluation.score.recommendationScore * weights.recommendationWeight),
+      explicitPreferencePenalty: guard.penalty,
+      explicitPreferenceReasons: guard.reasons,
+      finalRecommendationScore: round(Math.max(0,
+        existingCoreScore * weights.existingCoreWeight
+          + ryoEvaluation.score.recommendationScore * weights.recommendationWeight
+          - guard.penalty,
+      )),
     };
-  }).sort((left, right) =>
+  });
+
+  ranked = enforceHighCutWinnerGuard(vector, ranked);
+  return ranked.sort((left, right) =>
     right.finalRecommendationScore - left.finalRecommendationScore ||
     right.ryoEvaluation.score.recommendationScore - left.ryoEvaluation.score.recommendationScore ||
     (mode === "ryo" ? right.ryoScore.total - left.ryoScore.total : right.balancedScore.total - left.balancedScore.total),
   );
 }
 
+export function evaluateExplicitPreferenceGuards(
+  vector: RyoPreferenceVector,
+  evaluation: RyoModeCandidateEvaluation,
+): ExplicitPreferenceGuard {
+  const traits = evaluation.features.traits;
+  const reasons: string[] = [];
+  let penalty = 0;
+  const add = (condition: boolean | undefined, value: number, reason: string) => {
+    if (!condition) return;
+    penalty += value;
+    reasons.push(reason);
+  };
+
+  add(
+    vector.cut.high > 0 && traits.lowCut && !traits.highCut && !traits.midCut,
+    28,
+    "High指定に対してLow専用モデル",
+  );
+  add(
+    vector.color.blackWhite > 0 && traits.whiteWhite && !traits.blackBased,
+    16,
+    "Black / White指定に対してWhite / White配色",
+  );
+  add(
+    vector.color.blackWhite > 0 && !traits.blackWhite && !traits.blackBased && !traits.whiteWhite,
+    4,
+    "Black / White配色をモデル名から確認できない",
+  );
+  add(
+    vector.style.amekaji > 0 && traits.airForce1WhiteWhite,
+    10,
+    "アメカジ指定で主軸外のAF1 Low",
+  );
+  add(
+    (vector.materialAging.leatherSinking > 0 || vector.materialAging.leatherCreasing > 0)
+      && traits.canvas && !traits.leather && !traits.suede,
+    8,
+    "レザー経年変化指定に対してキャンバス素材",
+  );
+
+  return { penalty, reasons };
+}
+
 export function getRerankingWeights(summary: RyoPreferenceSummary): { existingCoreWeight: number; recommendationWeight: number } {
   switch (summary.ryoInfluence) {
-    case "light": return { existingCoreWeight: 0.7, recommendationWeight: 0.3 };
-    case "standard": return { existingCoreWeight: 0.5, recommendationWeight: 0.5 };
-    case "strong": return { existingCoreWeight: 0.35, recommendationWeight: 0.65 };
-    case "beginner": return { existingCoreWeight: 0.4, recommendationWeight: 0.6 };
-    default: return { existingCoreWeight: 0.9, recommendationWeight: 0.1 };
+    case "light": return { existingCoreWeight: 0.65, recommendationWeight: 0.35 };
+    case "standard": return { existingCoreWeight: 0.4, recommendationWeight: 0.6 };
+    case "strong": return { existingCoreWeight: 0.3, recommendationWeight: 0.7 };
+    case "beginner": return { existingCoreWeight: 0.45, recommendationWeight: 0.55 };
+    default: return { existingCoreWeight: 0.45, recommendationWeight: 0.55 };
   }
+}
+
+function enforceHighCutWinnerGuard(
+  vector: RyoPreferenceVector,
+  candidates: RyoRerankedCandidate[],
+): RyoRerankedCandidate[] {
+  if (vector.cut.high <= 0) return candidates;
+  const compatible = candidates.filter((entry) => {
+    const traits = entry.ryoEvaluation.features.traits;
+    return (traits.highCut || traits.midCut)
+      && entry.ryoEvaluation.features.verified
+      && entry.ryoEvaluation.score.recommendationScore >= 55;
+  });
+  if (compatible.length === 0) return candidates;
+
+  const compatibleFloor = Math.max(...compatible.map((entry) => entry.finalRecommendationScore));
+  return candidates.map((entry) => {
+    const traits = entry.ryoEvaluation.features.traits;
+    const lowOnly = traits.lowCut && !traits.highCut && !traits.midCut;
+    if (!lowOnly || entry.finalRecommendationScore < compatibleFloor) return entry;
+    const additionalPenalty = round(entry.finalRecommendationScore - compatibleFloor + 0.1);
+    return {
+      ...entry,
+      explicitPreferencePenalty: round(entry.explicitPreferencePenalty + additionalPenalty),
+      explicitPreferenceReasons: [...new Set([
+        ...entry.explicitPreferenceReasons,
+        "妥当なHigh/Mid候補があるためLow専用モデルを1位から除外",
+      ])],
+      finalRecommendationScore: round(Math.max(0, compatibleFloor - 0.1)),
+    };
+  });
 }
 
 function createAnchorCandidate(definition: AnchorDefinition, budgetYen?: number): CandidateProfile {

@@ -176,6 +176,8 @@ export type RecommendationResult = {
     candidatePoolSize: number;
     selectedSource: CandidateResearchSource;
     selectedRecommendationScore: number;
+    selectedExplicitPreferencePenalty: number;
+    selectedExplicitPreferenceReasons: string[];
   };
 };
 

@@ -2,6 +2,7 @@ import type { SneakerTag } from "../../../src/domain/sneaker/sneakerTag";
 import type { CandidateProfile, DiagnosisAnswer, DiagnosisAnswerValue, RecommendationMode } from "../core-v1/types";
 import { buildRyoOpinion } from "./opinion";
 import { buildRyoCulturalEvaluation } from "./cultural-evaluation";
+import { normalizeRyoSneakerFeatures } from "./features";
 import { RYO_MODE_V4_QUESTIONS } from "./questions";
 import { clampRyoScore, scoreRyoModeCandidate } from "./scoring";
 import { normalizeOfficialSneakerName } from "./names";
@@ -89,7 +90,7 @@ export function buildRyoSneakerFeaturesFromCandidate(candidate: CandidateProfile
 }
 
 export function buildRyoModeCandidateEvaluation(vector: RyoPreferenceVector, candidate: CandidateProfile): RyoModeCandidateEvaluation {
-  const features = buildRyoSneakerFeaturesFromCandidate(candidate);
+  const features = normalizeRyoSneakerFeatures(buildRyoSneakerFeaturesFromCandidate(candidate));
   const displayValidation = validateRyoDisplayName(features);
   const rawScore = scoreRyoModeCandidate(vector, features);
   const culture = buildRyoCulturalEvaluation(features.displayNameOfficial, vector, features);
@@ -155,7 +156,9 @@ function inferSafeCandidateTraits(displayName: string, tags: readonly SneakerTag
   const traits: RyoSneakerFeatures["traits"] = {};
   const set = (condition: boolean, values: Partial<RyoSneakerFeatures["traits"]>) => { if (condition) Object.assign(traits, values); };
   set(tags.includes("canvas"), { canvas: true });
-  set(/black\s*[/ -]\s*white|white\s*[/ -]\s*white/i.test(displayName), { blackWhite: true });
+  set(/(?:black\s*[/ -]\s*white|white\s*[/ -]\s*black)/i.test(displayName), { blackWhite: true, blackBased: true });
+  set(/\bblack\b/i.test(displayName), { blackBased: true });
+  set(/white\s*[/ -]\s*white/i.test(displayName), { whiteWhite: true });
   set(/Nike\s+Air\s+Force\s+1\s+Low/i.test(displayName), { leather: true, oldShape: true, lowCut: true, tiedSilhouetteGood: true });
   set(/Air\s+Jordan\s+1\s+High/i.test(displayName), { leather: true, oldShape: true, highCut: true, tiedSilhouetteGood: true });
   set(/Air\s+Jordan\s+1\s+Low/i.test(displayName), { leather: true, oldShape: true, lowCut: true, tiedSilhouetteGood: true });

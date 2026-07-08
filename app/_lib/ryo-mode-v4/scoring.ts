@@ -248,6 +248,9 @@ function collectRecommendationDeductions(
   const highCutMismatch = vector.cut.high > 0 && t.lowCut && !t.highCut && !t.midCut;
   deduction += recordPenalty(highCutMismatch, Math.round(10 * strengthFactor), "high cut selected but candidate is low-cut", penalties, cautions);
 
+  const blackWhiteMismatch = vector.color.blackWhite > 0 && t.whiteWhite && !t.blackBased;
+  deduction += recordPenalty(blackWhiteMismatch, Math.round(12 * strengthFactor), "Black / White selected but candidate is White / White", penalties, cautions);
+
   const basketballMismatch = vector.sportOrigin.basketball > 0
     && t.sportOrigin !== undefined
     && t.sportOrigin !== "basketball"

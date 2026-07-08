@@ -235,6 +235,14 @@ export async function recommendCoreV1(
   const geminiConfigured = Boolean(env["GEMINI_API_KEY"]);
   const selectedRyoEvaluation = buildRyoModeCandidateEvaluation(ryoPreferenceVector, best.candidate);
   const rerankingWeights = getRerankingWeights(ryoSummary);
+  const selectedExplicitPreferencePenalty = "explicitPreferencePenalty" in best
+    && typeof best.explicitPreferencePenalty === "number"
+    ? best.explicitPreferencePenalty
+    : 0;
+  const selectedExplicitPreferenceReasons = "explicitPreferenceReasons" in best
+    && Array.isArray(best.explicitPreferenceReasons)
+    ? best.explicitPreferenceReasons.filter((reason): reason is string => typeof reason === "string")
+    : [];
 
   return {
     recommendationId: `core-v1:${best.candidate.id}`,
@@ -254,6 +262,8 @@ export async function recommendCoreV1(
       candidatePoolSize: scoredCandidates.length,
       selectedSource: best.candidate.researchSource ?? "fallback_catalog",
       selectedRecommendationScore: selectedRyoEvaluation.score.recommendationScore,
+      selectedExplicitPreferencePenalty,
+      selectedExplicitPreferenceReasons,
     },
     readiness: {
       geminiResearch: createGeminiResearchReadiness(candidateResearch),
