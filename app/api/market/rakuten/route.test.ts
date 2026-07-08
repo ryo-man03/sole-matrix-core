@@ -45,7 +45,7 @@ describe("GET /api/market/rakuten", () => {
 
   it("returns a safe market_find response from a mocked Rakuten request", async () => {
     configureCredentials();
-    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
       items: [{
         itemName: "adidas Tobacco Mesa Gum",
         itemPrice: 14_800,
@@ -54,7 +54,8 @@ describe("GET /api/market/rakuten", () => {
         shopName: "Example Shop",
         availability: 1,
       }],
-    })));
+    }));
+    vi.stubGlobal("fetch", fetcher);
 
     const response = await GET(request(
       "?q=adidas%20Tobacco%20Mesa%20Gum&minPrice=10000&maxPrice=20000&hits=5&page=1&sort=%2BitemPrice",
@@ -77,6 +78,9 @@ describe("GET /api/market/rakuten", () => {
     expect(body["fetchedAt"]).toEqual(expect.any(String));
     expect(serialized).not.toContain("application-id-secret");
     expect(serialized).not.toContain("access-key-secret");
+    const [, init] = fetcher.mock.calls[0] ?? [];
+    const requestHeaders = new Headers(init?.headers);
+    expect(requestHeaders.get("origin")).toBe("https://example.com");
   });
 
   it("does not make market_find safety guarantees or label it as Gemini grounding", async () => {
@@ -115,9 +119,33 @@ describe("GET /api/market/rakuten", () => {
     expect(body).toEqual({
       error: "rakuten_api_error",
       message: "Temporary failure for [redacted] with [redacted].",
+      code: "system_error",
+      upstreamStatus: 500,
     });
     expect(serialized).not.toContain("application-id-secret");
     expect(serialized).not.toContain("access-key-secret");
+  });
+
+  it("returns the safe 2026 gateway error details", async () => {
+    configureCredentials();
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        errors: {
+          errorCode: 403,
+          errorMessage: "HTTP_REFERRER_NOT_ALLOWED",
+        },
+      }, 403),
+    ));
+
+    const response = await GET(request("?q=PRO-Keds%20Royal%20Plus"));
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "rakuten_api_error",
+      message: "HTTP_REFERRER_NOT_ALLOWED",
+      code: "HTTP_REFERRER_NOT_ALLOWED",
+      upstreamStatus: 403,
+    });
   });
 });
 

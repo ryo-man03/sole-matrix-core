@@ -77,8 +77,53 @@ describe("Rakuten market product search", () => {
     expect(requestUrl.searchParams.get("sort")).toBe("standard");
     expect(requestHeaders.get("accept")).toBe("application/json");
     expect(requestHeaders.get("accessKey")).toBe("access-key");
+    expect(requestHeaders.get("origin")).toBeNull();
     expect((init as RequestInit & { next?: { revalidate?: number } }).next?.revalidate)
       .toBe(60 * 30);
+  });
+
+  it("normalizes the live 2026 Rakuten Items response shape", async () => {
+    configureCredentials();
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
+      Items: [{
+        itemName: "CONVERSE JACK PURCELL CL black",
+        itemPrice: 13_200,
+        itemUrl: "https://hb.afl.rakuten.co.jp/hgc/example/",
+        mediumImageUrls: ["https://thumbnail.image.rakuten.co.jp/example.jpg"],
+        shopName: "KICKS LAB. 楽天市場店",
+        availability: 1,
+      }],
+    })));
+
+    const products = await searchRakutenProducts({
+      query: "Converse Jack Purcell CL black",
+    });
+
+    expect(products).toEqual([
+      expect.objectContaining({
+        title: "CONVERSE JACK PURCELL CL black",
+        imageUrl: "https://thumbnail.image.rakuten.co.jp/example.jpg",
+        price: 13_200,
+        shopName: "KICKS LAB. 楽天市場店",
+      }),
+    ]);
+  });
+
+  it("sends an Origin header when a request origin is provided", async () => {
+    configureCredentials();
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
+      items: [],
+    }));
+    vi.stubGlobal("fetch", fetcher);
+
+    await searchRakutenProducts({
+      query: "Converse Jack Purcell",
+      requestOrigin: "https://abc123.ngrok-free.app/search",
+    });
+
+    const [, init] = fetcher.mock.calls[0] ?? [];
+    const requestHeaders = new Headers(init?.headers);
+    expect(requestHeaders.get("origin")).toBe("https://abc123.ngrok-free.app");
   });
 
   it("throws a recognizable error when credentials are missing", async () => {
@@ -165,6 +210,29 @@ describe("Rakuten market product search", () => {
       code: "too_many_requests",
       status: 429,
       message: "Please try again soon.",
+    } satisfies Partial<RakutenApiError>);
+  });
+
+  it("maps the 2026 gateway error shape into a structured API error", async () => {
+    configureCredentials();
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse(
+        {
+          errors: {
+            errorCode: 403,
+            errorMessage: "REQUEST_CONTEXT_BODY_HTTP_REFERRER_MISSING",
+          },
+        },
+        403,
+      ),
+    ));
+
+    const result = searchRakutenProducts({ query: "PUMA Clyde" });
+    await expect(result).rejects.toMatchObject({
+      name: "RakutenApiError",
+      code: "REQUEST_CONTEXT_BODY_HTTP_REFERRER_MISSING",
+      status: 403,
+      message: "REQUEST_CONTEXT_BODY_HTTP_REFERRER_MISSING",
     } satisfies Partial<RakutenApiError>);
   });
 

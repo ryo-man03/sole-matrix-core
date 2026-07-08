@@ -26,7 +26,7 @@ type RakutenItem = {
   itemName?: string;
   itemPrice?: number;
   itemUrl?: string;
-  mediumImageUrls?: { imageUrl: string }[];
+  mediumImageUrls?: Array<{ imageUrl: string } | string>;
   shopName?: string;
   shopCode?: string;
   itemCode?: string;
@@ -43,8 +43,15 @@ type RakutenSearchResponse = {
   hits?: number;
   pageCount?: number;
   items?: RakutenItem[];
+  Items?: RakutenItem[];
   error?: string;
   error_description?: string;
+  errors?: {
+    errorCode?: number | string;
+    errorMessage?: string;
+  };
+  statusCode?: number;
+  message?: string;
 };
 
 export class RakutenCredentialsMissingError extends Error {
@@ -116,14 +123,22 @@ export async function searchRakutenProducts(
     url.searchParams.set("affiliateId", affiliateId);
   }
 
+  const requestOrigin = normalizeHttpOrigin(
+    input.requestOrigin ?? process.env["RAKUTEN_REQUEST_ORIGIN"],
+  );
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    accessKey,
+  };
+  if (requestOrigin) {
+    headers.Origin = requestOrigin;
+  }
+
   let response: Response;
   try {
     response = await fetch(url, {
       method: "GET",
-      headers: {
-        Accept: "application/json",
-        accessKey,
-      },
+      headers,
       next: { revalidate: 60 * 30 },
     });
   } catch {
@@ -145,7 +160,8 @@ export async function searchRakutenProducts(
       response.status,
     );
   }
-  if (!Array.isArray(body.items)) {
+  const responseItems = normalizeRakutenResponseItems(body);
+  if (!responseItems) {
     throw new RakutenApiError(
       "Rakuten API returned an invalid response.",
       "invalid_response",
@@ -154,7 +170,7 @@ export async function searchRakutenProducts(
   }
 
   const fetchedAt = new Date().toISOString();
-  return body.items
+  return responseItems
     .filter(isRecord)
     .map((item) => normalizeRakutenItem(item, query, fetchedAt))
     .filter((item): item is MarketProductCandidate => item !== null);
@@ -176,7 +192,7 @@ export function normalizeRakutenItem(
     return null;
   }
 
-  const imageUrl = normalizeHttpsUrl(item.mediumImageUrls?.[0]?.imageUrl);
+  const imageUrl = normalizeRakutenImageUrl(item.mediumImageUrls?.[0]);
   const price = optionalNonNegativeNumber(item.itemPrice);
   const availability = optionalNonNegativeNumber(item.availability);
   const reviewCount = optionalNonNegativeNumber(item.reviewCount);
@@ -284,7 +300,7 @@ export function calculateRakutenConfidence(
   score += matchRatio * 0.2;
   if (matchRatio === 1 && queryTerms.length > 0) score += 0.05;
   if (normalizeHttpsUrl(item.itemUrl)) score += 0.05;
-  if (normalizeHttpsUrl(item.mediumImageUrls?.[0]?.imageUrl)) score += 0.05;
+  if (normalizeRakutenImageUrl(item.mediumImageUrls?.[0])) score += 0.05;
   if (item.availability === 1) score += 0.05;
   if ((item.reviewCount ?? 0) > 0) score += 0.05;
   if (guessBrand(title)) score += 0.05;
@@ -320,7 +336,10 @@ function safeApiMessage(
   body: RakutenSearchResponse | null,
   fallback: string,
 ): string {
-  const message = body?.error_description;
+  const message =
+    body?.error_description ??
+    body?.errors?.errorMessage ??
+    body?.message;
   if (typeof message !== "string") return fallback;
   let normalized = message.replace(/[\u0000-\u001f\u007f]+/g, " ").trim();
   for (const secret of [
@@ -334,9 +353,32 @@ function safeApiMessage(
 }
 
 function responseErrorCode(body: RakutenSearchResponse | null): string {
-  return typeof body?.error === "string" && body.error.trim()
-    ? body.error.trim().slice(0, 80)
-    : "rakuten_api_error";
+  if (typeof body?.error === "string" && body.error.trim()) {
+    return body.error.trim().slice(0, 80);
+  }
+  if (typeof body?.errors?.errorMessage === "string" && body.errors.errorMessage.trim()) {
+    return body.errors.errorMessage.trim().slice(0, 80);
+  }
+  if (body?.errors?.errorCode !== undefined) {
+    return String(body.errors.errorCode).trim().slice(0, 80);
+  }
+  if (body?.statusCode !== undefined) {
+    return String(body.statusCode).trim().slice(0, 80);
+  }
+  return "rakuten_api_error";
+}
+
+function normalizeRakutenResponseItems(
+  body: RakutenSearchResponse,
+): RakutenItem[] | null {
+  const items: unknown = body.items ?? body.Items;
+  if (!Array.isArray(items)) return null;
+  return items.map((item: unknown) => {
+    if (!isRecord(item)) return item;
+    if (isRecord(item["item"])) return item["item"] as RakutenItem;
+    if (isRecord(item["Item"])) return item["Item"] as RakutenItem;
+    return item;
+  }) as RakutenItem[];
 }
 
 function normalizeListingTitle(value: unknown): string | null {
@@ -358,6 +400,23 @@ function normalizeHttpsUrl(value: unknown): string | undefined {
     return url.protocol === "https:" && !url.username && !url.password
       ? url.toString()
       : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeRakutenImageUrl(value: unknown): string | undefined {
+  if (typeof value === "string") return normalizeHttpsUrl(value);
+  if (isRecord(value)) return normalizeHttpsUrl(value["imageUrl"]);
+  return undefined;
+}
+
+function normalizeHttpOrigin(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length > 512) return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    return url.origin;
   } catch {
     return undefined;
   }
