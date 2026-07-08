@@ -6,7 +6,7 @@ export default defineConfig({
     environment: "node",
     include: [
       "src/**/*.test.ts",
-      "app/_lib/**/*.test.ts",
+      "app/**/*.test.ts",
       "server/**/*.test.ts",
     ],
   }
