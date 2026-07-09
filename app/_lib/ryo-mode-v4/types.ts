@@ -36,6 +36,7 @@ export type RyoParentModelId =
   | "converse_all_star_j"
   | "converse_jack_purcell"
   | "adidas_archive"
+  | "adidas_training_archive"
   | "adidas_superstar_vintage"
   | "puma_suede_clyde"
   | "nike_jordan_heritage"

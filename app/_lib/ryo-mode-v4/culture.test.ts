@@ -7,9 +7,9 @@ import type { CandidateProfile } from "../core-v1/types";
 
 describe("Ryo parent model culture rules", () => {
   it("provides all required parent profiles", () => {
-    expect(getRyoParentModelProfiles()).toHaveLength(11);
+    expect(getRyoParentModelProfiles()).toHaveLength(12);
     expect(getRyoParentModelProfiles().map((item) => item.id)).toEqual(expect.arrayContaining([
-      "converse_one_star", "converse_all_star_j", "converse_jack_purcell", "adidas_archive", "adidas_superstar_vintage",
+      "converse_one_star", "converse_all_star_j", "converse_jack_purcell", "adidas_archive", "adidas_training_archive", "adidas_superstar_vintage",
       "puma_suede_clyde", "nike_jordan_heritage", "nike_retro_running_archive", "vans_skate",
       "new_balance_premium_runner", "reebok_prokeds_lastresort",
     ]));
@@ -47,6 +47,28 @@ describe("Ryo parent model culture rules", () => {
     expect(profile?.cultureSignals).toEqual(expect.arrayContaining(["B-boy", "hip hop", "classic basketball"]));
     expect(profile?.cultureSignals).not.toContain("football terrace");
     expect(profile && buildParentModelExplanation("adidas Superstar Vintage", profile)).toContain("Superstar Vintageはテラス枠ではなく");
+  });
+
+  it("keeps training adidas models out of terrace explanations", () => {
+    for (const name of ["adidas Japan", "adidas Country OG", "adidas BW Army", "adidas SL 72"]) {
+      const profile = findRyoParentModelProfile(name);
+      expect(profile?.id).toBe("adidas_training_archive");
+      expect(profile?.cultureSignals).not.toContain("football terrace");
+      expect(profile && buildParentModelExplanation(name, profile)).not.toMatch(/Samba|Tobacco|City Series/);
+    }
+  });
+
+  it("does not attach classic parent lore to modern or downrank siblings", () => {
+    for (const name of ["New Balance 1906", "New Balance 9060", "New Balance 2002R", "New Balance 2010", "New Balance 990v6", "PUMA Speedcat", "Vans Knu Skool"]) {
+      expect(findRyoParentModelProfile(name)).toBeUndefined();
+    }
+
+    const highTechEvaluation = buildRyoModeCandidateEvaluation(
+      buildRyoPreferenceVector({ style: "street", pantsFit: "wide_pants", techTolerance: "airmax_nb_ok", sportOrigin: "running" }),
+      candidate("New Balance 1906"),
+    );
+    expect(highTechEvaluation.culture.reasons.join(" ")).not.toMatch(/991|998|Made in USA|Made in UK/);
+    expect(highTechEvaluation.culture.cautions.join(" ")).toContain("Ryo classic tasteとは別枠");
   });
 });
 
