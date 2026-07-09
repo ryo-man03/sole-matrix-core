@@ -115,6 +115,29 @@ export type RyoCandidateMetadata = {
   pantsSignals?: string[];
   cautionSignals?: string[];
   verificationStatus: "verified" | "needs_check" | "unverified";
+  recommendationBucket?: RyoRecommendationBucket;
+  ryoSignature?: RyoSignatureMetadata;
+};
+
+export type RyoRecommendationBucket =
+  | "anchor_classic"
+  | "ryo_signature"
+  | "adjacent_discovery"
+  | "practical_buy"
+  | "wildcard";
+
+export type RyoSignatureMetadata = {
+  bucket: RyoRecommendationBucket;
+  obviousnessPenalty: number;
+  ryoTwistBonus: number;
+  adjacentDiscoveryBonus: number;
+  materialStoryBonus: number;
+  colorPersonalityBonus: number;
+  archiveContextBonus: number;
+  ownedDuplicatePenalty: number;
+  totalAdjustment: number;
+  reasons: string[];
+  ownedReferenceMatches: string[];
 };
 
 export type RyoAffinityBreakdown = {

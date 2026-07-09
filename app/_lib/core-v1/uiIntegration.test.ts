@@ -65,6 +65,8 @@ describe("Core v1 UI integration", () => {
     expect(ryoResultSource).toContain("RyoOpinion");
     expect(ryoResultSource).toContain("候補プールを作り");
     expect(ryoResultSource).toContain("data-ryo-affinities");
+    expect(ryoResultSource).toContain("Ryo Signature slot");
+    expect(ryoResultSource).toContain("formatRyoSignatureBucket");
     expect(ryoResultSource).toContain("Ryo親モデル");
     expect(ryoResultSource).toContain("サブジャンル");
   });
