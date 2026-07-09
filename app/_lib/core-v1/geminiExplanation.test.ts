@@ -151,6 +151,57 @@ describe("Core v1 Gemini structured explanation", () => {
     expect(result.source).toBe("gemini");
   });
 
+  it("passes Ryo Signature metadata to Gemini as explanation-only context", async () => {
+    const fetcher = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as {
+        contents: Array<{ parts: Array<{ text: string }> }>;
+      };
+      const prompt = body.contents[0]!.parts[0]!.text;
+      expect(prompt).toContain('"recommendationBucket":"ryo_signature"');
+      expect(prompt).toContain('"ryoTwistBonus":10');
+      expect(prompt).toContain("at least two concrete axes");
+      return jsonResponse({
+        candidates: [{ content: { parts: [{ text: JSON.stringify({
+          summary: "署名レイヤーを踏まえた説明です。",
+          reasons: ["素材と文脈を説明しています。"],
+          cautions: [],
+          balancedView: "Balanced",
+          ryoView: "Ryo",
+          finalTone: "balanced",
+        }) }] } }],
+      });
+    });
+    const result = await generateCoreV1Explanation(
+      {
+        ...input,
+        candidate: {
+          ...input.candidate,
+          ryoMetadata: {
+            verificationStatus: "verified",
+            recommendationBucket: "ryo_signature",
+            ryoSignature: {
+              bucket: "ryo_signature",
+              obviousnessPenalty: 6,
+              ryoTwistBonus: 10,
+              adjacentDiscoveryBonus: 4,
+              materialStoryBonus: 5,
+              colorPersonalityBonus: 0,
+              archiveContextBonus: 4,
+              contextMismatchPenalty: 0,
+              ownedDuplicatePenalty: 0,
+              totalAdjustment: 17,
+              reasons: ["bucket:ryo_signature", "Ryo twist bonus +10"],
+              ownedReferenceMatches: [],
+            },
+          },
+        },
+      },
+      { apiKey: "configured", fetcher },
+    );
+
+    expect(result.source).toBe("gemini");
+  });
+
   it("marks Gemini ready only when the structured provider succeeds", async () => {
     const result = await recommendCoreV1(
       {

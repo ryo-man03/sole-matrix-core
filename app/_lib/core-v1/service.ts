@@ -9,6 +9,8 @@ import {
   mergeRyoModeCandidatePool,
   normalizeCandidateOfficialName,
   rerankRyoModeCandidates,
+  type CoreScoredCandidate,
+  type RyoRerankedCandidate,
 } from "../ryo-mode-v4/candidates";
 import { buildRyoModeCandidateEvaluation } from "../ryo-mode-v4/integration";
 import { buildRyoPreferenceVector, summarizeRyoPreferenceVector } from "../ryo-mode-v4/vector";
@@ -243,6 +245,7 @@ export async function recommendCoreV1(
     && Array.isArray(best.explicitPreferenceReasons)
     ? best.explicitPreferenceReasons.filter((reason): reason is string => typeof reason === "string")
     : [];
+  const selectedRyoSignature = isRyoRerankedCandidate(best) ? best.ryoSignature : undefined;
 
   return {
     recommendationId: `core-v1:${best.candidate.id}`,
@@ -250,7 +253,13 @@ export async function recommendCoreV1(
     ...best,
     candidate: {
       ...best.candidate,
-      ryoMetadata: selectedRyoEvaluation.culture.metadata,
+      ryoMetadata: {
+        ...selectedRyoEvaluation.culture.metadata,
+        ...(selectedRyoSignature ? {
+          recommendationBucket: selectedRyoSignature.bucket,
+          ryoSignature: selectedRyoSignature,
+        } : {}),
+      },
     },
     explanation,
     candidateResearch,
@@ -264,6 +273,10 @@ export async function recommendCoreV1(
       selectedRecommendationScore: selectedRyoEvaluation.score.recommendationScore,
       selectedExplicitPreferencePenalty,
       selectedExplicitPreferenceReasons,
+      ...(selectedRyoSignature ? {
+        selectedBucket: selectedRyoSignature.bucket,
+        selectedRyoSignature,
+      } : {}),
     },
     readiness: {
       geminiResearch: createGeminiResearchReadiness(candidateResearch),
@@ -364,15 +377,55 @@ function addResearchContext(
   explanation: RecommendationExplanation,
   candidate: CandidateProfile,
 ): RecommendationExplanation {
+  const signature = candidate.ryoMetadata?.ryoSignature;
   return {
     ...explanation,
-    reasons: [...new Set([candidate.researchReason, ...explanation.reasons].filter((item): item is string => Boolean(item)))].slice(0, 6),
-    cautions: [...new Set([...(candidate.researchCautions ?? []), ...explanation.cautions])].slice(0, 6),
+    reasons: [...new Set([
+      candidate.researchReason,
+      ...(signature ? buildRyoSignatureContextReasons(signature) : []),
+      ...explanation.reasons,
+    ].filter((item): item is string => Boolean(item)))].slice(0, 6),
+    cautions: [...new Set([
+      ...(candidate.researchCautions ?? []),
+      ...(signature?.ownedReferenceMatches.length ? [`Owned reference overlap: ${signature.ownedReferenceMatches.join(" / ")}`] : []),
+      ...explanation.cautions,
+    ])].slice(0, 6),
   };
+}
+
+function buildRyoSignatureContextReasons(
+  signature: NonNullable<NonNullable<CandidateProfile["ryoMetadata"]>["ryoSignature"]>,
+): string[] {
+  const details = [
+    signature.ryoTwistBonus + signature.archiveContextBonus > 0 ? "復刻・アーカイブ文脈" : null,
+    signature.materialStoryBonus > 0 ? "素材の育ち" : null,
+    signature.adjacentDiscoveryBonus > 0 ? "定番から少し近い別軸" : null,
+    signature.colorPersonalityBonus > 0 ? "履ける範囲の色の面白さ" : null,
+    signature.contextMismatchPenalty > 0 ? "回答とのズレを減点" : null,
+    signature.obviousnessPenalty > 0 ? "分かりやすすぎる定番を抑制" : null,
+  ].filter((item): item is string => Boolean(item));
+  const signedAdjustment = signature.totalAdjustment >= 0 ? `+${signature.totalAdjustment}` : String(signature.totalAdjustment);
+  return [`Ryo Signature補正: ${formatRyoSignatureBucket(signature.bucket)} (${signedAdjustment})。${details.slice(0, 3).join(" / ") || "役割のみ"}。`];
+}
+
+function formatRyoSignatureBucket(
+  bucket: NonNullable<NonNullable<CandidateProfile["ryoMetadata"]>["recommendationBucket"]>,
+): string {
+  switch (bucket) {
+    case "anchor_classic": return "軸になる定番";
+    case "ryo_signature": return "Ryoらしいズラし";
+    case "adjacent_discovery": return "近い系統の発見";
+    case "practical_buy": return "買いやすい候補";
+    case "wildcard": return "攻め候補";
+  }
 }
 
 function hasProductContext(input: RecommendRequestInput): boolean {
   return Boolean(input.sneakerName || input.brand || input.color || input.urlNameHint);
+}
+
+function isRyoRerankedCandidate(entry: CoreScoredCandidate | RyoRerankedCandidate): entry is RyoRerankedCandidate {
+  return "ryoSignature" in entry;
 }
 
 async function loadRakutenCandidatesSafely(

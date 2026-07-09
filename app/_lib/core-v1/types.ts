@@ -6,7 +6,7 @@ import type {
   GeminiResearchStages,
 } from "../ai/gemini-sneaker-research";
 import type { EvidenceUrlType } from "../ai/gemini-sneaker-research-schema";
-import type { RyoCandidateMetadata } from "../ryo-mode-v4/types";
+import type { RyoCandidateMetadata, RyoRecommendationBucket, RyoSignatureMetadata } from "../ryo-mode-v4/types";
 
 export type DiagnosisAnswerValue = "like" | "neutral" | "dislike";
 
@@ -178,6 +178,8 @@ export type RecommendationResult = {
     selectedRecommendationScore: number;
     selectedExplicitPreferencePenalty: number;
     selectedExplicitPreferenceReasons: string[];
+    selectedBucket?: RyoRecommendationBucket;
+    selectedRyoSignature?: RyoSignatureMetadata;
   };
 };
 

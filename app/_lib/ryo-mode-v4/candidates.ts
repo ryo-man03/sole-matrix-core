@@ -6,7 +6,8 @@ import { buildRyoModeCandidateEvaluation } from "./integration";
 import type { RyoModeCandidateEvaluation } from "./integration";
 import { normalizeCandidateOfficialName, normalizeOfficialSneakerName } from "./names";
 export { normalizeCandidateOfficialName, normalizeOfficialSneakerName } from "./names";
-import type { RyoPreferenceSummary, RyoPreferenceVector } from "./types";
+import { applyRyoSignatureLayer } from "./signature-layer";
+import type { RyoPreferenceSummary, RyoPreferenceVector, RyoSignatureMetadata } from "./types";
 import { summarizeRyoPreferenceVector } from "./vector";
 
 type AnchorSignal =
@@ -35,6 +36,7 @@ export type CoreScoredCandidate = {
 
 export type RyoRerankedCandidate = CoreScoredCandidate & {
   ryoEvaluation: RyoModeCandidateEvaluation;
+  ryoSignature: RyoSignatureMetadata;
   finalRecommendationScore: number;
   explicitPreferencePenalty: number;
   explicitPreferenceReasons: string[];
@@ -136,20 +138,36 @@ export function rerankRyoModeCandidates(
 ): RyoRerankedCandidate[] {
   const summary = summarizeRyoPreferenceVector(vector);
   const weights = getRerankingWeights(summary);
-  let ranked = candidates.map((entry) => {
+  let ranked: RyoRerankedCandidate[] = candidates.map((entry): RyoRerankedCandidate => {
     const ryoEvaluation = buildRyoModeCandidateEvaluation(vector, entry.candidate);
     const existingCoreScore = mode === "ryo" ? entry.ryoScore.total : entry.balancedScore.total;
     const guard = evaluateExplicitPreferenceGuards(vector, ryoEvaluation);
+    const ryoSignature = applyRyoSignatureLayer({
+      candidate: entry.candidate,
+      vector,
+      evaluation: ryoEvaluation,
+    });
+    const finalRecommendationScore = round(Math.max(0,
+      existingCoreScore * weights.existingCoreWeight
+        + ryoEvaluation.score.recommendationScore * weights.recommendationWeight
+        + ryoSignature.totalAdjustment
+        - guard.penalty,
+    ));
     return {
       ...entry,
+      candidate: {
+        ...entry.candidate,
+        ryoMetadata: {
+          ...ryoEvaluation.culture.metadata,
+          recommendationBucket: ryoSignature.bucket,
+          ryoSignature,
+        },
+      },
       ryoEvaluation,
+      ryoSignature,
       explicitPreferencePenalty: guard.penalty,
       explicitPreferenceReasons: guard.reasons,
-      finalRecommendationScore: round(Math.max(0,
-        existingCoreScore * weights.existingCoreWeight
-          + ryoEvaluation.score.recommendationScore * weights.recommendationWeight
-          - guard.penalty,
-      )),
+      finalRecommendationScore,
     };
   });
 
@@ -178,6 +196,11 @@ export function evaluateExplicitPreferenceGuards(
     vector.cut.high > 0 && traits.lowCut && !traits.highCut && !traits.midCut,
     28,
     "High指定に対してLow専用モデル",
+  );
+  add(
+    vector.cut.low > 0 && (traits.highCut || traits.midCut) && !traits.lowCut,
+    22,
+    "Low selected but candidate is High/Mid",
   );
   add(
     vector.color.blackWhite > 0 && traits.whiteWhite && !traits.blackBased,
@@ -262,7 +285,7 @@ function createAnchorCandidate(definition: AnchorDefinition, budgetYen?: number)
     modelType: definition.modelType,
     searchKeywords: [definition.name],
     evidenceUrls: [`https://www.google.com/search?q=${encodeURIComponent(definition.name)}`],
-    researchReason: `11問回答に対応するRyo candidate anchor（${definition.signals.join(" / ")}）です。`,
+    researchReason: `Ryo candidate anchorの候補シグナル: ${definition.signals.join(" / ")}。実際の順位は回答との再評価で決めています。`,
     researchCautions: ["価格・在庫・サイズ・購入可能性は販売元で確認してください。"],
     researchSource: "ryo_anchor",
   };

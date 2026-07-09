@@ -262,6 +262,39 @@ describe("Ryo Mode v4 candidate pool and reranking", () => {
     expect(highestScore(ranked, /Vans Authentic|Vans Era|Vans Half Cab/i)).toBeGreaterThanOrEqual(75);
   });
 
+  it("does not leak terrace or Superstar context into premium running suede answers", async () => {
+    const result = await recommendCoreV1({
+      diagnosisAnswers: [{ questionId: "trusted-classic", value: "like" }],
+      preferenceTags: ["classic", "running", "comfortable", "premium"],
+      mode: "ryo",
+      ryoModeAnswers: {
+        style: "normcore",
+        pantsFit: "wide_pants",
+        taste: "muted_color",
+        sportOrigin: "running",
+        cut: "low",
+        wearingStyle: "no_preference",
+        materialAging: "suede_fading_nap",
+        color: "earth_tone",
+        budget: "premium_ok",
+        techTolerance: "airmax_nb_ok",
+        ryoStrength: "balanced",
+      },
+    }, {
+      env: {},
+      rakutenCandidateProvider: async () => ({ status: "missing_config", candidates: [], evidence: [], readiness: { provider: "rakuten", status: "missing_config", detail: "missing" }, networkAttempted: false, responseOk: false, shapeValid: false }),
+    });
+
+    expect(result.candidate.name).toMatch(/New Balance (991|998|990v3|990v4|1500)|Nike Cortez/i);
+    expect(result.candidate.name).not.toMatch(/Superstar|Tobacco|Hamburg|London|Spezial/i);
+    expect(result.candidate.ryoMetadata?.parentModelIds).not.toContain("adidas_archive");
+    expect([
+      ...result.explanation.reasons,
+      ...(result.candidate.ryoMetadata?.cultureSignals ?? []),
+      result.candidate.ryoMetadata?.genre ?? "",
+    ].join(" ")).not.toMatch(/Samba|Tobacco|football terrace|City Series/i);
+  });
+
   it("keeps leather-aging explanations off canvas-primary Vans and All Star J", () => {
     const vector = buildRyoPreferenceVector(highBasketballLeatherAnswers);
     const anchors = createRyoModeCandidateAnchors(vector, 20_000);

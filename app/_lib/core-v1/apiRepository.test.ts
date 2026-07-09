@@ -67,10 +67,24 @@ describe("Core v1 recommend API", () => {
         },
       }),
     );
-    const payload = (await response.json()) as { ok: boolean; data: { ryoReranking: { applied: boolean; strength: string } } };
+    const payload = (await response.json()) as {
+      ok: boolean;
+      data: {
+        candidate: { ryoMetadata?: { recommendationBucket?: string; ryoSignature?: { bucket: string } } };
+        ryoReranking: {
+          applied: boolean;
+          strength: string;
+          selectedBucket?: string;
+          selectedRyoSignature?: { bucket: string; reasons: string[] };
+        };
+      };
+    };
     expect(response.status).toBe(200);
     expect(payload.ok).toBe(true);
     expect(payload.data.ryoReranking).toMatchObject({ applied: true, strength: "strong" });
+    expect(payload.data.ryoReranking.selectedBucket).toMatch(/anchor_classic|ryo_signature|adjacent_discovery|practical_buy|wildcard/);
+    expect(payload.data.ryoReranking.selectedRyoSignature?.bucket).toBe(payload.data.ryoReranking.selectedBucket);
+    expect(payload.data.candidate.ryoMetadata?.recommendationBucket).toBe(payload.data.ryoReranking.selectedBucket);
 
     const invalid = await postRecommendation(
       jsonRequest("http://localhost/api/core-v1/recommend", {
