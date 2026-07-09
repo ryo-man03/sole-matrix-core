@@ -36,6 +36,7 @@ export type RyoParentModelId =
   | "converse_all_star_j"
   | "converse_jack_purcell"
   | "adidas_archive"
+  | "adidas_superstar_vintage"
   | "puma_suede_clyde"
   | "nike_jordan_heritage"
   | "nike_retro_running_archive"
@@ -134,6 +135,7 @@ export type RyoSignatureMetadata = {
   materialStoryBonus: number;
   colorPersonalityBonus: number;
   archiveContextBonus: number;
+  contextMismatchPenalty: number;
   ownedDuplicatePenalty: number;
   totalAdjustment: number;
   reasons: string[];

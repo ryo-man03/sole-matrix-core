@@ -4,6 +4,7 @@ import type { RyoModeCandidateEvaluation } from "./integration";
 import type {
   RyoPreferenceVector,
   RyoRecommendationBucket,
+  RyoSneakerFeatures,
   RyoSignatureMetadata,
 } from "./types";
 
@@ -34,6 +35,7 @@ export function applyRyoSignatureLayer(input: SignatureLayerInput): RyoSignature
   const materialStoryBonus = calculateMaterialStoryBonus(input);
   const colorPersonalityBonus = calculateColorPersonalityBonus(input);
   const archiveContextBonus = calculateArchiveContextBonus(input);
+  const contextMismatchPenalty = calculateContextMismatchPenalty(input);
   const ownedReferenceMatches = findOwnedReferenceMatches(input.candidate.name);
   const ownedDuplicatePenalty = calculateOwnedDuplicatePenalty(input, ownedReferenceMatches);
   const bucket = assignRyoRecommendationBucket({
@@ -44,10 +46,11 @@ export function applyRyoSignatureLayer(input: SignatureLayerInput): RyoSignature
     materialStoryBonus,
     colorPersonalityBonus,
     archiveContextBonus,
+    contextMismatchPenalty,
     ownedDuplicatePenalty,
   });
   const rawAdjustment = ryoTwistBonus + adjacentDiscoveryBonus + materialStoryBonus + colorPersonalityBonus + archiveContextBonus
-    - obviousnessPenalty - ownedDuplicatePenalty;
+    - obviousnessPenalty - contextMismatchPenalty - ownedDuplicatePenalty;
   const simpleBeginnerCap = isSimpleBeginnerContext(input.vector)
     ? bucket === "practical_buy" || isPlainObviousClassic(normalizeName(input.candidate.name)) ? 10 : 4
     : 24;
@@ -67,6 +70,7 @@ export function applyRyoSignatureLayer(input: SignatureLayerInput): RyoSignature
     materialStoryBonus,
     colorPersonalityBonus,
     archiveContextBonus,
+    contextMismatchPenalty,
     ownedDuplicatePenalty,
     totalAdjustment,
     reasons: buildSignatureReasons({
@@ -77,6 +81,7 @@ export function applyRyoSignatureLayer(input: SignatureLayerInput): RyoSignature
       materialStoryBonus,
       colorPersonalityBonus,
       archiveContextBonus,
+      contextMismatchPenalty,
       ownedDuplicatePenalty,
       ownedReferenceMatches,
     }),
@@ -127,12 +132,25 @@ export function calculateAdjacentDiscoveryBonus(input: SignatureLayerInput): num
   const name = normalizeName(input.candidate.name);
   const vector = input.vector;
   let bonus = 0;
+  const terraceContext =
+    vector.sportOrigin.football > 0
+      || vector.pantsFit.straightPants > 0
+      || vector.pantsFit.slimPants > 0
+      || vector.style.cleanCasual > 0
+      || vector.color.creamGum > 0
+      || (vector.style.amekaji > 0 && vector.pantsFit.denim > 0);
 
   if (
-    /adidas (tobacco|hamburg|london|handball spezial|spezial|bern|galapagos|japan|superstar vintage|country og)/.test(name)
-    && (hasStorySeekingContext(vector) || vector.sportOrigin.football > 0 || vector.materialAging.suedeFadingNap > 0 || vector.color.creamGum > 0)
+    /adidas (tobacco|hamburg|london|handball spezial|spezial|bern|galapagos|japan|country og)/.test(name)
+    && terraceContext
   ) {
     bonus += 8;
+  }
+  if (
+    /adidas superstar vintage/.test(name)
+    && (vector.sportOrigin.basketball > 0 || vector.materialAging.leatherSinking > 0 || vector.materialAging.leatherCreasing > 0 || vector.style.amekaji > 0)
+  ) {
+    bonus += 5;
   }
   if (
     /converse (pro leather|star bars|star and bars|jack purcell 1935|jack purcell leather|all star j vtg|all star aged|addict|one star loafer)/.test(name)
@@ -181,6 +199,7 @@ export function assignRyoRecommendationBucket(input: SignatureLayerInput & {
   materialStoryBonus: number;
   colorPersonalityBonus: number;
   archiveContextBonus: number;
+  contextMismatchPenalty: number;
   ownedDuplicatePenalty: number;
 }): RyoRecommendationBucket {
   const candidate = input.candidate;
@@ -238,6 +257,36 @@ function calculateArchiveContextBonus(input: SignatureLayerInput): number {
   return round(clamp(isSimpleBeginnerContext(input.vector) ? Math.min(bonus, 4) : bonus, 0, 12));
 }
 
+function calculateContextMismatchPenalty(input: SignatureLayerInput): number {
+  const traits = input.evaluation.features.traits;
+  const vector = input.vector;
+  let penalty = 0;
+
+  const selectedSport = getSelectedSportOrigin(vector);
+  if (selectedSport && traits.sportOrigin && traits.sportOrigin !== selectedSport) penalty += 10;
+
+  const wantsLeather = vector.materialAging.leatherSinking > 0 || vector.materialAging.leatherCreasing > 0;
+  if (wantsLeather && !traits.leather) penalty += 5;
+  if (vector.materialAging.suedeFadingNap > 0 && !traits.suede) penalty += 6;
+  if (vector.materialAging.canvasFading > 0 && !traits.canvas) penalty += 5;
+
+  const name = normalizeName(input.candidate.name);
+  if (vector.color.earthTone > 0 && !hasWearableOddColor(name) && !/brown|navy|olive|indigo|burgundy|gum|cream|sail/.test(name)) {
+    penalty += 3;
+  }
+
+  return round(clamp(penalty, 0, 18));
+}
+
+function getSelectedSportOrigin(vector: RyoPreferenceVector): RyoSneakerFeatures["traits"]["sportOrigin"] | undefined {
+  if (vector.sportOrigin.basketball > 0) return "basketball";
+  if (vector.sportOrigin.tennis > 0) return "tennis";
+  if (vector.sportOrigin.football > 0) return "football";
+  if (vector.sportOrigin.skate > 0) return "skate";
+  if (vector.sportOrigin.running > 0) return "running";
+  return undefined;
+}
+
 function findOwnedReferenceMatches(candidateName: string): string[] {
   const candidate = normalizeName(candidateName);
   const candidateColors = extractColorTokens(candidateName);
@@ -265,6 +314,7 @@ function buildSignatureReasons(input: {
   materialStoryBonus: number;
   colorPersonalityBonus: number;
   archiveContextBonus: number;
+  contextMismatchPenalty: number;
   ownedDuplicatePenalty: number;
   ownedReferenceMatches: string[];
 }): string[] {
@@ -274,6 +324,7 @@ function buildSignatureReasons(input: {
   if (input.materialStoryBonus > 0) reasons.push(`material story bonus +${input.materialStoryBonus}`);
   if (input.colorPersonalityBonus > 0) reasons.push(`color personality bonus +${input.colorPersonalityBonus}`);
   if (input.archiveContextBonus > 0) reasons.push(`archive context bonus +${input.archiveContextBonus}`);
+  if (input.contextMismatchPenalty > 0) reasons.push(`context mismatch penalty -${input.contextMismatchPenalty}`);
   if (input.obviousnessPenalty > 0) reasons.push(`obvious safe-classic penalty -${input.obviousnessPenalty}`);
   if (input.ownedDuplicatePenalty > 0) reasons.push(`owned reference penalty -${input.ownedDuplicatePenalty}`);
   if (input.ownedReferenceMatches.length > 0) reasons.push(`owned reference: ${input.ownedReferenceMatches.join(" / ")}`);

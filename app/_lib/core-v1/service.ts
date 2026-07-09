@@ -397,14 +397,27 @@ function buildRyoSignatureContextReasons(
   signature: NonNullable<NonNullable<CandidateProfile["ryoMetadata"]>["ryoSignature"]>,
 ): string[] {
   const details = [
-    signature.ryoTwistBonus + signature.archiveContextBonus > 0 ? "archive or vintage context" : null,
-    signature.materialStoryBonus > 0 ? "material aging" : null,
-    signature.adjacentDiscoveryBonus > 0 ? "adjacent discovery" : null,
-    signature.colorPersonalityBonus > 0 ? "wearable color twist" : null,
-    signature.obviousnessPenalty > 0 ? "obvious classic downweight" : null,
+    signature.ryoTwistBonus + signature.archiveContextBonus > 0 ? "復刻・アーカイブ文脈" : null,
+    signature.materialStoryBonus > 0 ? "素材の育ち" : null,
+    signature.adjacentDiscoveryBonus > 0 ? "定番から少し近い別軸" : null,
+    signature.colorPersonalityBonus > 0 ? "履ける範囲の色の面白さ" : null,
+    signature.contextMismatchPenalty > 0 ? "回答とのズレを減点" : null,
+    signature.obviousnessPenalty > 0 ? "分かりやすすぎる定番を抑制" : null,
   ].filter((item): item is string => Boolean(item));
   const signedAdjustment = signature.totalAdjustment >= 0 ? `+${signature.totalAdjustment}` : String(signature.totalAdjustment);
-  return [`Ryo Signature Layer: ${signature.bucket} (${signedAdjustment}). ${details.slice(0, 3).join(" / ") || "role metadata"}.`];
+  return [`Ryo Signature補正: ${formatRyoSignatureBucket(signature.bucket)} (${signedAdjustment})。${details.slice(0, 3).join(" / ") || "役割のみ"}。`];
+}
+
+function formatRyoSignatureBucket(
+  bucket: NonNullable<NonNullable<CandidateProfile["ryoMetadata"]>["recommendationBucket"]>,
+): string {
+  switch (bucket) {
+    case "anchor_classic": return "軸になる定番";
+    case "ryo_signature": return "Ryoらしいズラし";
+    case "adjacent_discovery": return "近い系統の発見";
+    case "practical_buy": return "買いやすい候補";
+    case "wildcard": return "攻め候補";
+  }
 }
 
 function hasProductContext(input: RecommendRequestInput): boolean {

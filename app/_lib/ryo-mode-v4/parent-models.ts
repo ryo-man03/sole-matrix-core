@@ -20,11 +20,17 @@ const profiles: RyoParentModelProfile[] = [
     ["normcore", "clean casual", "amekaji"], ["leather creasing", "canvas fading"], ["straight pants", "denim", "chino", "clean slacks"],
     ["スマイルとヒゲを持つ静かな定番で、CLは買いやすさ、1935は思想、Leatherは大人の育て枠です"], []),
   profile("adidas_archive", "adidas Archive / Terrace / City Series", "S",
-    ["adidas Tobacco", "adidas London", "adidas Hamburg", "adidas Spezial", "adidas Country OG", "adidas Japan", "adidas Gazelle Indoor", "adidas BW Army", "adidas Superstar Vintage"],
-    ["Tobacco", "London", "Hamburg", "Spezial", "Country OG", "Japan", "BW Army", "Superstar Vintage Made in Germany"], ["Samba OG", "Gazelle Indoor"], ["Samba"],
+    ["adidas Tobacco", "adidas London", "adidas Hamburg", "adidas Spezial", "adidas Country OG", "adidas Japan", "adidas Gazelle Indoor", "adidas BW Army"],
+    ["Tobacco", "London", "Hamburg", "Spezial", "Country OG", "Japan", "BW Army"], ["Samba OG", "Gazelle Indoor"], ["Samba"],
     ["terrace", "city series", "archive training"], ["UK casual", "football terrace"], ["britpop", "soul"],
     ["clean casual", "amekaji"], ["suede fading", "leather creasing"], ["slim pants", "straight pants", "denim"],
     ["Samba一択にせずTobacco、London、Hamburg、Spezial、Country、Japanまでアーカイブを広げます"], ["Sambaは良い靴ですが流行だけを理由に上位固定しません"]),
+  profile("adidas_superstar_vintage", "adidas Superstar Vintage / Shell Toe", "S",
+    ["adidas Superstar Vintage", "adidas Superstar Made in Germany", "adidas Superstar GTX"],
+    ["Superstar Vintage", "Superstar Made in Germany", "Superstar GTX"], ["adidas Superstar"], [],
+    ["basketball heritage", "shell toe"], ["B-boy", "hip hop", "classic basketball"], ["hip hop", "funk"],
+    ["amekaji", "street", "clean casual"], ["leather creasing"], ["wide pants", "denim", "straight pants"],
+    ["シェルトゥとバスケットボール由来、B-boy文脈、レザーの履きジワを評価するSuperstar固有のアーカイブ枠です"], []),
   profile("puma_suede_clyde", "PUMA Suede / Clyde / Brasil", "S",
     ["PUMA Suede", "PUMA Clyde", "PUMA Brasil"], ["Suede VTG", "Suede MIJ", "Clyde MIJ", "Brasil"], [], ["Speedcat"],
     ["basketball", "track and field"], ["B-boy", "NBA", "hip hop"], ["hip hop", "funk"],
@@ -70,7 +76,8 @@ export function findRyoParentModelProfile(candidateName: string): RyoParentModel
   const id = name.includes("one star") ? "converse_one_star"
     : /all star|chuck taylor|converse addict/.test(name) ? "converse_all_star_j"
       : name.includes("jack purcell") ? "converse_jack_purcell"
-        : name.startsWith("adidas ") ? "adidas_archive"
+        : /^adidas superstar/.test(name) ? "adidas_superstar_vintage"
+          : name.startsWith("adidas ") ? "adidas_archive"
           : /^puma (suede|clyde|brasil|speedcat)/.test(name) ? "puma_suede_clyde"
             : /^nike (cortez|ld 1000|astro grabber|moon shoe|waffle trainer|daybreak|field general)/.test(name) ? "nike_retro_running_archive"
               : /air jordan 1|nike (blazer|terminator|dunk|air force 1)|converse (weapon|pro leather)/.test(name) ? "nike_jordan_heritage"
@@ -104,6 +111,7 @@ export function buildParentModelExplanation(candidate: string | { name: string }
   }
   if (profile.id === "converse_one_star") return "一つ星のシンプルさ、スエードの毛並み変化、デニムや古着との相性、skate・grungeの70s文脈を評価します。";
   if (profile.id === "converse_jack_purcell") return /1935/i.test(name) ? "1935は思想枠。スマイルとヒゲを持つ静かな上品さを評価します。" : /leather/i.test(name) ? "Leatherは大人の育て枠。革の沈みとシワを評価します。" : "CLは買いやすい現行本命。スマイルとヒゲの静かな上品さを評価します。";
+  if (profile.id === "adidas_superstar_vintage") return "Superstar Vintageはテラス枠ではなく、シェルトゥとバスケットボール由来、B-boy文脈、レザーの履きジワを評価します。";
   return profile.ryoReasons[0] ?? `${profile.label}の文化的背景を評価します。`;
 }
 
@@ -114,6 +122,7 @@ function contextBonus(id: RyoParentModelProfile["id"], name: string, v: RyoPrefe
     case "converse_all_star_j": return points(v.style.amekaji, v.pantsFit.denim, v.materialAging.canvasFading, v.cut.high) + (/\b(j|vtg|timeline|addict)\b/.test(n) ? 9 : -8);
     case "converse_jack_purcell": return points(v.style.normcore, v.style.cleanCasual, v.pantsFit.straightPants, v.materialAging.leatherSinking);
     case "adidas_archive": return points(v.style.cleanCasual, v.pantsFit.slimPants, v.pantsFit.straightPants, v.sportOrigin.football) + (/samba/.test(n) ? -8 : 4);
+    case "adidas_superstar_vintage": return points(v.style.amekaji, v.style.street, v.sportOrigin.basketball, v.materialAging.leatherSinking, v.materialAging.leatherCreasing) + (v.sportOrigin.running > 0 || v.materialAging.suedeFadingNap > 0 ? -12 : 0);
     case "puma_suede_clyde": return points(v.style.amekaji, v.style.street, v.pantsFit.denim, v.pantsFit.workPants, v.materialAging.suedeFadingNap) + (/speedcat/.test(n) ? -18 : 0);
     case "nike_jordan_heritage": return points(v.style.amekaji, v.style.street, v.sportOrigin.basketball, v.materialAging.leatherCreasing) + (/air force 1/.test(n) && v.style.amekaji > 0 ? -12 : 0);
     case "nike_retro_running_archive": return points(v.style.amekaji, v.style.cleanCasual, v.pantsFit.denim, v.pantsFit.slimPants, v.techTolerance.avoidTech);

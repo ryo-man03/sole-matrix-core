@@ -285,7 +285,7 @@ function createAnchorCandidate(definition: AnchorDefinition, budgetYen?: number)
     modelType: definition.modelType,
     searchKeywords: [definition.name],
     evidenceUrls: [`https://www.google.com/search?q=${encodeURIComponent(definition.name)}`],
-    researchReason: `11問回答に対応するRyo candidate anchor（${definition.signals.join(" / ")}）です。`,
+    researchReason: `Ryo candidate anchorの候補シグナル: ${definition.signals.join(" / ")}。実際の順位は回答との再評価で決めています。`,
     researchCautions: ["価格・在庫・サイズ・購入可能性は販売元で確認してください。"],
     researchSource: "ryo_anchor",
   };

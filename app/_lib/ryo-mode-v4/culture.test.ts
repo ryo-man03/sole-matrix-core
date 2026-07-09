@@ -7,9 +7,9 @@ import type { CandidateProfile } from "../core-v1/types";
 
 describe("Ryo parent model culture rules", () => {
   it("provides all required parent profiles", () => {
-    expect(getRyoParentModelProfiles()).toHaveLength(10);
+    expect(getRyoParentModelProfiles()).toHaveLength(11);
     expect(getRyoParentModelProfiles().map((item) => item.id)).toEqual(expect.arrayContaining([
-      "converse_one_star", "converse_all_star_j", "converse_jack_purcell", "adidas_archive",
+      "converse_one_star", "converse_all_star_j", "converse_jack_purcell", "adidas_archive", "adidas_superstar_vintage",
       "puma_suede_clyde", "nike_jordan_heritage", "nike_retro_running_archive", "vans_skate",
       "new_balance_premium_runner", "reebok_prokeds_lastresort",
     ]));
@@ -39,6 +39,14 @@ describe("Ryo parent model culture rules", () => {
     const premium = buildRyoPreferenceVector({ budget: "premium_ok", sportOrigin: "running", ryoStrength: "ryo_mode" });
     expect(scoreRyoParentModelAffinity("New Balance 991", premium)).toBeGreaterThan(scoreRyoParentModelAffinity("New Balance 9060", premium));
     expect(scoreRyoParentModelAffinity("New Balance 990v4", premium)).toBeGreaterThan(scoreRyoParentModelAffinity("New Balance 990v6", premium));
+  });
+
+  it("keeps Superstar Vintage out of terrace and Samba explanations", () => {
+    const profile = findRyoParentModelProfile("adidas Superstar Vintage");
+    expect(profile?.id).toBe("adidas_superstar_vintage");
+    expect(profile?.cultureSignals).toEqual(expect.arrayContaining(["B-boy", "hip hop", "classic basketball"]));
+    expect(profile?.cultureSignals).not.toContain("football terrace");
+    expect(profile && buildParentModelExplanation("adidas Superstar Vintage", profile)).toContain("Superstar Vintageはテラス枠ではなく");
   });
 });
 

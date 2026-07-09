@@ -35,7 +35,7 @@ export function createRuleBasedExplanation(input: ExplanationInput): Recommendat
 }
 
 function buildRyoSignatureExplanationReasons(signature: RyoSignatureMetadata): string[] {
-  const reasons = [`Ryo Signature bucket: ${signature.bucket}.`];
+  const reasons = [`Ryo Signature枠は「${formatRyoSignatureBucket(signature.bucket)}」です。`];
   if (signature.ryoTwistBonus + signature.archiveContextBonus > 0) {
     reasons.push("アーカイブ、復刻、日本製、兄弟モデルなどの文脈があり、ただの定番より個人の好みに寄っています。");
   }
@@ -51,7 +51,20 @@ function buildRyoSignatureExplanationReasons(signature: RyoSignatureMetadata): s
   if (signature.obviousnessPenalty > 0) {
     reasons.push("分かりやすい定番が知名度だけで勝ちすぎないように調整しています。");
   }
+  if (signature.contextMismatchPenalty > 0) {
+    reasons.push("回答で選ばれた競技・素材・色とのズレは減点しています。");
+  }
   return reasons.slice(0, 4);
+}
+
+function formatRyoSignatureBucket(bucket: RyoSignatureMetadata["bucket"]): string {
+  switch (bucket) {
+    case "anchor_classic": return "軸になる定番";
+    case "ryo_signature": return "Ryoらしいズラし";
+    case "adjacent_discovery": return "近い系統の発見";
+    case "practical_buy": return "買いやすい候補";
+    case "wildcard": return "攻め候補";
+  }
 }
 
 function toneForDecision(decision: Decision): RecommendationExplanation["finalTone"] {

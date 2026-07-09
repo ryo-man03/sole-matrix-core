@@ -187,6 +187,7 @@ describe("Core v1 Gemini structured explanation", () => {
               materialStoryBonus: 5,
               colorPersonalityBonus: 0,
               archiveContextBonus: 4,
+              contextMismatchPenalty: 0,
               ownedDuplicatePenalty: 0,
               totalAdjustment: 17,
               reasons: ["bucket:ryo_signature", "Ryo twist bonus +10"],
