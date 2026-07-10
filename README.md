@@ -70,6 +70,8 @@ SOLE//MATRIX は、AI におすすめを丸投げするためのアプリでは�
 
 Ryo Mode v4 は、古い型、復刻、素材の育ち方、パンツ相性、文化背景を重視する推薦補助レイヤーです。
 
+Ryo Signature Layer は、既存の候補評価の後段で Ryo Mode の再ランキングを補正します。定番モデルを禁止するのではなく、アメカジ、素材の経年変化、復刻や文化背景を強く求める回答では、Tobacco、Terminator、Converse J / VTG 系、New Balance 998 のような文脈のある隣接候補が上がりやすくなる一方、初心者・シンプル・実用重視の回答では安全牌の推薦を残します。
+
 - `parent model`
   Converse One Star、All Star J / VTG、Jack Purcell、PUMA Suede / Clyde、Vans、New Balance 991 / 998 / 1500 などの親モデル軸を持つ
 - `style template`
@@ -183,7 +185,7 @@ Supabase など、ほかの任意設定は [`.env.local.example`](.env.local.exa
 2026-07-09 時点で、以下をローカルで確認しました。
 
 - TypeScript: passed
-- Tests: 69 files / 502 tests passed
+- Tests: 70 files / 513 tests passed
 - Production build: passed
 - Browser check: passed（`localhost:3000` の guest flow、11問診断、High 条件に合う Ryo Mode v4 結果、Rakuten `market_find` の実商品カード、推薦結果の維持を確認）
 
