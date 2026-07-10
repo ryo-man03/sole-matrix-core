@@ -23,6 +23,7 @@ import type { UserMemorySummary } from "../_lib/user-memory/types";
 import { ExternalEvidencePanel } from "./ExternalEvidencePanel";
 import { createLatestRequestGate, resolveRecommendationProductName } from "./productLinkResolution";
 import { RyoModeResultPanel } from "./RyoModeResultPanel";
+import { RakutenMarketFind } from "./RakutenMarketFind";
 
 const workspaceModes = [
   { id: "ryo", label: "Ryo Mode", description: "文化的背景とコレクションとの関係を深く見る" },
@@ -56,6 +57,7 @@ export function RecommendationWorkspace({
   const [productUrl, setProductUrl] = useState("");
   const [budgetText, setBudgetText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [answers, setAnswers] = useState<PreferenceDiagnosisAnswers>(() => diagnosisAnswers ?? {});
   const [result, setResult] = useState<IntegratedRecommendationResult | null>(null);
   const [currentUser, setCurrentUser] = useState<UserMemorySummary | null>(null);
@@ -70,7 +72,9 @@ export function RecommendationWorkspace({
   const [isSavingFeedback, setIsSavingFeedback] = useState(false);
   const [feedbackSaved, setFeedbackSaved] = useState(false);
   const [workspaceStatus, setWorkspaceStatus] = useState("商品名・URL・画像のいずれかを入力してください。予算は任意です。");
+  const [analysisStage, setAnalysisStage] = useState<"idle" | "analyzing" | "recommending" | "complete" | "error">("idle");
   const requestGateRef = useRef(createLatestRequestGate());
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const selectedMode = workspaceModes.find((item) => item.id === mode)!;
   const ryoPreferenceVector = useMemo(() => buildRyoPreferenceVector(answers), [answers]);
@@ -84,6 +88,12 @@ export function RecommendationWorkspace({
     if (onboardingHint?.preferredBudgetYen) setBudgetText((current) => current || String(onboardingHint.preferredBudgetYen));
   }, [onboardingHint]);
   useEffect(() => () => requestGateRef.current.invalidate(), []);
+  useEffect(() => {
+    if (!imageFile) { setImagePreviewUrl(""); return; }
+    const url = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
   useEffect(() => {
     if (authState.status !== "user") { setCurrentUser(null); return; }
     let active = true;
@@ -102,22 +112,24 @@ export function RecommendationWorkspace({
   async function handleRecommend() {
     if (requireSessionSelection && (authState.status === "loading" || authState.status === "signed_out")) {
       setWorkspaceStatus("ログインまたはゲストモードを選んでください。");
+      setAnalysisStage("error");
       return;
     }
     if (!sneakerName.trim() && !productUrl.trim() && !imageFile) {
       setWorkspaceStatus("商品名・URL・画像のいずれかを入力してください。");
+      setAnalysisStage("error");
       return;
     }
     const budgetYen = budgetText.trim() ? Number(budgetText) : undefined;
     if (budgetYen !== undefined && (!Number.isInteger(budgetYen) || budgetYen <= 0)) {
       setWorkspaceStatus("予算は1円以上の整数で入力してください。");
+      setAnalysisStage("error");
       return;
     }
 
     setIsAnalyzing(true);
-    setResult(null);
-    setProductLinks([]);
     setFeedbackSaved(false);
+    setAnalysisStage("analyzing");
     requestGateRef.current.invalidate();
     setWorkspaceStatus("商品情報を安全に分析しています…");
     try {
@@ -127,9 +139,10 @@ export function RecommendationWorkspace({
         ...(productUrl.trim() ? { url: productUrl.trim() } : {}),
         ...(imageFile ? { image: imageFile } : {}),
       });
-      if (!analysisResponse.ok) { setWorkspaceStatus(analysisResponse.error.message); return; }
+      if (!analysisResponse.ok) { setWorkspaceStatus(analysisResponse.error.message); setAnalysisStage("error"); return; }
 
       setWorkspaceStatus("CoreでスコアとDecisionを計算しています…");
+      setAnalysisStage("recommending");
       const recommendationResponse = await searchRecommendations({
         diagnosisAnswers: ryoContext.diagnosisAnswers,
         preferenceTags: [...new Set([...ryoContext.preferenceTags, ...(onboardingHint?.preferenceTags ?? [])])].slice(0, 5),
@@ -139,11 +152,13 @@ export function RecommendationWorkspace({
         ...(currentUser ? { userId: currentUser.profile.userId } : {}),
         analysis: analysisResponse.data,
       });
-      if (!recommendationResponse.ok) { setWorkspaceStatus(recommendationResponse.error.message); return; }
+      if (!recommendationResponse.ok) { setWorkspaceStatus(recommendationResponse.error.message); setAnalysisStage("error"); return; }
 
+      setProductLinks([]);
       setResult(recommendationResponse.data);
       void loadProductLinks(recommendationResponse.data);
       setWorkspaceStatus(`${selectedMode.label}の判断が完了しました。最終DecisionはTypeScript Coreが決定しています。`);
+      setAnalysisStage("complete");
       if (currentUser) {
         const profile = await getUserProfile(currentUser.profile.userId);
         if (profile.ok) setCurrentUser(profile.data);
@@ -200,10 +215,37 @@ export function RecommendationWorkspace({
   async function handleUseDemoImage() {
     try {
       setImageFile(await createDemoSneakerFile());
+      if (imageInputRef.current) imageInputRef.current.value = "";
       setWorkspaceStatus("デモ画像を設定しました。画像判断を何回でも試せます。");
     } catch {
       setWorkspaceStatus("デモ画像を作成できませんでした。");
     }
+  }
+
+  function handleImageChange(file: File | null) {
+    if (!file) { setImageFile(null); return; }
+    if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(file.type)) {
+      setWorkspaceStatus("JPEG・PNG・WebP形式の画像を選んでください。");
+      setAnalysisStage("error");
+      if (imageInputRef.current) imageInputRef.current.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setWorkspaceStatus("画像は5MB以下にしてください。");
+      setAnalysisStage("error");
+      if (imageInputRef.current) imageInputRef.current.value = "";
+      return;
+    }
+    setImageFile(file);
+    setAnalysisStage("idle");
+    setWorkspaceStatus("画像を選択しました。商品名やURLを追加すると候補を絞りやすくなります。");
+  }
+
+  function removeImage() {
+    setImageFile(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+    setWorkspaceStatus("画像を取り除きました。");
+    setAnalysisStage("idle");
   }
 
   async function handleSaveFeedback() {
@@ -262,6 +304,12 @@ export function RecommendationWorkspace({
         </div>
       </div>
       <p className="workspace-status" aria-live="polite">{workspaceStatus}</p>
+      <ol className="workspace-progress" aria-label="購入判断の処理状況" data-stage={analysisStage}>
+        <li data-state={analysisStage === "idle" || analysisStage === "error" ? "current" : "complete"}><span>01</span>入力を確認</li>
+        <li data-state={analysisStage === "analyzing" ? "current" : analysisStage === "recommending" || analysisStage === "complete" ? "complete" : "pending"}><span>02</span>候補を比較</li>
+        <li data-state={analysisStage === "recommending" ? "current" : analysisStage === "complete" ? "complete" : "pending"}><span>03</span>Coreで判断</li>
+        <li data-state={analysisStage === "complete" ? "complete" : "pending"}><span>04</span>結果と次の行動</li>
+      </ol>
 
       <nav className="mobile-workspace-steps" aria-label="商品判断ステップ"><a href="#mobile-step-1"><span>1</span>入力</a><a href="#mobile-step-2"><span>2</span>画像 / URL</a><a href="#mobile-step-3"><span>3</span>判断結果</a><a href="#mobile-step-4"><span>4</span>証拠 / リンク</a><a href="#mobile-step-5"><span>5</span>保存 / 評価</a></nav>
 
@@ -271,7 +319,7 @@ export function RecommendationWorkspace({
           <div className="workspace-fields workspace-basic-fields">
             <label><span>スニーカー名</span><input onChange={(event) => setSneakerName(event.target.value)} placeholder="例: adidas SAMBA OG" value={sneakerName} /></label>
             <label><span>予算（円・任意）</span><input inputMode="numeric" min="1" onChange={(event) => setBudgetText(event.target.value)} placeholder="例: 20000" type="number" value={budgetText} /></label>
-            <div data-mobile-step="2" id="mobile-step-2"><label><span>商品URL</span><input inputMode="url" onChange={(event) => setProductUrl(event.target.value)} placeholder="https://example.com/item" type="url" value={productUrl} /><small>URLは外部参考情報として扱い、Core scoreには混ぜません。</small></label><div className="workspace-image-field"><label><span>画像</span><input accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} type="file" /><small>{imageFile ? `${imageFile.name} / ${formatFileSize(imageFile.size)}` : "JPEG / PNG / WebP・5MBまで"}</small></label><button onClick={handleUseDemoImage} type="button">デモ画像を使う</button></div></div>
+            <div data-mobile-step="2" id="mobile-step-2"><label><span>商品URL</span><input inputMode="url" onChange={(event) => setProductUrl(event.target.value)} placeholder="https://example.com/item" type="url" value={productUrl} /><small>URLは外部参考情報として扱い、Core scoreには混ぜません。</small></label><div className="workspace-image-field"><label><span>画像</span><input accept="image/jpeg,image/png,image/webp" onChange={(event) => handleImageChange(event.target.files?.[0] ?? null)} ref={imageInputRef} type="file" /><small>{imageFile ? `${imageFile.name} / ${formatFileSize(imageFile.size)}` : "JPEG / PNG / WebP・5MBまで"}</small></label><div className="workspace-image-actions"><button onClick={handleUseDemoImage} type="button">デモ画像を使う</button>{imageFile ? <button onClick={removeImage} type="button">画像を取り除く</button> : null}</div>{imagePreviewUrl ? <img alt="選択したスニーカー画像のプレビュー" className="workspace-image-preview" src={imagePreviewUrl} /> : null}</div></div>
           </div>
           <p className="workspace-preference-context">{diagnosisAnswers ? "このセッションの11問診断結果を好みの参考に使います。" : "11問診断結果がないため、Ryo Mode v4は未指定の軸を中立として扱います。"}</p>
           <button className="workspace-primary-button" disabled={isAnalyzing || (requireSessionSelection && (authState.status === "loading" || authState.status === "signed_out"))} onClick={handleRecommend} type="button">{isAnalyzing ? "分析・推薦中…" : "分析して購入判断を実行する"}</button>
@@ -282,9 +330,9 @@ export function RecommendationWorkspace({
           <div className="workspace-decision-placeholder" data-decision={result?.modeRecommendation.decision ?? "pending"}><span>Decision</span><strong>{result ? decisionLabels[result.modeRecommendation.decision] : isAnalyzing ? "分析中…" : "入力待ち"}</strong><p>{result ? result.explanation.summary : "最終DecisionはAIではなくTypeScript Coreが決定します。"}</p></div>
           {result ? <div className="workspace-candidate-summary"><span>{result.candidate.researchSource === "product_input" ? "入力商品" : result.candidate.researchSource === "gemini" ? "Gemini調査候補 / Core再評価済み" : result.candidate.researchSource === "ryo_anchor" ? "Ryo candidate anchor / Core再ランキング済み" : "fallback catalog"}</span><h4>{result.candidate.name}</h4>{result.candidate.modelType ? <small>タイプ: {result.candidate.modelType}</small> : null}<p>{result.candidate.description}</p></div> : null}
           <div className="workspace-score-preview"><div><span>Balanced Score</span><strong>{result ? result.modeRecommendation.balancedScore : "--"}</strong></div><div><span>Ryo Score</span><strong>{result ? result.modeRecommendation.ryoScore : "--"}</strong></div></div>
-          {result ? <><p className="core-v1-provider-note" data-ryo-reranking={result.ryoReranking.applied ? "applied" : "not-applied"}>Ryo再ランキング: {result.ryoReranking.applied ? `適用済み（候補${result.ryoReranking.candidatePoolSize}足 / recommendationScore ${result.ryoReranking.selectedRecommendationScore}）` : "商品単体判断のため未適用"}</p><RyoModeResultPanel candidate={result.candidate} rerankingApplied={result.ryoReranking.applied} vector={ryoPreferenceVector} /></> : null}
+          {result ? <><p className="core-v1-provider-note" data-ryo-reranking={result.ryoReranking.applied ? "applied" : "not-applied"}>Ryo再ランキング: {result.ryoReranking.applied ? `適用済み（候補${result.ryoReranking.candidatePoolSize}足 / recommendationScore ${result.ryoReranking.selectedRecommendationScore}）` : "商品単体判断のため未適用"}</p><details className="result-detail-accordion"><summary>Ryoらしい評価を詳しく見る</summary><RyoModeResultPanel candidate={result.candidate} rerankingApplied={result.ryoReranking.applied} vector={ryoPreferenceVector} /></details></> : null}
           <dl className="workspace-result-list"><div><dt>Core判断理由</dt><dd>{result ? `${selectedMode.description}。Coreが候補特徴・予算適合度・リスクから判定しました。` : selectedMode.description}</dd></div><div><dt>Gemini補助</dt><dd>{result ? `${result.candidateResearch.detail} 説明: ${result.explanation.source}` : "結果生成後に表示します。"}</dd></div><div><dt>注意点</dt><dd>{allCautions.length ? allCautions.join(" / ") : "価格・在庫・サイズ・購入可能性は保証しません。"}</dd></div></dl>
-          <div data-mobile-step="4" id="mobile-step-4"><ExternalEvidencePanel result={result} productLinks={productLinks} productLinksMessage={productLinksMessage} isProductLinksLoading={isResolvingProductLinks} manualProductUrl={manualProductUrl} isResolvingManualUrl={isResolvingManualUrl} onManualProductUrlChange={setManualProductUrl} onAddManualProductUrl={handleAddManualProductUrl} /></div>
+          <div data-mobile-step="4" id="mobile-step-4"><ExternalEvidencePanel result={result} productLinks={productLinks} productLinksMessage={productLinksMessage} isProductLinksLoading={isResolvingProductLinks} manualProductUrl={manualProductUrl} isResolvingManualUrl={isResolvingManualUrl} onManualProductUrlChange={setManualProductUrl} onAddManualProductUrl={handleAddManualProductUrl} />{result ? <RakutenMarketFind candidate={result.candidate} key={result.candidate.name} /> : null}</div>
         </section>
 
         <aside className="workspace-panel workspace-user-panel" aria-labelledby="workspace-user-title" data-mobile-step="5" id="mobile-step-5">
@@ -292,6 +340,7 @@ export function RecommendationWorkspace({
           <div className="workspace-user-summary"><span>現在のユーザー</span><strong>{currentUser ? currentUser.profile.displayName : authState.status === "guest" ? "ゲスト" : "未登録"}</strong></div>
           {result ? <div className="workspace-feedback-form"><span>この判断は役に立ちましたか？</span><div className="workspace-feedback-evaluation" role="group" aria-label="推薦への評価">{([['good','役に立った'],['neutral','どちらとも言えない'],['bad','改善してほしい']] as const).map(([value,label]) => <button aria-pressed={feedbackEvaluation === value} data-selected={feedbackEvaluation === value} key={value} onClick={() => setFeedbackEvaluation(value)} type="button">{label}</button>)}</div><label>理由メモ<textarea maxLength={500} onChange={(event) => setFeedbackComment(event.target.value)} value={feedbackComment} /></label><button disabled={isSavingFeedback} onClick={handleSaveFeedback} type="button">{isSavingFeedback ? "保存中…" : authState.status === "guest" ? "この画面で評価する" : "評価を保存する"}</button>{feedbackSaved ? <small>反映しました。</small> : null}</div> : null}
           {authState.status === "guest" ? <div className="guest-upgrade-callout"><strong>ゲストは何回でも利用できます</strong><p>履歴を保存したい場合はログインしてください。</p><a href="/login">ログインへ</a></div> : null}
+          {currentUser ? <section className="workspace-history" aria-labelledby="workspace-history-title"><div><span>Saved feedback</span><h4 id="workspace-history-title">保存済み評価履歴</h4></div>{currentUser.feedbackHistory.length ? <ul>{[...currentUser.feedbackHistory].reverse().slice(0, 4).map((item) => <li key={`${item.createdAt}:${item.sneakerName}`}><strong>{item.sneakerName}</strong><span>{decisionLabels[item.decision as keyof typeof decisionLabels] ?? item.decision} / {item.mode === "ryo" ? "Ryo" : "Balanced"}</span><small>{new Date(item.createdAt).toLocaleDateString("ja-JP")}・評価 {item.userRating}/5</small></li>)}</ul> : <p className="workspace-history-empty">まだ保存された評価はありません。結果への評価を送信すると、ここに表示されます。</p>}</section> : null}
         </aside>
       </div>
     </section>

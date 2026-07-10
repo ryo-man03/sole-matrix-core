@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { SessionStorage } from "../_lib/auth-session/types";
 import {
@@ -15,6 +15,7 @@ import type {
   OnboardingPurpose,
   SneakerExperience,
 } from "../_lib/onboarding/types";
+import { getAuthSession } from "../_lib/apiClient";
 
 const purposeOptions: Array<{ id: OnboardingPurpose; label: string }> = [
   { id: "purchase_decision", label: "買うか迷っている" },
@@ -52,6 +53,13 @@ export function OnboardingFlow() {
   const [priorities, setPriorities] = useState<OnboardingPriority[]>([]);
   const [hint, setHint] = useState<OnboardingPreferenceHint | null>(null);
   const [message, setMessage] = useState("重視する項目は3つまで選べます。");
+  const [nextHref, setNextHref] = useState("/app?session=guest");
+
+  useEffect(() => {
+    void getAuthSession().then((result) => {
+      if (result.ok && result.data.status === "user") setNextHref("/app");
+    });
+  }, []);
 
   function togglePriority(priority: OnboardingPriority) {
     setPriorities((current) => {
@@ -93,6 +101,10 @@ export function OnboardingFlow() {
         <p>
           回答は候補の並べ方と入力補助にだけ使います。買う・待つの最終判断は既存Coreが決めます。
         </p>
+        <div className="onboarding-skip-row">
+          <span>4項目・約1分</span>
+          <a href={nextHref}>今回はスキップして診断へ</a>
+        </div>
       </div>
 
       <OnboardingQuestion title="目的" description="今回、いちばん知りたいこと">
@@ -121,7 +133,7 @@ export function OnboardingFlow() {
           <strong>Preference profile ready</strong>
           <p>補助タグ: {hint.preferenceTags.join(" / ") || "なし"}</p>
           <p>ゲストではこのタブの一時状態だけに保存されます。</p>
-          <a href="/app?session=guest">ゲストで診断へ</a>
+          <a href={nextHref}>この設定で診断へ</a>
         </div>
       ) : null}
     </section>

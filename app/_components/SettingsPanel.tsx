@@ -1,31 +1,55 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { GUEST_SESSION_STORAGE_KEY } from "../_lib/auth-session/guestSession";
+import { getAuthSession, signOut } from "../_lib/apiClient";
 import { TEMPORARY_ONBOARDING_KEY } from "../_lib/onboarding/onboardingProfile";
+import { DIAGNOSIS_DRAFT_STORAGE_KEY } from "../_lib/diagnosis/diagnosisDraft";
 
 export function SettingsPanel() {
   const [status, setStatus] = useState(
-    "設定内容を確認できます。削除操作はこのbrowserのゲスト状態だけに作用します。",
+    "現在の保存状態を確認しています…",
   );
+  const [sessionLabel, setSessionLabel] = useState("確認中");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  useEffect(() => {
+    void getAuthSession().then((result) => {
+      if (!result.ok) {
+        setSessionLabel("確認できません");
+        setStatus("認証状態を取得できませんでした。ゲストデータの管理は利用できます。");
+        return;
+      }
+      setSessionLabel(result.data.status === "user" ? "ログイン中" : "ログインしていません");
+      setStatus("保存範囲と外部サービスの境界を確認できます。");
+    });
+  }, []);
 
   function deleteGuestData() {
     try {
       window.localStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
       window.sessionStorage.removeItem(TEMPORARY_ONBOARDING_KEY);
-      setStatus("このbrowserのゲスト診断状態と一時onboardingを削除しました。");
+      window.sessionStorage.removeItem(DIAGNOSIS_DRAFT_STORAGE_KEY);
+      setConfirmingDelete(false);
+      setStatus("このブラウザのゲスト状態、診断下書き、初回設定を削除しました。");
     } catch {
       setStatus("browser保存領域を利用できないため、削除対象はありませんでした。");
     }
   }
 
-  function logout() {
-    try {
-      window.sessionStorage.removeItem(TEMPORARY_ONBOARDING_KEY);
-    } catch {
-      // Continue to the signed-out entry even when storage is restricted.
+  async function logout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setStatus("ログアウトしています…");
+    const result = await signOut();
+    if (!result.ok) {
+      setLoggingOut(false);
+      setStatus("ログアウトできませんでした。通信状態を確認して、もう一度お試しください。");
+      return;
     }
+    try { window.sessionStorage.removeItem(TEMPORARY_ONBOARDING_KEY); } catch { /* Session is already invalidated server-side. */ }
     window.location.assign("/login");
   }
 
@@ -40,20 +64,23 @@ export function SettingsPanel() {
       <p className="settings-status" aria-live="polite">{status}</p>
 
       <div className="settings-grid">
+        <SettingsCard title="現在の利用状態">
+          <div className="settings-current-state"><span>SESSION</span><strong>{sessionLabel}</strong><a href="/app">診断・商品判断へ戻る</a></div>
+        </SettingsCard>
         <SettingsCard title="保存されるデータ">
           <ul>
-            <li>ゲスト: 匿名IDと1回診断済みフラグ。個人memoryは保存しません。</li>
-            <li>ログイン相当のローカルユーザー: profile、診断履歴、feedback。</li>
+            <li>ゲスト: このブラウザの匿名セッションID。診断下書きと初回設定はタブ内の一時保存です。</li>
+            <li>ログインユーザー: profile、診断回数、推薦へのfeedback。</li>
             <li>共通corpus: 匿名化された推薦評価。userIdやdisplayNameは含みません。</li>
           </ul>
         </SettingsCard>
 
         <SettingsCard title="Session actions">
           <div className="settings-actions">
-            <button onClick={logout} type="button">ログアウト</button>
-            <button onClick={deleteGuestData} type="button">ゲストデータ削除</button>
-            <button disabled type="button">将来のアカウント削除（準備中）</button>
+            <button disabled={loggingOut} onClick={logout} type="button">{loggingOut ? "ログアウト中…" : "ログアウト"}</button>
+            {!confirmingDelete ? <button onClick={() => setConfirmingDelete(true)} type="button">ゲストデータを削除</button> : <div className="settings-confirm" role="group" aria-label="ゲストデータ削除の確認"><strong>このブラウザの一時データを削除しますか？</strong><button onClick={deleteGuestData} type="button">削除する</button><button onClick={() => setConfirmingDelete(false)} type="button">キャンセル</button></div>}
           </div>
+          <p className="feature-boundary-note"><strong>アカウント削除:</strong> 現在は未対応です。利用可能とは表示しません。</p>
         </SettingsCard>
 
         <SettingsCard title="外部API利用">

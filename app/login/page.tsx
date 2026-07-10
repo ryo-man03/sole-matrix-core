@@ -17,6 +17,8 @@ export default function LoginPage() {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState("認証設定を確認しています…");
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,6 +40,15 @@ export default function LoginPage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const errors: Record<string, string> = {};
+    if (mode === "signup" && displayName.trim().length < 2) errors.displayName = "表示名を2文字以上で入力してください。";
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) errors.email = "有効なメールアドレスを入力してください。";
+    if (password.length < 8) errors.password = "パスワードは8文字以上で入力してください。";
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) {
+      setStatus("入力内容を確認してください。");
+      return;
+    }
     if (!configured) {
       setStatus("Supabase未設定のため認証できません。ゲストモードをお試しください。");
       return;
@@ -54,7 +65,7 @@ export default function LoginPage() {
       const result = await signUp({ displayName, email, password });
       if (!result.ok) { setStatus(result.error.message); return; }
       if (result.data.sessionCreated) {
-        window.location.assign("/app");
+        window.location.assign("/onboarding?from=signup");
       } else {
         setMode("login");
         setStatus("登録を受け付けました。確認メールの案内に従ってからログインしてください。");
@@ -72,7 +83,11 @@ export default function LoginPage() {
           <div className="product-entry-copy">
             <p className="product-entry-kicker">SOLE//MATRIX / ENTRY</p>
             <h1 id="product-entry-title">利用方法を選ぶ</h1>
-            <p>Supabaseが設定済みならログイン・新規登録を利用できます。設定がなくても、ゲストで診断と商品判断を何回でも試せます。</p>
+            <p>履歴を残すならアカウント、まず判断を試すならゲスト。どちらでも診断と商品判断を最後まで使えます。</p>
+            <div className="product-entry-benefits" aria-label="ログインとゲストの違い">
+              <div><span>ACCOUNT</span><strong>評価履歴を保存</strong><p>推薦へのフィードバックを次回も確認できます。</p></div>
+              <div><span>GUEST</span><strong>登録せずに完走</strong><p>入力と診断結果は個人履歴として保存しません。</p></div>
+            </div>
           </div>
 
           <div className="product-entry-panel" aria-label="ログインと新規登録">
@@ -82,15 +97,15 @@ export default function LoginPage() {
             </div>
             <form className="workspace-fields" onSubmit={handleSubmit}>
               {mode === "signup" ? (
-                <label><span>表示名</span><input autoComplete="name" maxLength={80} onChange={(event) => setDisplayName(event.target.value)} required value={displayName} /></label>
+                <label><span>表示名</span><input aria-describedby={fieldErrors.displayName ? "display-name-error" : undefined} aria-invalid={Boolean(fieldErrors.displayName)} autoComplete="name" maxLength={80} onChange={(event) => { setDisplayName(event.target.value); setFieldErrors((current) => ({ ...current, displayName: "" })); }} required value={displayName} />{fieldErrors.displayName ? <small className="field-error" id="display-name-error">{fieldErrors.displayName}</small> : null}</label>
               ) : null}
-              <label><span>メールアドレス</span><input autoComplete="email" onChange={(event) => setEmail(event.target.value)} required type="email" value={email} /></label>
-              <label><span>パスワード</span><input autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} /></label>
+              <label><span>メールアドレス</span><input aria-describedby={fieldErrors.email ? "email-error" : undefined} aria-invalid={Boolean(fieldErrors.email)} autoComplete="email" onChange={(event) => { setEmail(event.target.value); setFieldErrors((current) => ({ ...current, email: "" })); }} required type="email" value={email} />{fieldErrors.email ? <small className="field-error" id="email-error">{fieldErrors.email}</small> : null}</label>
+              <label><span>パスワード</span><span className="password-field"><input aria-describedby={fieldErrors.password ? "password-error" : "password-hint"} aria-invalid={Boolean(fieldErrors.password)} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} onChange={(event) => { setPassword(event.target.value); setFieldErrors((current) => ({ ...current, password: "" })); }} required type={passwordVisible ? "text" : "password"} value={password} /><button aria-label={passwordVisible ? "パスワードを隠す" : "パスワードを表示"} onClick={() => setPasswordVisible((visible) => !visible)} type="button">{passwordVisible ? "隠す" : "表示"}</button></span>{fieldErrors.password ? <small className="field-error" id="password-error">{fieldErrors.password}</small> : <small id="password-hint">8文字以上</small>}</label>
               <button className="workspace-primary-button" disabled={submitting || configured !== true} type="submit">
                 {submitting ? "送信中…" : mode === "login" ? "ログインする" : "アカウントを作成する"}
               </button>
             </form>
-            <p className="product-entry-provider-note" aria-live="polite">{status}</p>
+            <p className="product-entry-provider-note" aria-live="polite" data-status={configured === null ? "loading" : configured ? "ready" : "partial"}>{status}</p>
             <a className="product-entry-action" data-kind="guest" href="/app?session=guest">
               <span><strong>ゲストで試す</strong><small>ログインなしで何回でも利用できます。履歴は保存しません。</small></span>
               <span aria-hidden="true">→</span>

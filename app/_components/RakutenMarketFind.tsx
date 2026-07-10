@@ -68,7 +68,7 @@ export function RakutenMarketFind({ candidate }: Props) {
       <p className="rakuten-market-find-disclaimer">{DISCLAIMER}</p>
 
       {state.status === "loading" ? (
-        <p className="rakuten-market-find-status" aria-live="polite">楽天市場の商品を探しています…</p>
+        <p className="rakuten-market-find-status" aria-live="polite" role="status">楽天市場の商品を探しています…</p>
       ) : null}
       {state.status === "empty" ? (
         <p className="rakuten-market-find-status">近い商品が見つかりませんでした。推薦結果はそのまま確認できます。</p>
@@ -91,7 +91,7 @@ function RakutenProductCard({ product }: { product: MarketProductCandidate }) {
   return (
     <article className="rakuten-product-card">
       {product.imageUrl ? (
-        <img alt="" loading="lazy" src={product.imageUrl} />
+        <img alt={`${product.title}の商品画像`} loading="lazy" src={product.imageUrl} />
       ) : (
         <div className="rakuten-product-image-placeholder" aria-hidden="true">SOLE</div>
       )}
