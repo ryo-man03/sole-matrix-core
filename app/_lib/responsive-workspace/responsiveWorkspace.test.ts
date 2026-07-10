@@ -43,7 +43,7 @@ describe("responsive product workspace", () => {
     expect(normalizedCss).toContain("--surface-page:");
     expect(normalizedCss).toContain("--accent-primary:");
     expect(normalizedCss).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(normalizedCss).toMatch(/html\s*\{[^}]*overflow-x:\s*hidden/s);
+    expect(normalizedCss).not.toMatch(/html\s*\{[^}]*overflow-x:\s*hidden/s);
     expect(normalizedCss).toContain(".workspace-progress");
     expect(normalizedCss).toContain(".workspace-image-preview");
   });

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { GUEST_SESSION_STORAGE_KEY } from "../_lib/auth-session/guestSession";
+import { GUEST_SESSION_STORAGE_KEY, readGuestSession } from "../_lib/auth-session/guestSession";
 import { getAuthSession, signOut } from "../_lib/apiClient";
 import { TEMPORARY_ONBOARDING_KEY } from "../_lib/onboarding/onboardingProfile";
 import { DIAGNOSIS_DRAFT_STORAGE_KEY } from "../_lib/diagnosis/diagnosisDraft";
@@ -22,7 +22,14 @@ export function SettingsPanel() {
         setStatus("認証状態を取得できませんでした。ゲストデータの管理は利用できます。");
         return;
       }
-      setSessionLabel(result.data.status === "user" ? "ログイン中" : "ログインしていません");
+      const browserStorage = getBrowserStorage();
+      setSessionLabel(
+        result.data.status === "user"
+          ? "ログイン中"
+          : browserStorage && readGuestSession(browserStorage)
+            ? "ゲスト利用中"
+            : "ログインしていません",
+      );
       setStatus("保存範囲と外部サービスの境界を確認できます。");
     });
   }, []);
@@ -72,6 +79,7 @@ export function SettingsPanel() {
             <li>ゲスト: このブラウザの匿名セッションID。診断下書きと初回設定はタブ内の一時保存です。</li>
             <li>ログインユーザー: profile、診断回数、推薦へのfeedback。</li>
             <li>共通corpus: 匿名化された推薦評価。userIdやdisplayNameは含みません。</li>
+            <li>推薦結果そのものの一覧・再利用用履歴は保存しません。</li>
           </ul>
         </SettingsCard>
 
@@ -104,6 +112,10 @@ export function SettingsPanel() {
       </div>
     </section>
   );
+}
+
+function getBrowserStorage() {
+  try { return window.localStorage; } catch { return undefined; }
 }
 
 function SettingsCard({

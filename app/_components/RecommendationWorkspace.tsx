@@ -16,6 +16,7 @@ import type { AuthState, UserSession } from "../_lib/auth-session/types";
 import type { IntegratedRecommendationResult } from "../_lib/integrated-recommendation/types";
 import type { OnboardingPreferenceHint } from "../_lib/onboarding/types";
 import type { LiveProductUrl } from "../_lib/product-links/types";
+import { retainPreviousProductJudgementOnFailure } from "../_lib/product-judgement/resultRetention";
 import { buildRyoModeContextForRecommendation } from "../_lib/ryo-mode-v4/integration";
 import { buildRyoPreferenceVector } from "../_lib/ryo-mode-v4/vector";
 import type { SatisfactionEvaluation } from "../_lib/satisfaction-feedback/types";
@@ -73,6 +74,7 @@ export function RecommendationWorkspace({
   const [feedbackSaved, setFeedbackSaved] = useState(false);
   const [workspaceStatus, setWorkspaceStatus] = useState("商品名・URL・画像のいずれかを入力してください。予算は任意です。");
   const [analysisStage, setAnalysisStage] = useState<"idle" | "analyzing" | "recommending" | "complete" | "error">("idle");
+  const [isShowingRetainedResult, setIsShowingRetainedResult] = useState(false);
   const requestGateRef = useRef(createLatestRequestGate());
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -109,28 +111,36 @@ export function RecommendationWorkspace({
     return () => { active = false; };
   }, [authState]);
 
+  function showRequestFailure(message: string) {
+    const presentation = retainPreviousProductJudgementOnFailure({ result, productLinks }, message);
+    setWorkspaceStatus(presentation.status);
+    setAnalysisStage(presentation.analysisStage);
+    setIsAnalyzing(presentation.isAnalyzing);
+    setIsShowingRetainedResult(presentation.retainedPreviousResult);
+  }
+
   async function handleRecommend() {
     if (requireSessionSelection && (authState.status === "loading" || authState.status === "signed_out")) {
-      setWorkspaceStatus("ログインまたはゲストモードを選んでください。");
-      setAnalysisStage("error");
+      showRequestFailure("ログインまたはゲストモードを選んでください。");
       return;
     }
     if (!sneakerName.trim() && !productUrl.trim() && !imageFile) {
-      setWorkspaceStatus("商品名・URL・画像のいずれかを入力してください。");
-      setAnalysisStage("error");
+      showRequestFailure("商品名・URL・画像のいずれかを入力してください。");
       return;
     }
     const budgetYen = budgetText.trim() ? Number(budgetText) : undefined;
     if (budgetYen !== undefined && (!Number.isInteger(budgetYen) || budgetYen <= 0)) {
-      setWorkspaceStatus("予算は1円以上の整数で入力してください。");
-      setAnalysisStage("error");
+      showRequestFailure("予算は1円以上の整数で入力してください。");
       return;
     }
 
     setIsAnalyzing(true);
+    setIsShowingRetainedResult(result !== null);
     setFeedbackSaved(false);
     setAnalysisStage("analyzing");
     requestGateRef.current.invalidate();
+    setIsResolvingProductLinks(false);
+    setIsResolvingManualUrl(false);
     setWorkspaceStatus("商品情報を安全に分析しています…");
     try {
       const ryoContext = buildRyoModeContextForRecommendation(answers);
@@ -139,7 +149,7 @@ export function RecommendationWorkspace({
         ...(productUrl.trim() ? { url: productUrl.trim() } : {}),
         ...(imageFile ? { image: imageFile } : {}),
       });
-      if (!analysisResponse.ok) { setWorkspaceStatus(analysisResponse.error.message); setAnalysisStage("error"); return; }
+      if (!analysisResponse.ok) { showRequestFailure(analysisResponse.error.message); return; }
 
       setWorkspaceStatus("CoreでスコアとDecisionを計算しています…");
       setAnalysisStage("recommending");
@@ -152,10 +162,11 @@ export function RecommendationWorkspace({
         ...(currentUser ? { userId: currentUser.profile.userId } : {}),
         analysis: analysisResponse.data,
       });
-      if (!recommendationResponse.ok) { setWorkspaceStatus(recommendationResponse.error.message); setAnalysisStage("error"); return; }
+      if (!recommendationResponse.ok) { showRequestFailure(recommendationResponse.error.message); return; }
 
       setProductLinks([]);
       setResult(recommendationResponse.data);
+      setIsShowingRetainedResult(false);
       void loadProductLinks(recommendationResponse.data);
       setWorkspaceStatus(`${selectedMode.label}の判断が完了しました。最終DecisionはTypeScript Coreが決定しています。`);
       setAnalysisStage("complete");
@@ -163,6 +174,8 @@ export function RecommendationWorkspace({
         const profile = await getUserProfile(currentUser.profile.userId);
         if (profile.ok) setCurrentUser(profile.data);
       }
+    } catch {
+      showRequestFailure("分析サービスに接続できませんでした。時間をおいて、もう一度お試しください。");
     } finally {
       setIsAnalyzing(false);
     }
@@ -300,7 +313,7 @@ export function RecommendationWorkspace({
       <div className="workspace-heading">
         <div><p className="workspace-kicker">Product judgement</p><h2 id="recommendation-workspace-title">気になる一足の購入判断を整理する</h2></div>
         <div className="mode-toggle" aria-label="推薦モード" role="group">
-          {workspaceModes.map((item) => <button aria-pressed={mode === item.id} data-active={mode === item.id} key={item.id} onClick={() => { setMode(item.id); setResult(null); setProductLinks([]); }} type="button"><strong>{item.label}</strong><span>{item.description}</span></button>)}
+          {workspaceModes.map((item) => <button aria-pressed={mode === item.id} data-active={mode === item.id} key={item.id} onClick={() => { setMode(item.id); setResult(null); setProductLinks([]); setIsShowingRetainedResult(false); }} type="button"><strong>{item.label}</strong><span>{item.description}</span></button>)}
         </div>
       </div>
       <p className="workspace-status" aria-live="polite">{workspaceStatus}</p>
@@ -327,6 +340,7 @@ export function RecommendationWorkspace({
 
         <section className="workspace-panel workspace-result-panel" aria-labelledby="workspace-result-title" data-mobile-step="3" id="mobile-step-3">
           <div className="workspace-panel-heading"><span>02 / RESULT</span><h3 id="workspace-result-title">購入判断</h3><p>{selectedMode.description}</p></div>
+          {result && isShowingRetainedResult ? <p className="workspace-retained-result-note" role="status">以下の判断・参考リンク・評価欄は前回成功時の内容です。今回失敗した入力の結果ではありません。</p> : null}
           <div className="workspace-decision-placeholder" data-decision={result?.modeRecommendation.decision ?? "pending"}><span>Decision</span><strong>{result ? decisionLabels[result.modeRecommendation.decision] : isAnalyzing ? "分析中…" : "入力待ち"}</strong><p>{result ? result.explanation.summary : "最終DecisionはAIではなくTypeScript Coreが決定します。"}</p></div>
           {result ? <div className="workspace-candidate-summary"><span>{result.candidate.researchSource === "product_input" ? "入力商品" : result.candidate.researchSource === "gemini" ? "Gemini調査候補 / Core再評価済み" : result.candidate.researchSource === "ryo_anchor" ? "Ryo candidate anchor / Core再ランキング済み" : "fallback catalog"}</span><h4>{result.candidate.name}</h4>{result.candidate.modelType ? <small>タイプ: {result.candidate.modelType}</small> : null}<p>{result.candidate.description}</p></div> : null}
           <div className="workspace-score-preview"><div><span>Balanced Score</span><strong>{result ? result.modeRecommendation.balancedScore : "--"}</strong></div><div><span>Ryo Score</span><strong>{result ? result.modeRecommendation.ryoScore : "--"}</strong></div></div>
@@ -336,10 +350,10 @@ export function RecommendationWorkspace({
         </section>
 
         <aside className="workspace-panel workspace-user-panel" aria-labelledby="workspace-user-title" data-mobile-step="5" id="mobile-step-5">
-          <div className="workspace-panel-heading"><span>03 / FEEDBACK</span><h3 id="workspace-user-title">保存と評価</h3><p>{authState.status === "guest" ? "ゲストの入力・診断履歴は保存しません。" : "ログインユーザーは既存のmemory APIへ保存できます。"}</p></div>
+          <div className="workspace-panel-heading"><span>03 / FEEDBACK</span><h3 id="workspace-user-title">保存と評価</h3><p>{authState.status === "guest" ? "診断下書きはこのタブに一時保存しますが、個人履歴には保存しません。" : "ログインユーザーはプロフィール、診断回数、推薦への評価を保存できます。"}</p></div>
           <div className="workspace-user-summary"><span>現在のユーザー</span><strong>{currentUser ? currentUser.profile.displayName : authState.status === "guest" ? "ゲスト" : "未登録"}</strong></div>
           {result ? <div className="workspace-feedback-form"><span>この判断は役に立ちましたか？</span><div className="workspace-feedback-evaluation" role="group" aria-label="推薦への評価">{([['good','役に立った'],['neutral','どちらとも言えない'],['bad','改善してほしい']] as const).map(([value,label]) => <button aria-pressed={feedbackEvaluation === value} data-selected={feedbackEvaluation === value} key={value} onClick={() => setFeedbackEvaluation(value)} type="button">{label}</button>)}</div><label>理由メモ<textarea maxLength={500} onChange={(event) => setFeedbackComment(event.target.value)} value={feedbackComment} /></label><button disabled={isSavingFeedback} onClick={handleSaveFeedback} type="button">{isSavingFeedback ? "保存中…" : authState.status === "guest" ? "この画面で評価する" : "評価を保存する"}</button>{feedbackSaved ? <small>反映しました。</small> : null}</div> : null}
-          {authState.status === "guest" ? <div className="guest-upgrade-callout"><strong>ゲストは何回でも利用できます</strong><p>履歴を保存したい場合はログインしてください。</p><a href="/login">ログインへ</a></div> : null}
+          {authState.status === "guest" ? <div className="guest-upgrade-callout"><strong>ゲストは何回でも利用できます</strong><p>プロフィールや推薦への評価を残す場合はログインしてください。推薦結果そのものの保存には現在対応していません。</p><a href="/login">ログインへ</a></div> : null}
           {currentUser ? <section className="workspace-history" aria-labelledby="workspace-history-title"><div><span>Saved feedback</span><h4 id="workspace-history-title">保存済み評価履歴</h4></div>{currentUser.feedbackHistory.length ? <ul>{[...currentUser.feedbackHistory].reverse().slice(0, 4).map((item) => <li key={`${item.createdAt}:${item.sneakerName}`}><strong>{item.sneakerName}</strong><span>{decisionLabels[item.decision as keyof typeof decisionLabels] ?? item.decision} / {item.mode === "ryo" ? "Ryo" : "Balanced"}</span><small>{new Date(item.createdAt).toLocaleDateString("ja-JP")}・評価 {item.userRating}/5</small></li>)}</ul> : <p className="workspace-history-empty">まだ保存された評価はありません。結果への評価を送信すると、ここに表示されます。</p>}</section> : null}
         </aside>
       </div>

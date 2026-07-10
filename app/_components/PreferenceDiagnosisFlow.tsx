@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { preferenceDiagnosisQuestions, type CompletedPreferenceDiagnosisAnswers, type DiagnosisAnswerId, type PreferenceDiagnosisAnswers } from "../_data/preferenceDiagnosisQuestions";
 import type { RyoPreferenceVector } from "../_lib/ryo-mode-v4/types";
 import { buildRyoPreferenceVector } from "../_lib/ryo-mode-v4/vector";
-import { clearDiagnosisDraft, readDiagnosisDraft, writeDiagnosisDraft } from "../_lib/diagnosis/diagnosisDraft";
+import { readDiagnosisDraft, restartDiagnosisDraft, writeDiagnosisDraft } from "../_lib/diagnosis/diagnosisDraft";
 import { DiagnosisProgress } from "./DiagnosisProgress";
 import { DiagnosisQuestionCard } from "./DiagnosisQuestionCard";
 import { CoreV1RecommendationPanel } from "./CoreV1RecommendationPanel";
@@ -54,8 +54,7 @@ export function PreferenceDiagnosisFlow({ onComplete, onOpenProductJudgement, on
   }
 
   function restart() {
-    clearDiagnosisDraft(getSessionStorage());
-    onReset?.();
+    restartDiagnosisDraft(getSessionStorage(), onReset);
     setAnswers({});
     setCompletedVector(null);
     setCurrentQuestionIndex(0);

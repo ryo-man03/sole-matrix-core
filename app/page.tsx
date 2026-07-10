@@ -20,7 +20,7 @@ export default function Page() {
               <a className="home-primary-cta" href="/login"><span>ログイン / 新規登録</span><span aria-hidden="true">→</span></a>
               <a className="home-secondary-cta" href="/app?session=guest">ゲストで試す</a>
             </div>
-            <p className="home-cta-note">ゲストでも全11問と商品判断を完走できます。履歴を保存したい場合だけログインしてください。</p>
+            <p className="home-cta-note">ゲストでも全11問と商品判断を完走できます。プロフィールや推薦への評価を残す場合はログインしてください。</p>
           </div>
           <aside className="home-hero-ledger" aria-label="推薦で確認できる内容">
             <span className="home-hero-ledger-number">11</span>

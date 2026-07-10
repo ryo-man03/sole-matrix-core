@@ -124,8 +124,18 @@ Visual direction:
 
 - React hydration error: 0
 - application console error: 0
-- horizontal overflow: 0 at home and product result
+- horizontal overflow: 0 across the final browser matrix; verified from actual child bounds with `overflow-x: hidden` removed
 - duplicate recommendation fetch observed: 0
+
+### Final hardening recheck
+
+- 1440×900: Home、Login、Onboarding、Mode selection、partial/completed diagnosis、recommendation result、product judgement success、previous-result retention error、Rakuten success、Settings signed-outを再確認した。
+- 390×844: 同じ主要導線に加え、candidate fallback、image confidence 0 fallback、Rakuten error、Settings guestを再確認した。
+- 新しい商品判断を通信失敗させても、直前の候補・Decision・参考リンク・feedback欄を保持し、それらが前回成功時の内容であることを明示した。loadingは終了した。
+- feedbackは未選択時の案内と端末保存成功を確認した。認証ユーザーの保存errorはSupabase未設定のためブラウザ未確認で、unit/API contractの範囲に留まる。
+- CSS refreshで使う60 classはすべて参照あり。全体の重複selector occurrence 139件のうち、source orderで値を変更するrefresh rule 35件を意図したvisual refreshとして照合した。今回のPRでは大規模分割を行わない。
+- `!important`はreduced-motion強制停止だけに限定した。focus-visible ruleとreduced-motion coverageを保持した。
+- sticky要素による内容隠れ、読めない長いモデル名、false success、dead button、clipped text、hydration/console errorは確認されなかった。
 
 ## External blockers
 
@@ -177,6 +187,10 @@ Remaining deductions are for unverified authenticated screens, provider-dependen
 
 ## Readiness decision
 
-`READY WITH MINOR LIMITATIONS`
+Guest/demo submission readiness: `READY WITH MINOR LIMITATIONS`
 
-Guest diagnosis, recommendation, fallback, product judgement, URL/image evidence, manual Rakuten search, feedback boundary, settings, reload restore, and responsive layout are complete. Authenticated persistence and full saved-recommendation history require the owner actions above.
+Guest diagnosis, fallback recommendation, product judgement, manual Rakuten search, settings boundaries, feedback UI, reload restore, and responsive layout were verified.
+
+Full authenticated product readiness: `NOT READY`
+
+Live login/sign-up, authenticated persistence, Gemini candidate-research success, image-identification success, saved recommendation history, and account deletion remain blocked, partially verified, or not implemented. These limitations are not described as complete features in the UI or PR readiness judgement.

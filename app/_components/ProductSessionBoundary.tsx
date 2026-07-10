@@ -23,8 +23,11 @@ export function ProductSessionBoundary() {
   useEffect(() => {
     setOnboardingHint(readTemporaryOnboardingHint(getBrowserSessionStorage()));
     const diagnosisDraft = readDiagnosisDraft(getBrowserSessionStorage());
-    if (diagnosisDraft?.completed) {
-      setDiagnosisAnswers(diagnosisDraft.answers as CompletedPreferenceDiagnosisAnswers);
+    if (diagnosisDraft) {
+      setExperienceMode("diagnosis");
+      if (diagnosisDraft.completed) {
+        setDiagnosisAnswers(diagnosisDraft.answers as CompletedPreferenceDiagnosisAnswers);
+      }
     }
     const query = new URLSearchParams(window.location.search);
     if (query.get("session") === "guest") {
@@ -120,7 +123,7 @@ function SessionStatus({
 }) {
   if (authState.status === "loading") return <div className="session-status session-status--loading" role="status"><span className="loading-mark" aria-hidden="true" /><span><strong>利用状態を確認しています</strong><small>ゲストまたはログイン状態を安全に準備します。</small></span></div>;
   if (authState.status === "guest") {
-    return <div className="session-status" data-session="guest"><strong>ゲストモード</strong><span>ログインなしで診断と商品判断を何回でも試せます。履歴保存は行いません。</span>{message ? <small role="status">{message}</small> : null}</div>;
+    return <div className="session-status" data-session="guest"><strong>ゲストモード</strong><span>ログインなしで診断と商品判断を何回でも試せます。診断下書きはこのタブだけに一時保存します。</span>{message ? <small role="status">{message}</small> : null}</div>;
   }
   if (authState.status === "user") {
     return <div className="session-status" data-session="user"><strong>{authState.session.displayName ?? authState.session.userId}</strong><span>ログイン中です。推薦への評価をこのアカウントの履歴へ保存できます。</span><button onClick={onLogout} type="button">ログアウト</button>{message ? <small role="status">{message}</small> : null}</div>;

@@ -83,10 +83,10 @@ export default function LoginPage() {
           <div className="product-entry-copy">
             <p className="product-entry-kicker">SOLE//MATRIX / ENTRY</p>
             <h1 id="product-entry-title">利用方法を選ぶ</h1>
-            <p>履歴を残すならアカウント、まず判断を試すならゲスト。どちらでも診断と商品判断を最後まで使えます。</p>
+            <p>プロフィールや推薦への評価を残すならアカウント、まず判断を試すならゲスト。どちらでも診断と商品判断を最後まで使えます。</p>
             <div className="product-entry-benefits" aria-label="ログインとゲストの違い">
-              <div><span>ACCOUNT</span><strong>評価履歴を保存</strong><p>推薦へのフィードバックを次回も確認できます。</p></div>
-              <div><span>GUEST</span><strong>登録せずに完走</strong><p>入力と診断結果は個人履歴として保存しません。</p></div>
+              <div><span>ACCOUNT</span><strong>プロフィール / 評価を保存</strong><p>プロフィール、診断回数、推薦へのフィードバックが保存対象です。</p></div>
+              <div><span>GUEST</span><strong>登録せずに完走</strong><p>診断下書きはこのタブに一時保存しますが、個人履歴には保存しません。</p></div>
             </div>
           </div>
 
@@ -107,7 +107,7 @@ export default function LoginPage() {
             </form>
             <p className="product-entry-provider-note" aria-live="polite" data-status={configured === null ? "loading" : configured ? "ready" : "partial"}>{status}</p>
             <a className="product-entry-action" data-kind="guest" href="/app?session=guest">
-              <span><strong>ゲストで試す</strong><small>ログインなしで何回でも利用できます。履歴は保存しません。</small></span>
+              <span><strong>ゲストで試す</strong><small>ログインなしで何回でも利用できます。下書きはこのタブだけに一時保存します。</small></span>
               <span aria-hidden="true">→</span>
             </a>
           </div>
@@ -116,8 +116,9 @@ export default function LoginPage() {
             <p className="product-entry-kicker">Data policy</p>
             <h2 id="storage-title">保存される情報</h2>
             <ul>
-              <li>ゲストの診断・商品入力・画像は履歴として保存しません。</li>
-              <li>ログインユーザーは既存のユーザーmemory APIを保存入口として利用します。</li>
+              <li>ゲストの診断下書きと初回設定は、このタブにだけ一時保存します。商品入力・画像は履歴として保存しません。</li>
+              <li>ログインユーザーはprofile、診断回数、推薦へのfeedbackを既存のユーザーmemory APIへ保存できます。</li>
+              <li>推薦結果そのものを一覧・再利用できる履歴保存には現在対応していません。</li>
               <li>APIキーや認証エラーの内部詳細は画面に表示しません。</li>
             </ul>
           </aside>

@@ -12,6 +12,8 @@ describe("product entry", () => {
     expect(html).toContain("新規登録");
     expect(html).toContain("ゲストで試す");
     expect(html).toContain("保存される情報");
+    expect(html).toContain("プロフィール / 評価を保存");
+    expect(html).toContain("推薦結果そのものを一覧・再利用できる履歴保存には現在対応していません");
     expect(html).toContain("パスワードを表示");
     expect(html).toContain("8文字以上");
   });
