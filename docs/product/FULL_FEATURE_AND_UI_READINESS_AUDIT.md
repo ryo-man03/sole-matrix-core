@@ -158,6 +158,8 @@ Suggested separate PR: versioned recommendation history storage
 
 ## Visual QA score
 
+同じ100点基準でのbaseline再評価は **68 / 100**。主な減点は、行動不能カード、弱いCTA階層、技術情報の初期露出、診断下書き消失、商品判断側の楽天未到達、画像preview不足、失敗時の前結果消失だった。変更後は **93 / 100**。
+
 | Category | Score |
 | --- | ---: |
 | Brand / visual identity | 14 / 15 |
