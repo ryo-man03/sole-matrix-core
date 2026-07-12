@@ -43,6 +43,7 @@ describe("Core v1 UI integration", () => {
     expect(componentSource).toContain("保存日時:");
     expect(componentSource).toContain("評価ボタンを選んでください。");
     expect(componentSource).toContain("フィードバックを保存できませんでした。もう一度試してください。");
+    expect(componentSource).not.toContain("setResult(null)");
   });
 
   it("keeps Gemini and URL evidence outside the final Decision", () => {

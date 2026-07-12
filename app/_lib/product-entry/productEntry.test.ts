@@ -12,6 +12,10 @@ describe("product entry", () => {
     expect(html).toContain("新規登録");
     expect(html).toContain("ゲストで試す");
     expect(html).toContain("保存される情報");
+    expect(html).toContain("プロフィール / 評価を保存");
+    expect(html).toContain("推薦結果そのものを一覧・再利用できる履歴保存には現在対応していません");
+    expect(html).toContain("パスワードを表示");
+    expect(html).toContain("8文字以上");
   });
 
   it("lets a guest enter while auth actions are available when configured", () => {
@@ -23,7 +27,10 @@ describe("product entry", () => {
   it("keeps the home page as a landing page with a login CTA", () => {
     const html = renderToStaticMarkup(createElement(HomePage));
     expect(html).toContain('href="/login"');
+    expect(html).toContain('href="/app?session=guest"');
     expect(html).toContain("はじめる");
+    expect(html).toContain("ログイン / 新規登録");
+    expect(html).toContain("楽天検索は推薦結果と分離して手動実行します");
     expect(html).not.toContain("recommendation-workspace");
     expect(html).not.toContain("preference-diagnosis-section");
   });

@@ -6,6 +6,7 @@ import { beginGuestSession, createUserAuthState } from "../_lib/auth-session/gue
 import type { AuthState, SessionStorage, UserSession } from "../_lib/auth-session/types";
 import type { CompletedPreferenceDiagnosisAnswers } from "../_data/preferenceDiagnosisQuestions";
 import { readTemporaryOnboardingHint } from "../_lib/onboarding/onboardingProfile";
+import { readDiagnosisDraft } from "../_lib/diagnosis/diagnosisDraft";
 import type { OnboardingPreferenceHint } from "../_lib/onboarding/types";
 import { ExperienceModeSelector, type ExperienceMode } from "./ExperienceModeSelector";
 import { PreferenceDiagnosisFlow } from "./PreferenceDiagnosisFlow";
@@ -17,9 +18,17 @@ export function ProductSessionBoundary() {
   const [onboardingHint, setOnboardingHint] = useState<OnboardingPreferenceHint | null>(null);
   const [experienceMode, setExperienceMode] = useState<ExperienceMode | null>(null);
   const [diagnosisAnswers, setDiagnosisAnswers] = useState<CompletedPreferenceDiagnosisAnswers | null>(null);
+  const [sessionMessage, setSessionMessage] = useState("");
 
   useEffect(() => {
     setOnboardingHint(readTemporaryOnboardingHint(getBrowserSessionStorage()));
+    const diagnosisDraft = readDiagnosisDraft(getBrowserSessionStorage());
+    if (diagnosisDraft) {
+      setExperienceMode("diagnosis");
+      if (diagnosisDraft.completed) {
+        setDiagnosisAnswers(diagnosisDraft.answers as CompletedPreferenceDiagnosisAnswers);
+      }
+    }
     const query = new URLSearchParams(window.location.search);
     if (query.get("session") === "guest") {
       setAuthState({ status: "guest", session: beginGuestSession(getBrowserStorage()) });
@@ -49,14 +58,21 @@ export function ProductSessionBoundary() {
   }
 
   async function handleLogout() {
-    await signOut();
+    setSessionMessage("ログアウトしています…");
+    const result = await signOut();
+    if (!result.ok) {
+      setSessionMessage("ログアウトできませんでした。通信状態を確認して、もう一度お試しください。");
+      return;
+    }
     setAuthState({ status: "signed_out" });
     setExperienceMode(null);
+    setDiagnosisAnswers(null);
+    setSessionMessage("ログアウトしました。");
   }
 
   return (
     <>
-      <SessionStatus authState={authState} providerConfigured={providerConfigured} onLogout={handleLogout} />
+      <SessionStatus authState={authState} providerConfigured={providerConfigured} message={sessionMessage} onLogout={handleLogout} />
       {authState.status === "guest" || authState.status === "user" ? (
         experienceMode === null ? (
           <ExperienceModeSelector hasDiagnosisResult={diagnosisAnswers !== null} onSelect={setExperienceMode} />
@@ -70,6 +86,7 @@ export function ProductSessionBoundary() {
               <PreferenceDiagnosisFlow
                 onComplete={setDiagnosisAnswers}
                 onOpenProductJudgement={() => setExperienceMode("product")}
+                onReset={() => setDiagnosisAnswers(null)}
               />
             ) : (
               <RecommendationWorkspace
@@ -96,18 +113,20 @@ export function ProductSessionBoundary() {
 function SessionStatus({
   authState,
   providerConfigured,
+  message,
   onLogout,
 }: {
   authState: AuthState;
   providerConfigured: boolean;
+  message: string;
   onLogout: () => void;
 }) {
-  if (authState.status === "loading") return <p className="session-status">セッションを確認しています…</p>;
+  if (authState.status === "loading") return <div className="session-status session-status--loading" role="status"><span className="loading-mark" aria-hidden="true" /><span><strong>利用状態を確認しています</strong><small>ゲストまたはログイン状態を安全に準備します。</small></span></div>;
   if (authState.status === "guest") {
-    return <div className="session-status" data-session="guest"><strong>ゲストモード</strong><span>ログインなしで診断と商品判断を何回でも試せます。履歴保存は行いません。</span></div>;
+    return <div className="session-status" data-session="guest"><strong>ゲストモード</strong><span>ログインなしで診断と商品判断を何回でも試せます。診断下書きはこのタブだけに一時保存します。</span>{message ? <small role="status">{message}</small> : null}</div>;
   }
   if (authState.status === "user") {
-    return <div className="session-status" data-session="user"><strong>{authState.session.displayName ?? authState.session.userId}</strong><span>ログイン中です。既存のユーザーmemory APIを保存入口として利用します。</span><button onClick={onLogout} type="button">ログアウト</button></div>;
+    return <div className="session-status" data-session="user"><strong>{authState.session.displayName ?? authState.session.userId}</strong><span>ログイン中です。推薦への評価をこのアカウントの履歴へ保存できます。</span><button onClick={onLogout} type="button">ログアウト</button>{message ? <small role="status">{message}</small> : null}</div>;
   }
   return <div className="session-status" data-session="signed-out"><strong>ログインしていません</strong><span>{providerConfigured ? "ログインまたはゲストモードを選んでください。" : "Supabaseは未設定です。ゲストモードは利用できます。"}</span><a href="/login">利用方法を選ぶ</a></div>;
 }

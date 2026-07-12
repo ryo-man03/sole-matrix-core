@@ -51,12 +51,12 @@ export function ExternalEvidencePanel({
         </EvidenceSection>
       </div>
 
-      <div className="workspace-provider-readiness">
+      <details className="result-detail-accordion"><summary>外部サービスの状態を見る</summary><div className="workspace-provider-readiness">
         <span>Readiness / fallback status</span>
         <div><strong>Rakuten</strong><em data-status={result?.readiness.rakuten.status ?? "not_checked"}>{result?.readiness.rakuten.status ?? "not_checked"}</em></div>
         <div><strong>Gemini候補調査</strong><em data-status={result?.readiness.geminiResearch.status ?? "not_checked"}>{result?.readiness.geminiResearch.status ?? "not_checked"}</em></div>
         <div><strong>Gemini補助説明</strong><em data-status={result?.readiness.geminiExplanation.status ?? "not_checked"}>{result?.readiness.geminiExplanation.status ?? "not_checked"}</em></div>
-      </div>
+      </div></details>
     </section>
   );
 }

@@ -3,6 +3,8 @@ type HomeEntryCardProps = {
   title: string;
   description: string;
   items: string[];
+  href: string;
+  actionLabel: string;
 };
 
 export function HomeEntryCard({
@@ -10,6 +12,8 @@ export function HomeEntryCard({
   title,
   description,
   items,
+  href,
+  actionLabel,
 }: HomeEntryCardProps) {
   return (
     <article className="home-entry-card">
@@ -21,6 +25,9 @@ export function HomeEntryCard({
           <li key={item}>{item}</li>
         ))}
       </ul>
+      <a className="home-entry-action" href={href}>
+        {actionLabel}<span aria-hidden="true">→</span>
+      </a>
     </article>
   );
 }
