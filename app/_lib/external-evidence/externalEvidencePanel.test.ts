@@ -5,13 +5,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ExternalEvidencePanel } from "../../_components/ExternalEvidencePanel";
 
 describe("External Evidence Panel", () => {
-  it("renders safe fallback sections and the Core boundary", () => {
+  it("keeps the Core boundary visible and collapses secondary evidence", () => {
     const html = renderToStaticMarkup(createElement(ExternalEvidencePanel, { result: null }));
     expect(html).toContain("外部証拠・参考情報");
-    expect(html).toContain("Rakuten参考情報");
-    expect(html).toContain("画像分析");
-    expect(html).toContain("URL分析");
+    expect(html).toContain("参考リンク・画像・URLの内容を見る");
+    expect(html).toContain("商品参考リンク");
     expect(html).toContain("Core score・Decision・budgetFitを変更しません");
+    expect(html).not.toContain("画像がある場合に");
+    expect(html).not.toContain("URLがある場合に");
   });
 
   it("contains none of the prohibited certainty claims", () => {

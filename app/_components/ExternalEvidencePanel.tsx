@@ -31,32 +31,29 @@ export function ExternalEvidencePanel({
       <div className="external-evidence-heading"><div><span>External evidence</span><h4 id="external-evidence-title">外部証拠・参考情報</h4></div><strong>Decisionとは分離</strong></div>
       <p className="external-evidence-boundary">外部情報は不確かな参考です。Core score・Decision・budgetFitを変更しません。</p>
 
-      <div className="external-evidence-sections">
-        <EvidenceSection title="Rakuten参考情報">
-          {evidence?.listings.length ? <ul className="external-listing-list">{evidence.listings.map((listing) => <li key={`${listing.productUrl}:${listing.listingName}`}><strong>{listing.listingName}</strong><span>{formatYen(listing.priceYen)} / 取得時の参考価格</span><small>{listing.warnings.join(" / ") || "価格・在庫・サイズは保証しません。"}</small></li>)}</ul> : <EmptyEvidence>{result?.readiness.rakuten.status === "blocked_forbidden" ? "楽天APIは現在利用許可を確認できないため、検索リンクfallbackで表示します。" : result?.readiness.rakuten.detail ?? "判断後にreadinessを表示します。"}</EmptyEvidence>}
-        </EvidenceSection>
+      <details className="external-evidence-details">
+        <summary>参考リンク・画像・URLの内容を見る</summary>
+        <div className="external-evidence-sections">
+          {evidence?.listings.length ? <EvidenceSection title="Rakuten参考情報"><ul className="external-listing-list">{evidence.listings.map((listing) => <li key={`${listing.productUrl}:${listing.listingName}`}><strong>{listing.listingName}</strong><span>{formatYen(listing.priceYen)} / 取得時の参考価格</span><small>{listing.warnings.join(" / ") || "価格・在庫・サイズは保証しません。"}</small></li>)}</ul></EvidenceSection> : null}
 
-        <EvidenceSection title="画像分析">
-          {evidence?.visual ? <EvidenceSummary confidence={evidence.visual.confidence} summary={evidence.visual.summary} warnings={evidence.visual.warnings} /> : <EmptyEvidence>画像がある場合に、限定的な視覚特徴を表示します。</EmptyEvidence>}
-        </EvidenceSection>
+          {evidence?.visual ? <EvidenceSection title="画像分析"><EvidenceSummary confidence={evidence.visual.confidence} summary={evidence.visual.summary} warnings={evidence.visual.warnings} /></EvidenceSection> : null}
 
-        <EvidenceSection title="URL分析">
-          {evidence?.url ? <EvidenceSummary confidence={evidence.url.confidence} summary={`${evidence.url.domain} / ${evidence.url.summary}`} warnings={evidence.url.warnings} /> : <EmptyEvidence>URLがある場合に、安全に取得できたmetadataを表示します。</EmptyEvidence>}
-        </EvidenceSection>
+          {evidence?.url ? <EvidenceSection title="URL分析"><EvidenceSummary confidence={evidence.url.confidence} summary={`${evidence.url.domain} / ${evidence.url.summary}`} warnings={evidence.url.warnings} /></EvidenceSection> : null}
 
-        <EvidenceSection title="商品参考リンク">
-          <p className="product-links-boundary">具体モデル名から生成した検索入口です。直接商品URLとは限らず、価格・在庫・サイズ・購入可能性を保証しません。</p>
-          {isProductLinksLoading ? <p className="product-links-status">参考リンクを準備しています…</p> : displayableLinks.length ? <ul className="product-link-list">{displayableLinks.map((link) => <li key={`${link.source}:${link.href}`}><div><strong>{link.label}</strong><span>{link.displayDomain}</span></div><small>{link.verificationStatus === "search_fallback" ? "未検証の検索入口" : "URL応答を確認した参考ページ"}</small><small>{link.note}</small><a href={link.href} rel="noopener noreferrer" target="_blank">外部サイトで確認する</a></li>)}</ul> : <EmptyEvidence>{productLinksMessage}</EmptyEvidence>}
-          {result ? <div className="manual-product-link"><label htmlFor="manual-product-url">任意の公開商品URL（保存しません）</label><input id="manual-product-url" inputMode="url" onChange={(event) => onManualProductUrlChange?.(event.target.value)} placeholder="https://example.com/item" type="url" value={manualProductUrl} /><button disabled={isResolvingManualUrl} onClick={onAddManualProductUrl} type="button">{isResolvingManualUrl ? "確認中…" : "安全性を確認して追加"}</button><small aria-live="polite">{productLinksMessage}</small></div> : null}
-        </EvidenceSection>
-      </div>
+          <EvidenceSection title="商品参考リンク">
+            <p className="product-links-boundary">具体モデル名から生成した検索入口です。直接商品URLとは限らず、価格・在庫・サイズ・購入可能性を保証しません。</p>
+            {isProductLinksLoading ? <p className="product-links-status">参考リンクを準備しています…</p> : displayableLinks.length ? <ul className="product-link-list">{displayableLinks.map((link) => <li key={`${link.source}:${link.href}`}><div><strong>{link.label}</strong><span>{link.displayDomain}</span></div><small>{link.note}</small><a href={link.href} rel="noopener noreferrer" target="_blank">外部サイトで確認する</a></li>)}</ul> : <EmptyEvidence>{productLinksMessage}</EmptyEvidence>}
+            {result ? <div className="manual-product-link"><label htmlFor="manual-product-url">任意の公開商品URL（保存しません）</label><input id="manual-product-url" inputMode="url" onChange={(event) => onManualProductUrlChange?.(event.target.value)} placeholder="https://example.com/item" type="url" value={manualProductUrl} /><button disabled={isResolvingManualUrl} onClick={onAddManualProductUrl} type="button">{isResolvingManualUrl ? "確認中…" : "安全性を確認して追加"}</button><small aria-live="polite">{productLinksMessage}</small></div> : null}
+          </EvidenceSection>
+        </div>
 
-      <details className="result-detail-accordion"><summary>外部サービスの状態を見る</summary><div className="workspace-provider-readiness">
-        <span>Readiness / fallback status</span>
-        <div><strong>Rakuten</strong><em data-status={result?.readiness.rakuten.status ?? "not_checked"}>{result?.readiness.rakuten.status ?? "not_checked"}</em></div>
-        <div><strong>Gemini候補調査</strong><em data-status={result?.readiness.geminiResearch.status ?? "not_checked"}>{result?.readiness.geminiResearch.status ?? "not_checked"}</em></div>
-        <div><strong>Gemini補助説明</strong><em data-status={result?.readiness.geminiExplanation.status ?? "not_checked"}>{result?.readiness.geminiExplanation.status ?? "not_checked"}</em></div>
-      </div></details>
+        <details className="result-detail-accordion"><summary>外部サービスの状態を見る</summary><div className="workspace-provider-readiness">
+          <span>Readiness / fallback status</span>
+          <div><strong>Rakuten</strong><em data-status={result?.readiness.rakuten.status ?? "not_checked"}>{result?.readiness.rakuten.status ?? "not_checked"}</em></div>
+          <div><strong>Gemini候補調査</strong><em data-status={result?.readiness.geminiResearch.status ?? "not_checked"}>{result?.readiness.geminiResearch.status ?? "not_checked"}</em></div>
+          <div><strong>Gemini補助説明</strong><em data-status={result?.readiness.geminiExplanation.status ?? "not_checked"}>{result?.readiness.geminiExplanation.status ?? "not_checked"}</em></div>
+        </div></details>
+      </details>
     </section>
   );
 }

@@ -326,7 +326,7 @@ export function RecommendationWorkspace({
 
       <nav className="mobile-workspace-steps" aria-label="商品判断ステップ"><a href="#mobile-step-1"><span>1</span>入力</a><a href="#mobile-step-2"><span>2</span>画像 / URL</a><a href="#mobile-step-3"><span>3</span>判断結果</a><a href="#mobile-step-4"><span>4</span>証拠 / リンク</a><a href="#mobile-step-5"><span>5</span>保存 / 評価</a></nav>
 
-      <div className="workspace-grid desktop-workspace-layout">
+      <div className="workspace-grid desktop-workspace-layout" data-has-result={result ? "true" : "false"}>
         <section className="workspace-panel workspace-input-panel" aria-labelledby="workspace-input-title" data-mobile-step="1" id="mobile-step-1">
           <div className="workspace-panel-heading"><span>01 / INPUT</span><h3 id="workspace-input-title">商品情報</h3><p>商品名・URL・画像のいずれかを入力してください。</p></div>
           <div className="workspace-fields workspace-basic-fields">
@@ -346,7 +346,7 @@ export function RecommendationWorkspace({
           <div className="workspace-score-preview"><div><span>Balanced Score</span><strong>{result ? result.modeRecommendation.balancedScore : "--"}</strong></div><div><span>Ryo Score</span><strong>{result ? result.modeRecommendation.ryoScore : "--"}</strong></div></div>
           {result ? <><p className="core-v1-provider-note" data-ryo-reranking={result.ryoReranking.applied ? "applied" : "not-applied"}>Ryo再ランキング: {result.ryoReranking.applied ? `適用済み（候補${result.ryoReranking.candidatePoolSize}足 / recommendationScore ${result.ryoReranking.selectedRecommendationScore}）` : "商品単体判断のため未適用"}</p><details className="result-detail-accordion"><summary>Ryoらしい評価を詳しく見る</summary><RyoModeResultPanel candidate={result.candidate} rerankingApplied={result.ryoReranking.applied} vector={ryoPreferenceVector} /></details></> : null}
           <dl className="workspace-result-list"><div><dt>Core判断理由</dt><dd>{result ? `${selectedMode.description}。Coreが候補特徴・予算適合度・リスクから判定しました。` : selectedMode.description}</dd></div><div><dt>Gemini補助</dt><dd>{result ? `${result.candidateResearch.detail} 説明: ${result.explanation.source}` : "結果生成後に表示します。"}</dd></div><div><dt>注意点</dt><dd>{allCautions.length ? allCautions.join(" / ") : "価格・在庫・サイズ・購入可能性は保証しません。"}</dd></div></dl>
-          <div data-mobile-step="4" id="mobile-step-4"><ExternalEvidencePanel result={result} productLinks={productLinks} productLinksMessage={productLinksMessage} isProductLinksLoading={isResolvingProductLinks} manualProductUrl={manualProductUrl} isResolvingManualUrl={isResolvingManualUrl} onManualProductUrlChange={setManualProductUrl} onAddManualProductUrl={handleAddManualProductUrl} />{result ? <RakutenMarketFind candidate={result.candidate} key={result.candidate.name} /> : null}</div>
+          <div data-mobile-step="4" id="mobile-step-4">{result ? <><ExternalEvidencePanel result={result} productLinks={productLinks} productLinksMessage={productLinksMessage} isProductLinksLoading={isResolvingProductLinks} manualProductUrl={manualProductUrl} isResolvingManualUrl={isResolvingManualUrl} onManualProductUrlChange={setManualProductUrl} onAddManualProductUrl={handleAddManualProductUrl} /><RakutenMarketFind candidate={result.candidate} key={result.candidate.name} /></> : <p className="workspace-evidence-pending">判断後に、参考リンク・画像・URL・外部サービスの状態を確認できます。</p>}</div>
         </section>
 
         <aside className="workspace-panel workspace-user-panel" aria-labelledby="workspace-user-title" data-mobile-step="5" id="mobile-step-5">

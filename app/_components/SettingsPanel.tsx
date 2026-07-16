@@ -91,24 +91,29 @@ export function SettingsPanel() {
           <p className="feature-boundary-note"><strong>アカウント削除:</strong> 現在は未対応です。利用可能とは表示しません。</p>
         </SettingsCard>
 
-        <SettingsCard title="外部API利用">
-          <p>
-            Rakuten listing、Gemini画像分析、Gemini URL Contextは外部証拠です。API key、raw response、keyを含むrequest URLは画面やログへ出しません。
-          </p>
-          <p>価格・画像・URLの結果はCore budgetFit、score、Decisionを直接変更しません。</p>
-        </SettingsCard>
+        <details className="settings-technical-details">
+          <summary>技術情報と外部サービスの扱い</summary>
+          <div className="settings-technical-grid">
+            <SettingsCard title="外部API利用">
+              <p>
+                Rakuten listing、Gemini画像分析、Gemini URL Contextは外部証拠です。API key、raw response、keyを含むrequest URLは画面やログへ出しません。
+              </p>
+              <p>価格・画像・URLの結果はCore budgetFit、score、Decisionを直接変更しません。</p>
+            </SettingsCard>
 
-        <SettingsCard title="共通推薦フィードバックコーパス">
-          <p>
-            過去の推薦評価を匿名の参考事例として保存します。自由記述はemail、phone、URLを伏せ、命令文として扱いません。
-          </p>
-        </SettingsCard>
+            <SettingsCard title="共通推薦フィードバックコーパス">
+              <p>
+                過去の推薦評価を匿名の参考事例として保存します。自由記述はemail、phone、URLを伏せ、命令文として扱いません。
+              </p>
+            </SettingsCard>
 
-        <SettingsCard title="Ryo Mode curated seed">
-          <p>
-            未購入でも人に勧めたい候補と推薦思想です。所有スニーカーや個人memoryとは別で、seedだけでDecisionを決めません。
-          </p>
-        </SettingsCard>
+            <SettingsCard title="Ryo Mode curated seed">
+              <p>
+                未購入でも人に勧めたい候補と推薦思想です。所有スニーカーや個人memoryとは別で、seedだけでDecisionを決めません。
+              </p>
+            </SettingsCard>
+          </div>
+        </details>
       </div>
     </section>
   );

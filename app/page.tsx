@@ -14,7 +14,7 @@ export default function Page() {
         <section className="home-hero home-hero--landing">
           <div className="home-hero-copy">
             <p className="home-kicker">SOLE//MATRIX — ISSUE 01</p>
-            <h1 id="home-title" className="home-title">迷っている一足を、<br />買う前に整理する。</h1>
+            <h1 id="home-title" className="home-title">迷っている一足を、買う前に整理する。</h1>
             <p className="home-lead">好み、カルチャー、予算、外部情報。散らばった判断材料を一枚の推薦記録にまとめます。</p>
             <div className="home-hero-actions">
               <a className="home-primary-cta" href="/login"><span>ログイン / 新規登録</span><span aria-hidden="true">→</span></a>
@@ -35,12 +35,12 @@ export default function Page() {
         </section>
 
         <section className="entry-section" aria-labelledby="home-capabilities-title">
-          <div className="section-heading"><p className="home-kicker">Choose your path</p><h2 id="home-capabilities-title">いま必要な入口から。</h2><p>どちらから始めても、結果のあとに診断・商品判断を行き来できます。</p></div>
+          <div className="section-heading"><div><p className="home-kicker">Choose your path</p><h2 id="home-capabilities-title">いま必要な入口から。</h2></div><p>どちらから始めても、結果のあとに診断・商品判断を行き来できます。</p></div>
           <div className="entry-grid">{entryCards.map((card) => <HomeEntryCard key={card.title} {...card} items={[...card.items]} />)}</div>
         </section>
 
         <section className="home-principles" aria-labelledby="home-principles-title">
-          <div><p className="home-kicker">What stays human</p><h2 id="home-principles-title">AIの答えではなく、<br />あなたの購入判断をつくる。</h2></div>
+          <div><p className="home-kicker">What stays human</p><h2 id="home-principles-title">AIの答えではなく、あなたの購入判断をつくる。</h2></div>
           <ol>
             <li><span>Core</span><strong>スコアと最終判断</strong><p>同じ入力には同じルールで答えます。</p></li>
             <li><span>Research</span><strong>候補と説明の補助</strong><p>取得できない場合はfallbackを明示します。</p></li>
