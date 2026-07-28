@@ -294,6 +294,7 @@ function enforceHighCutWinnerGuard(
 
 function createAnchorCandidate(definition: AnchorDefinition, budgetYen?: number): CandidateProfile {
   const vector = createVector(definition.tags, definition.name);
+  const identity = splitStaticCandidateName(definition.name);
   return {
     id: `ryo-anchor-${definition.id}`,
     name: definition.name,
@@ -307,12 +308,32 @@ function createAnchorCandidate(definition: AnchorDefinition, budgetYen?: number)
     readiness: "ready_local",
     priceYen: definition.priceYen,
     modelType: definition.modelType,
+    modelName: identity.modelName,
+    colorwayName: identity.colorwayName,
+    styleCode: null,
+    modelEvidenceUrls: [],
+    colorwayEvidenceUrls: [],
+    styleCodeEvidenceUrls: [],
+    verificationStatus: "unverified",
+    sourceQuality: "unknown",
     searchKeywords: [definition.name],
     evidenceUrls: [`https://www.google.com/search?q=${encodeURIComponent(definition.name)}`],
     researchReason: `Ryo candidate anchorの候補シグナル: ${definition.signals.join(" / ")}。実際の順位は回答との再評価で決めています。`,
     researchCautions: ["価格・在庫・サイズ・購入可能性は販売元で確認してください。"],
     researchSource: "ryo_anchor",
   };
+}
+
+function splitStaticCandidateName(name: string): { modelName: string; colorwayName: string | null } {
+  const quotedColor = name.match(/^(.*)\s+"([^"]+)"$/u);
+  if (quotedColor?.[1] && quotedColor[2] && /(?:black|white|grey|gray|orange|red|blue|green|brown|cream|gum|navy|olive|burgundy)/iu.test(quotedColor[2])) {
+    return { modelName: quotedColor[1].trim(), colorwayName: quotedColor[2].trim() };
+  }
+  const suffixColor = name.match(/^(.*)\s+(Black\s*\/\s*White|White\s*\/\s*Black|Black\s*\/\s*Grey|Black)$/iu);
+  if (suffixColor?.[1] && suffixColor[2]) {
+    return { modelName: suffixColor[1].trim(), colorwayName: suffixColor[2].replace(/\s*\/\s*/gu, "/").trim() };
+  }
+  return { modelName: name, colorwayName: null };
 }
 
 function getActiveSignals(vector: RyoPreferenceVector): Set<AnchorSignal> {

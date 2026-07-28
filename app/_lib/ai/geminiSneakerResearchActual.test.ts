@@ -14,6 +14,10 @@ describe("Gemini sneaker research actual smoke", () => {
     const result = await researchSneakerCandidatesWithGemini({
       answersSummary: "trusted-classic: like\nsimple-daily: like\nwalking-comfort: like",
       preferenceVector: { culture: 85, styleFit: 80, simplicity: 88, street: 55, volume: 40, comfort: 82, durability: 78, priceLevel: 50 },
+      purchasePurpose: "daily_rotation",
+      ownedModels: [],
+      dislikedModels: [],
+      dislikedSignals: [],
       budget: "20000円まで",
       mode: "balanced",
     }, { fetcher: async (input, init) => {

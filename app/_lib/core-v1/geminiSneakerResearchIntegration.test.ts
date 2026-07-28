@@ -6,8 +6,8 @@ describe("Gemini candidate research and Core re-evaluation", () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(groundedResponse("adidas SAMBA OG は実在するクラシックモデルです。", "adidas SAMBA OG", "https://source.example/samba"))
       .mockResolvedValueOnce(geminiResponse(JSON.stringify({ candidates: [
-        { brand: "adidas", modelName: "クラシック・デイリー型", modelType: "抽象", reason: "invalid", cautions: [], searchKeywords: ["クラシック・デイリー型"], confidence: 0.9 },
-        { brand: "adidas", modelName: "adidas SAMBA OG", modelType: "クラシック・デイリー", reason: "診断のクラシック志向に合います。", cautions: ["サイズを確認してください。"], searchKeywords: ["adidas SAMBA OG"], confidence: 0.8 },
+        { brand: "adidas", modelName: "クラシック・デイリー型", colorwayName: null, styleCode: null, modelType: "抽象", reason: "invalid", cautions: [], searchKeywords: ["クラシック・デイリー型"], confidence: 0.9 },
+        { brand: "adidas", modelName: "adidas SAMBA OG", colorwayName: null, styleCode: null, modelType: "クラシック・デイリー", reason: "診断のクラシック志向に合います。", cautions: ["サイズを確認してください。"], searchKeywords: ["adidas SAMBA OG"], confidence: 0.8 },
       ] })))
       .mockResolvedValueOnce(geminiResponse(JSON.stringify({ summary: "補助説明", reasons: ["補助理由"], cautions: ["補助注意"], balancedView: "balanced", ryoView: "ryo", finalTone: "balanced", decision: "strong_buy" })));
 
@@ -18,6 +18,13 @@ describe("Gemini candidate research and Core re-evaluation", () => {
     });
 
     expect(result.candidate.name).toBe("adidas Samba OG");
+    expect(result.candidate).toMatchObject({
+      modelName: "adidas Samba OG",
+      colorwayName: null,
+      styleCode: null,
+      verificationStatus: "model_verified_colorway_unverified",
+      sourceQuality: "unknown",
+    });
     expect(result.candidate.researchSource).toBe("gemini");
     expect(result.candidate.evidenceLinks).toEqual([
       { url: "https://source.example/samba", type: "gemini_citation_url" },

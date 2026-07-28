@@ -91,10 +91,16 @@ export async function recommendCoreV1(
       ? Promise.resolve(null)
       : researchSneakerCandidatesWithGemini(
           {
-            answersSummary: input.diagnosisAnswers
+            answersSummary: Object.entries(input.ryoModeAnswers ?? {})
+              .map(([questionId, optionId]) => `${questionId}: ${optionId}`)
+              .join("\n") || input.diagnosisAnswers
               .map((answer) => `${answer.questionId}: ${answer.value}`)
               .join("\n"),
             preferenceVector,
+            purchasePurpose: userSneakerContext.purchasePurpose,
+            ownedModels: userSneakerContext.ownedModels,
+            dislikedModels: userSneakerContext.dislikedModels,
+            dislikedSignals: userSneakerContext.dislikedSignals,
             budget: input.budgetYen === undefined ? null : `${input.budgetYen}円まで`,
             mode: input.mode ?? "balanced",
           },
@@ -328,6 +334,15 @@ function mapGeminiCandidate(
     informationCompleteness: 76,
     readiness: "ready_external",
     modelType: candidate.modelType,
+    brand: candidate.brand,
+    modelName: candidate.modelName,
+    colorwayName: candidate.colorwayName,
+    styleCode: candidate.styleCode,
+    modelEvidenceUrls: [...candidate.modelEvidenceUrls],
+    colorwayEvidenceUrls: [...candidate.colorwayEvidenceUrls],
+    styleCodeEvidenceUrls: [...candidate.styleCodeEvidenceUrls],
+    verificationStatus: candidate.verificationStatus,
+    sourceQuality: candidate.sourceQuality,
     searchKeywords: [...candidate.searchKeywords],
     evidenceUrls: [...candidate.evidenceUrls],
     evidenceLinks: candidate.evidenceLinks.map((link) => ({ ...link })),
