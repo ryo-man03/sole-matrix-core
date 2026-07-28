@@ -9,15 +9,28 @@
 SOLE//MATRIX は、好みを言語化しにくい人でも、服装・パンツ・素材・予算・カルチャーの軸でスニーカー選びを整理できるように設計したアプリです。
 
 - 11問診断から `RyoPreferenceVector v4` を生成できる
+- 最初の一足、普段使い、二足目、アーカイブという購入目的と、所有・苦手モデルを今回の推薦文脈に反映できる
 - 商品名・URL・画像から個別の商品判断ができる
-- Gemini を候補調査と補助説明に使い、Core が schema 検証・fallback・再ランキング・最終判断を担う
+- Gemini を候補調査と補助説明に使い、Core がモデル名・正式カラー名・Style Code・根拠 URL の検証、fallback、再ランキング、最終判断を担う
 - Ryo Mode v4 で文化背景、素材の育ち、パンツ相性を強く反映する
 - Rakuten `market_find` で、推薦後に楽天市場の購入候補を別枠で探せる
 - 価格・在庫・サイズ・購入可能性は販売元で要確認
 
 ## 2. Screenshots
 
-以下は、2026-07-07 にローカル環境で確認した画面です。実 API に依存しない確認用キャプチャを含みます。
+以下はローカル環境で確認した画面です。実 API に依存しない確認用キャプチャを含みます。
+
+### 診断 v2 / verified colorway flow
+
+購入文脈 → 説明付き11問 → 回答サマリー → 確認済みカラーまたは安全なカラー未確認表示、という順で進みます。
+
+| State | 390px | Desktop |
+| --- | --- | --- |
+| 購入文脈 | [context](docs/product/screenshots/diagnosis-v2/diagnosis-context-390.png) | — |
+| 説明付き選択肢 | [options](docs/product/screenshots/diagnosis-v2/diagnosis-options-390.png) | — |
+| 回答サマリー | [summary](docs/product/screenshots/diagnosis-v2/diagnosis-summary-390.png) | — |
+| モデル・カラー確認済み | [390px](docs/product/screenshots/diagnosis-v2/verified-colorway-result-390.png) | [1024px](docs/product/screenshots/diagnosis-v2/verified-colorway-result-1024.png) / [1440px](docs/product/screenshots/diagnosis-v2/verified-colorway-result-1440.png) |
+| モデル確認済み・カラー未確認 | [390px](docs/product/screenshots/diagnosis-v2/unverified-colorway-fallback-390.png) | — |
 
 ### 11問診断の開始画面
 
@@ -56,12 +69,15 @@ SOLE//MATRIX は、AI におすすめを丸投げするためのアプリでは�
 ## 4. Main features
 
 - 11問診断
+- 購入目的・所有モデル・避けたいモデルを使う `UserSneakerContext`
 - 商品判断（商品名 / URL / 画像）
 - `RyoPreferenceVector v4`
+- `RyoScoreBreakdownV2`（回答との相性 / Ryo Modeらしさ / 現実的な選びやすさ / 二足目・アーカイブ適性）
 - `productScore` / `recommendationScore` / `totalRyoScore`
 - cultural recommendation metadata
 - retro running taxonomy
 - Gemini grounded candidate research
+- verified model / colorway / Style Code と source quality の表示
 - fallback catalog
 - Rakuten `market_find` purchase-support layer
 - feedback localStorage persistence
@@ -89,7 +105,9 @@ AF1 は完全に排除していません。白レザー定番として機能す�
 
 ## 6. Core / Ryo Mode / Gemini / Rakuten の役割
 
-Ryo Mode は汎用的な AI プロンプトではなく、11問の回答を構造化した preference vector と、親モデル・文化背景・素材・パンツ相性などのルールを使う推薦ロジックです。Gemini は Google Search Grounding を使った候補調査と補助説明を担当しますが、出力はそのまま採用せず、Core 側で schema と内容を検証します。fallback catalog は Gemini 成功扱いにしません。
+Ryo Mode は汎用的な AI プロンプトではなく、11問の回答を構造化した preference vector と、親モデル・文化背景・素材・パンツ相性などのルールを使う推薦ロジックです。各選択肢には推薦へどう影響するかの説明があり、購入目的や所有・苦手モデルは `UserSneakerContext` として別に扱います。Gemini は Google Search Grounding を使った候補調査と補助説明を担当しますが、出力はそのまま採用せず、Core 側で schema と内容を検証します。fallback catalog は Gemini 成功扱いにしません。
+
+Gemini 候補は、モデル、カラー、Style Code の根拠を分けて確認します。カラーを同一モデルの信頼できる出典で確認できない場合は推測せず、「モデル確認済み・カラー未確認」と表示します。出典品質は公式、正規取扱店、信頼できる販売店・メディア、マーケットプレイス、未分類に分けます。Core 内の静的候補は「Core候補」、楽天の商品は「楽天市場の購入参考候補」として区別します。
 
 Rakuten `market_find` は推薦後の購入サポートです。楽天の商品情報は Core / Ryo Mode のスコア、ランキング、最終 Decision を変更しません。また、公式モデル同定、正規品判定、価格・在庫・サイズの保証には使いません。
 
@@ -113,6 +131,12 @@ Rakuten `market_find` は推薦後の購入サポートです。楽天の商品�
 | `retroRunningAffinity` | レトロランニング文脈との一致度 |
 | `materialAffinity` | 素材の育ち方や経年変化との相性 |
 | `pantsAffinity` | パンツとの合わせやすさ |
+| `userFitScore` | 11問と購入文脈への近さ |
+| `ryoIdentityScore` | 定番に寄りすぎない Ryo Mode らしさ |
+| `practicalFitScore` | 予算や用途を含む現実的な選びやすさ |
+| `explorationScore` | 二足目・アーカイブ枠としての面白さ |
+| `contextPenalty` | 所有・苦手モデルなど今回の文脈による減点 |
+| `finalRecommendationScore` | ブレンドと文脈補正後の最終推薦スコア |
 
 ## 8. Tech stack
 
@@ -137,6 +161,7 @@ Rakuten `market_find` は推薦後の購入サポートです。楽天の商品�
 ## 10. Limitations
 
 - Gemini の Grounding は候補調査の根拠を補いますが、情報の完全性や恒久的な正確性を保証するものではありません。候補は Core で検証し、失敗時は具体モデルの fallback catalog を使います。
+- モデルを確認できても正式カラーを確認できない場合があります。その場合はカラー名と Style Code を推測せず、モデルのみを表示します。
 - Rakuten `market_find` は検索語に近い販売商品を表示する購入サポートです。公式モデル同定、正規品判定、推薦根拠には使用しません。
 - 価格・在庫・サイズ・商品状態・返品条件は変動します。購入前に販売ページで確認してください。
 - 外部 API が未設定、拒否、rate limit、network error の場合も、推薦結果を残したまま fallback または soft error を表示します。
@@ -182,12 +207,13 @@ Supabase など、ほかの任意設定は [`.env.local.example`](.env.local.exa
 
 ## 13. Verification
 
-2026-07-09 時点で、以下をローカルで確認しました。
+2026-07-28 時点で、以下をローカルで確認しました。
 
 - TypeScript: passed
-- Tests: 70 files / 513 tests passed
+- Tests: 75 files / 544 tests passed
 - Production build: passed
-- Browser check: passed（`localhost:3000` の guest flow、11問診断、High 条件に合う Ryo Mode v4 結果、Rakuten `market_find` の実商品カード、推薦結果の維持を確認）
+- Browser check: passed（390x844 / 1024x900 / 1440x900。購入文脈、説明付き11問、サマリー、verified / unverified colorway、4軸スコア、楽天の別枠表示、横スクロールなし、console error 0件）
+- Gemini contract: mocked contract は検証済み。live Gemini colorway verification は未確認
 
 ## 14. Future improvements
 
