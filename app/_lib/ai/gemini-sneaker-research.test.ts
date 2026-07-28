@@ -3,6 +3,10 @@ import { researchSneakerCandidatesWithGemini } from "./gemini-sneaker-research";
 const input = {
   answersSummary: "trusted-classic: like",
   preferenceVector: { culture: 85 },
+  purchasePurpose: "daily_rotation" as const,
+  ownedModels: [],
+  dislikedModels: [],
+  dislikedSignals: [],
   budget: null,
   mode: "balanced" as const,
 };
@@ -10,6 +14,8 @@ const input = {
 const validCandidate = {
   brand: "adidas",
   modelName: "adidas SAMBA OG",
+  colorwayName: null,
+  styleCode: null,
   modelType: "クラシック",
   reason: "診断のクラシック志向に合います。",
   cautions: ["サイズを確認してください。"],
@@ -80,6 +86,96 @@ describe("Gemini sneaker research outcome", () => {
         normalization: { status: "fallback", repairAttempted: false, candidateCount: 0 },
       },
     });
+  });
+
+  it("verifies model, colorway, and style code only from matching official grounding evidence", async () => {
+    const candidate = {
+      ...validCandidate,
+      brand: "Nike",
+      modelName: "Nike Terminator High",
+      colorwayName: "Black / White",
+      styleCode: "HF6870-001",
+      searchKeywords: ["Nike Terminator High Black / White"],
+    };
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(groundedResponse(
+        "Nike Terminator High の Black / White、Style Code HF6870-001 を紹介します。",
+        "Nike Terminator High Black / White HF6870-001",
+        "https://www.nike.com/jp/t/terminator-high-hf6870-001",
+      ))
+      .mockResolvedValueOnce(geminiResponse(JSON.stringify({ candidates: [candidate] })));
+
+    const outcome = await researchSneakerCandidatesWithGemini(input, { apiKey: "test-key", fetcher });
+    expect(outcome.status).toBe("ready");
+    if (outcome.status !== "ready") return;
+    expect(outcome.result.candidates[0]).toMatchObject({
+      modelName: "Nike Terminator High",
+      colorwayName: "Black / White",
+      styleCode: "HF6870-001",
+      verificationStatus: "model_and_colorway_verified",
+      sourceQuality: "official",
+    });
+    expect(outcome.result.candidates[0]?.modelEvidenceUrls).toHaveLength(1);
+    expect(outcome.result.candidates[0]?.colorwayEvidenceUrls).toHaveLength(1);
+    expect(outcome.result.candidates[0]?.styleCodeEvidenceUrls).toHaveLength(1);
+  });
+
+  it("drops unverified colorway and style code while preserving a model-only candidate", async () => {
+    const candidate = {
+      ...validCandidate,
+      colorwayName: "Cloud White / Core Black",
+      styleCode: "B75806",
+    };
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(groundedResponse(
+        "adidas SAMBA OG は実在するクラシックモデルです。",
+        "adidas SAMBA OG",
+        "https://www.adidas.jp/samba-og",
+      ))
+      .mockResolvedValueOnce(geminiResponse(JSON.stringify({ candidates: [candidate] })));
+
+    const outcome = await researchSneakerCandidatesWithGemini(input, { apiKey: "test-key", fetcher });
+    expect(outcome.status).toBe("ready");
+    if (outcome.status !== "ready") return;
+    expect(outcome.result.candidates[0]).toMatchObject({
+      modelName: "adidas Samba OG",
+      colorwayName: null,
+      styleCode: null,
+      verificationStatus: "model_verified_colorway_unverified",
+      sourceQuality: "official",
+    });
+    expect(outcome.result.candidates[0]?.colorwayEvidenceUrls).toEqual([]);
+    expect(outcome.result.candidates[0]?.styleCodeEvidenceUrls).toEqual([]);
+  });
+
+  it("does not verify a colorway from an unknown source and caps marketplace confidence", async () => {
+    const candidate = { ...validCandidate, colorwayName: "Cloud White / Core Black", styleCode: null };
+    const unknown = await runWithStructured(
+      { candidates: [candidate] },
+      "adidas SAMBA OG Cloud White / Core Black",
+      "https://unknown.example/samba",
+    );
+    expect(unknown.status).toBe("ready");
+    if (unknown.status === "ready") {
+      expect(unknown.result.candidates[0]).toMatchObject({
+        colorwayName: null,
+        verificationStatus: "model_verified_colorway_unverified",
+        sourceQuality: "unknown",
+      });
+    }
+    const marketplace = await runWithStructured(
+      { candidates: [{ ...candidate, confidence: 0.92 }] },
+      "adidas SAMBA OG Cloud White / Core Black",
+      "https://stockx.com/adidas-samba-og",
+    );
+    expect(marketplace.status).toBe("ready");
+    if (marketplace.status === "ready") {
+      expect(marketplace.result.candidates[0]).toMatchObject({
+        colorwayName: "Cloud White / Core Black",
+        sourceQuality: "marketplace",
+        confidence: 0.65,
+      });
+    }
   });
 
   it("repairs malformed JSON once and validates the repaired result", async () => {
@@ -183,9 +279,13 @@ describe("Gemini sneaker research outcome", () => {
   });
 });
 
-async function runWithStructured(value: unknown) {
+async function runWithStructured(
+  value: unknown,
+  supportedText = "adidas SAMBA OG は実在するモデルです。",
+  url = "https://source.example/samba",
+) {
   const fetcher = vi.fn<typeof fetch>()
-    .mockResolvedValueOnce(groundedResponse("adidas SAMBA OG は実在するモデルです。", "adidas SAMBA OG", "https://source.example/samba"))
+    .mockResolvedValueOnce(groundedResponse(supportedText, supportedText, url))
     .mockResolvedValueOnce(geminiResponse(JSON.stringify(value)));
   return researchSneakerCandidatesWithGemini(input, { apiKey: "test-key", fetcher });
 }
