@@ -329,6 +329,22 @@ export type RyoModeScoreResult = {
   affinities?: RyoAffinityBreakdown;
 };
 
+export type RyoScoreBreakdownV2 = {
+  userFitScore: number;
+  ryoIdentityScore: number;
+  practicalFitScore: number;
+  explorationScore: number;
+  contextPenalty: number;
+  finalRecommendationScore: number;
+};
+
+export type RyoStrengthBlend = {
+  userFit: number;
+  ryoIdentity: number;
+  practicalFit: number;
+  exploration: number;
+};
+
 export type RyoOpinion = {
   summary: string;
   strongestSignals: string[];
