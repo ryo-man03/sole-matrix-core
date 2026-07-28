@@ -15,7 +15,7 @@ describe("Rakuten market_find result UI", () => {
   it("renders a separate, click-to-search Rakuten section", () => {
     expect(panelSource).toContain("RakutenMarketFind");
     expect(marketSource).toContain("楽天で近い商品を探す");
-    expect(marketSource).toContain("購入サポート / Rakuten market_find");
+    expect(marketSource).toContain("楽天市場の購入参考候補");
     expect(marketSource).toContain("onClick={searchProducts}");
     expect(marketSource).not.toContain("useEffect(");
     expect(marketSource).toContain("/api/market/rakuten?q=");

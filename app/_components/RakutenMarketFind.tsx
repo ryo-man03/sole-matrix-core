@@ -50,7 +50,7 @@ export function RakutenMarketFind({ candidate }: Props) {
     <section className="rakuten-market-find" aria-labelledby="rakuten-market-find-title">
       <div className="rakuten-market-find-heading">
         <div>
-          <p className="diagnosis-summary-kicker">購入サポート / Rakuten market_find</p>
+          <p className="diagnosis-summary-kicker">楽天市場の購入参考候補</p>
           <h4 id="rakuten-market-find-title">楽天で近い商品を探す</h4>
           <p>楽天市場で見つかった購入前の確認候補です。推薦結果とは別に表示しています。</p>
         </div>
