@@ -5,6 +5,7 @@ describe("Core v1 UI integration", () => {
   const diagnosisFlowSource = readFileSync(new URL("../../_components/PreferenceDiagnosisFlow.tsx", import.meta.url), "utf8");
   const diagnosisDataSource = readFileSync(new URL("../../_data/preferenceDiagnosisQuestions.ts", import.meta.url), "utf8");
   const ryoResultSource = readFileSync(new URL("../../_components/RyoModeResultPanel.tsx", import.meta.url), "utf8");
+  const verifiedResultSource = readFileSync(new URL("../../_components/VerifiedCandidateResult.tsx", import.meta.url), "utf8");
   const readinessSource = readFileSync(new URL("./readiness.ts", import.meta.url), "utf8");
 
   it("connects diagnosis answers to the recommendation API", () => {
@@ -18,9 +19,16 @@ describe("Core v1 UI integration", () => {
 
   it("renders concrete result, fallback, readiness, and feedback states", () => {
     expect(componentSource).toContain("具体的なおすすめモデルを見る");
-    expect(componentSource).toContain("fallback catalog");
-    expect(componentSource).toContain("Balanced Score");
-    expect(componentSource).toContain("Ryo Score");
+    expect(componentSource).toContain("Core候補");
+    expect(componentSource).toContain("VerifiedCandidateResult");
+    expect(verifiedResultSource).toContain("モデル・カラー確認済み");
+    expect(verifiedResultSource).toContain("モデル確認済み・カラー未確認");
+    expect(verifiedResultSource).toContain("配色: 実在確認できず");
+    expect(verifiedResultSource).toContain("Style Code");
+    expect(verifiedResultSource).toContain("あなたの回答との相性");
+    expect(verifiedResultSource).toContain("Ryo Modeらしさ");
+    expect(verifiedResultSource).toContain("現実的な選びやすさ");
+    expect(verifiedResultSource).toContain("二足目・アーカイブ適性");
     expect(readinessSource).toContain("rule-based説明");
     expect(componentSource).toContain("Gemini候補調査:");
     expect(componentSource).toContain("Gemini補助説明:");
@@ -58,8 +66,14 @@ describe("Core v1 UI integration", () => {
     expect(diagnosisFlowSource).toContain("buildRyoPreferenceVector");
     expect(componentSource).toContain("buildRyoModeContextForRecommendation");
     expect(componentSource).toContain("ryoModeAnswers");
+    expect(componentSource).toContain("purchasePurpose");
+    expect(componentSource).toContain("ownedModels");
+    expect(diagnosisFlowSource).toContain("SneakerContextForm");
+    expect(diagnosisFlowSource).toContain("userSneakerContext={context}");
     expect(componentSource).toContain("data-ryo-reranking");
     expect(componentSource).toContain("RyoModeResultPanel");
+    expect(componentSource).toContain("RyoScoreBreakdown");
+    expect(verifiedResultSource).toContain("selectedScoreBreakdownV2");
     expect(ryoResultSource).toContain("productScore");
     expect(ryoResultSource).toContain("recommendationScore");
     expect(ryoResultSource).toContain("totalRyoScore");

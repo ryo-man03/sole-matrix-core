@@ -65,6 +65,10 @@ describe("Core v1 recommend API", () => {
           color: "black_white",
           ryoStrength: "ryo_strong",
         },
+        purchasePurpose: "second_pair",
+        ownedModels: ["PUMA Suede"],
+        dislikedModels: ["Nike Air Force 1 Low"],
+        dislikedSignals: ["真っ白"],
       }),
     );
     const payload = (await response.json()) as {
@@ -76,6 +80,20 @@ describe("Core v1 recommend API", () => {
           strength: string;
           selectedBucket?: string;
           selectedRyoSignature?: { bucket: string; reasons: string[] };
+          selectedScoreBreakdownV2?: {
+            userFitScore: number;
+            ryoIdentityScore: number;
+            practicalFitScore: number;
+            explorationScore: number;
+            contextPenalty: number;
+            finalRecommendationScore: number;
+          };
+          strengthBlend?: {
+            userFit: number;
+            ryoIdentity: number;
+            practicalFit: number;
+            exploration: number;
+          };
         };
       };
     };
@@ -84,6 +102,20 @@ describe("Core v1 recommend API", () => {
     expect(payload.data.ryoReranking).toMatchObject({ applied: true, strength: "strong" });
     expect(payload.data.ryoReranking.selectedBucket).toMatch(/anchor_classic|ryo_signature|adjacent_discovery|practical_buy|wildcard/);
     expect(payload.data.ryoReranking.selectedRyoSignature?.bucket).toBe(payload.data.ryoReranking.selectedBucket);
+    expect(payload.data.ryoReranking.selectedScoreBreakdownV2).toMatchObject({
+      userFitScore: expect.any(Number),
+      ryoIdentityScore: expect.any(Number),
+      practicalFitScore: expect.any(Number),
+      explorationScore: expect.any(Number),
+      contextPenalty: expect.any(Number),
+      finalRecommendationScore: expect.any(Number),
+    });
+    expect(payload.data.ryoReranking.strengthBlend).toEqual({
+      userFit: 0.28,
+      ryoIdentity: 0.38,
+      practicalFit: 0.1,
+      exploration: 0.24,
+    });
     expect(payload.data.candidate.ryoMetadata?.recommendationBucket).toBe(payload.data.ryoReranking.selectedBucket);
 
     const invalid = await postRecommendation(

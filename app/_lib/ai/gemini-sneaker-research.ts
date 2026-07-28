@@ -6,6 +6,7 @@ import {
 } from "./gemini-sneaker-research-prompt";
 import {
   geminiSneakerResearchResponseSchema,
+  classifyEvidenceSourceQuality,
   validateEvidenceUrls,
   validateGeminiSneakerResearchDraft,
   type GeminiResearchEvidenceLink,
@@ -341,24 +342,100 @@ function attachTrustedEvidence(
   candidate: GeminiSneakerResearchDraftCandidate,
   grounding: GroundingEvidence,
 ): GeminiSneakerResearchCandidate | null {
-  const modelName = normalizeForMatch(candidate.sourceModelName);
-  const citationUrls = grounding.supports
-    .filter((support) => normalizeForMatch(support.text).includes(modelName))
-    .flatMap((support) => support.chunkIndices.map((index) => grounding.chunks[index]?.url ?? ""));
-  const trustedCitationUrls = validateEvidenceUrls(citationUrls);
-  if (trustedCitationUrls.length < 1) return null;
+  const modelTokens = [
+    normalizeForMatch(candidate.sourceModelName),
+    normalizeForMatch(candidate.modelName),
+  ].filter(Boolean);
+  const modelSupports = grounding.supports.filter((support) => {
+    const text = normalizeForMatch(support.text);
+    return modelTokens.some((modelName) => text.includes(modelName));
+  });
+  const modelEvidenceUrls = supportUrls(modelSupports, grounding);
+  if (modelEvidenceUrls.length < 1) return null;
+
+  const colorwayEvidenceUrls = candidate.sourceColorwayName
+    ? supportUrls(grounding.supports.filter((support) => {
+        const text = normalizeForMatch(support.text);
+        return modelTokens.some((modelName) => text.includes(modelName))
+          && text.includes(normalizeForMatch(candidate.sourceColorwayName!));
+      }), grounding)
+    : [];
+  const candidateSourceQuality = classifyEvidenceSourceQuality([
+    ...modelEvidenceUrls,
+    ...colorwayEvidenceUrls,
+  ]);
+  const verifiedColorway = candidate.colorwayName
+    && colorwayEvidenceUrls.length > 0
+    && candidateSourceQuality !== "unknown"
+    ? candidate.colorwayName
+    : null;
+  const styleCodeEvidenceUrls = candidate.sourceStyleCode
+    ? findStyleCodeEvidenceUrls(candidate.sourceStyleCode, modelTokens, grounding)
+    : [];
+  const verifiedStyleCode = styleCodeEvidenceUrls.length > 0 ? candidate.styleCode : null;
+  const evidenceUrls = validateEvidenceUrls([
+    ...modelEvidenceUrls,
+    ...(verifiedColorway ? colorwayEvidenceUrls : []),
+    ...(verifiedStyleCode ? styleCodeEvidenceUrls : []),
+  ]);
 
   const evidenceLinks: GeminiResearchEvidenceLink[] = [
-    ...trustedCitationUrls.slice(0, 4).map((url) => ({ url, type: "gemini_citation_url" as const })),
+    ...evidenceUrls.slice(0, 6).map((url) => ({ url, type: "gemini_citation_url" as const })),
     { url: createModelSearchEntryUrl(candidate.modelName), type: "search_entry_url" },
   ];
-  const { sourceModelName: _sourceModelName, ...publicCandidate } = candidate;
+  const {
+    sourceModelName: _sourceModelName,
+    sourceColorwayName: _sourceColorwayName,
+    sourceStyleCode: _sourceStyleCode,
+    ...publicCandidate
+  } = candidate;
   return {
     ...publicCandidate,
-    evidenceUrls: evidenceLinks.map((link) => link.url),
+    colorwayName: verifiedColorway,
+    styleCode: verifiedStyleCode,
+    modelEvidenceUrls,
+    colorwayEvidenceUrls: verifiedColorway ? colorwayEvidenceUrls : [],
+    styleCodeEvidenceUrls: verifiedStyleCode ? styleCodeEvidenceUrls : [],
+    evidenceUrls,
     evidenceLinks,
+    verificationStatus: verifiedColorway
+      ? "model_and_colorway_verified"
+      : "model_verified_colorway_unverified",
+    sourceQuality: candidateSourceQuality,
+    confidence: candidateSourceQuality === "marketplace"
+      ? Math.min(publicCandidate.confidence, 0.65)
+      : publicCandidate.confidence,
     researchOrigin: "gemini",
   };
+}
+
+function supportUrls(
+  supports: GroundingEvidence["supports"],
+  grounding: GroundingEvidence,
+): string[] {
+  return validateEvidenceUrls(supports.flatMap((support) =>
+    support.chunkIndices.map((index) => grounding.chunks[index]?.url ?? ""),
+  ));
+}
+
+function findStyleCodeEvidenceUrls(
+  styleCode: string,
+  modelTokens: string[],
+  grounding: GroundingEvidence,
+): string[] {
+  const normalizedCode = normalizeForMatch(styleCode);
+  const supportEvidence = supportUrls(grounding.supports.filter((support) => {
+    const text = normalizeForMatch(support.text);
+    return text.includes(normalizedCode) && modelTokens.some((modelName) => text.includes(modelName));
+  }), grounding);
+  const titleEvidence = grounding.chunks.flatMap((chunk) => {
+    if (!chunk) return [];
+    const title = normalizeForMatch(chunk.title);
+    return title.includes(normalizedCode) && modelTokens.some((modelName) => title.includes(modelName))
+      ? [chunk.url]
+      : [];
+  });
+  return validateEvidenceUrls([...supportEvidence, ...titleEvidence]);
 }
 
 function createModelSearchEntryUrl(modelName: string): string {

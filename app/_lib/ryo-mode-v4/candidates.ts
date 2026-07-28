@@ -2,12 +2,23 @@ import type { SneakerTag } from "../../../src/domain/sneaker/sneakerTag";
 import type { SneakerVector } from "../../../src/domain/sneaker/sneakerVector";
 import { calculateLocalBudgetFit } from "../core-v1/repository";
 import type { BalancedScore, CandidateProfile, Decision, RyoScore } from "../core-v1/types";
+import {
+  normalizeUserSneakerContext,
+  type UserSneakerContext,
+} from "../diagnosis/sneakerContext";
 import { buildRyoModeCandidateEvaluation } from "./integration";
 import type { RyoModeCandidateEvaluation } from "./integration";
 import { normalizeCandidateOfficialName, normalizeOfficialSneakerName } from "./names";
 export { normalizeCandidateOfficialName, normalizeOfficialSneakerName } from "./names";
 import { applyRyoSignatureLayer } from "./signature-layer";
-import type { RyoPreferenceSummary, RyoPreferenceVector, RyoSignatureMetadata } from "./types";
+import { buildRyoScoreBreakdownV2 } from "./score-breakdown";
+import type {
+  RyoPreferenceSummary,
+  RyoPreferenceVector,
+  RyoScoreBreakdownV2,
+  RyoSignatureMetadata,
+  RyoStrengthBlend,
+} from "./types";
 import { summarizeRyoPreferenceVector } from "./vector";
 
 type AnchorSignal =
@@ -40,6 +51,9 @@ export type RyoRerankedCandidate = CoreScoredCandidate & {
   finalRecommendationScore: number;
   explicitPreferencePenalty: number;
   explicitPreferenceReasons: string[];
+  scoreBreakdownV2: RyoScoreBreakdownV2;
+  strengthBlend: RyoStrengthBlend;
+  contextReasons: string[];
 };
 
 export type ExplicitPreferenceGuard = {
@@ -135,24 +149,27 @@ export function rerankRyoModeCandidates(
   candidates: readonly CoreScoredCandidate[],
   vector: RyoPreferenceVector,
   mode: "ryo" | "balanced" | undefined,
+  userContext?: UserSneakerContext,
 ): RyoRerankedCandidate[] {
   const summary = summarizeRyoPreferenceVector(vector);
-  const weights = getRerankingWeights(summary);
+  const context = normalizeUserSneakerContext(userContext);
   let ranked: RyoRerankedCandidate[] = candidates.map((entry): RyoRerankedCandidate => {
     const ryoEvaluation = buildRyoModeCandidateEvaluation(vector, entry.candidate);
-    const existingCoreScore = mode === "ryo" ? entry.ryoScore.total : entry.balancedScore.total;
     const guard = evaluateExplicitPreferenceGuards(vector, ryoEvaluation);
     const ryoSignature = applyRyoSignatureLayer({
       candidate: entry.candidate,
       vector,
       evaluation: ryoEvaluation,
     });
-    const finalRecommendationScore = round(Math.max(0,
-      existingCoreScore * weights.existingCoreWeight
-        + ryoEvaluation.score.recommendationScore * weights.recommendationWeight
-        + ryoSignature.totalAdjustment
-        - guard.penalty,
-    ));
+    const v2 = buildRyoScoreBreakdownV2({
+      core: entry,
+      evaluation: ryoEvaluation,
+      signature: ryoSignature,
+      summary,
+      context,
+      explicitPreferencePenalty: guard.penalty,
+    });
+    const finalRecommendationScore = v2.breakdown.finalRecommendationScore;
     return {
       ...entry,
       candidate: {
@@ -168,6 +185,9 @@ export function rerankRyoModeCandidates(
       explicitPreferencePenalty: guard.penalty,
       explicitPreferenceReasons: guard.reasons,
       finalRecommendationScore,
+      scoreBreakdownV2: v2.breakdown,
+      strengthBlend: v2.blend,
+      contextReasons: v2.contextReasons,
     };
   });
 
@@ -264,12 +284,17 @@ function enforceHighCutWinnerGuard(
         "妥当なHigh/Mid候補があるためLow専用モデルを1位から除外",
       ])],
       finalRecommendationScore: round(Math.max(0, compatibleFloor - 0.1)),
+      scoreBreakdownV2: {
+        ...entry.scoreBreakdownV2,
+        finalRecommendationScore: round(Math.max(0, compatibleFloor - 0.1)),
+      },
     };
   });
 }
 
 function createAnchorCandidate(definition: AnchorDefinition, budgetYen?: number): CandidateProfile {
   const vector = createVector(definition.tags, definition.name);
+  const identity = splitStaticCandidateName(definition.name);
   return {
     id: `ryo-anchor-${definition.id}`,
     name: definition.name,
@@ -283,12 +308,32 @@ function createAnchorCandidate(definition: AnchorDefinition, budgetYen?: number)
     readiness: "ready_local",
     priceYen: definition.priceYen,
     modelType: definition.modelType,
+    modelName: identity.modelName,
+    colorwayName: identity.colorwayName,
+    styleCode: null,
+    modelEvidenceUrls: [],
+    colorwayEvidenceUrls: [],
+    styleCodeEvidenceUrls: [],
+    verificationStatus: "unverified",
+    sourceQuality: "unknown",
     searchKeywords: [definition.name],
     evidenceUrls: [`https://www.google.com/search?q=${encodeURIComponent(definition.name)}`],
     researchReason: `Ryo candidate anchorの候補シグナル: ${definition.signals.join(" / ")}。実際の順位は回答との再評価で決めています。`,
     researchCautions: ["価格・在庫・サイズ・購入可能性は販売元で確認してください。"],
     researchSource: "ryo_anchor",
   };
+}
+
+function splitStaticCandidateName(name: string): { modelName: string; colorwayName: string | null } {
+  const quotedColor = name.match(/^(.*)\s+"([^"]+)"$/u);
+  if (quotedColor?.[1] && quotedColor[2] && /(?:black|white|grey|gray|orange|red|blue|green|brown|cream|gum|navy|olive|burgundy)/iu.test(quotedColor[2])) {
+    return { modelName: quotedColor[1].trim(), colorwayName: quotedColor[2].trim() };
+  }
+  const suffixColor = name.match(/^(.*)\s+(Black\s*\/\s*White|White\s*\/\s*Black|Black\s*\/\s*Grey|Black)$/iu);
+  if (suffixColor?.[1] && suffixColor[2]) {
+    return { modelName: suffixColor[1].trim(), colorwayName: suffixColor[2].replace(/\s*\/\s*/gu, "/").trim() };
+  }
+  return { modelName: name, colorwayName: null };
 }
 
 function getActiveSignals(vector: RyoPreferenceVector): Set<AnchorSignal> {

@@ -26,7 +26,7 @@ describe("diagnosis draft", () => {
   it("restores partial answers and the current question index", () => {
     const storage = createStorage();
     writeDiagnosisDraft(storage, { answers: { style: "amekaji", pantsFit: "denim" }, currentQuestionIndex: 2, completed: false });
-    expect(readDiagnosisDraft(storage)).toEqual({ version: 1, answers: { style: "amekaji", pantsFit: "denim" }, currentQuestionIndex: 2, completed: false });
+    expect(readDiagnosisDraft(storage)).toEqual({ version: DIAGNOSIS_DRAFT_VERSION, answers: { style: "amekaji", pantsFit: "denim" }, currentQuestionIndex: 2, completed: false });
     expect(JSON.parse(storage.values.get(DIAGNOSIS_DRAFT_STORAGE_KEY)!)).toMatchObject({ version: DIAGNOSIS_DRAFT_VERSION });
   });
 
@@ -34,7 +34,7 @@ describe("diagnosis draft", () => {
     const storage = createStorage();
     const answers = Object.fromEntries(preferenceDiagnosisQuestions.map((question) => [question.id, question.options[0]!.id]));
     writeDiagnosisDraft(storage, { answers, currentQuestionIndex: 10, completed: true });
-    expect(readDiagnosisDraft(storage)).toEqual({ version: 1, answers, currentQuestionIndex: 10, completed: true });
+    expect(readDiagnosisDraft(storage)).toEqual({ version: DIAGNOSIS_DRAFT_VERSION, answers, currentQuestionIndex: 10, completed: true });
   });
 
   it("ignores corrupt JSON", () => {
@@ -45,15 +45,15 @@ describe("diagnosis draft", () => {
 
   it("drops unknown answer IDs and does not accept a false completed state", () => {
     const storage = createStorage();
-    storage.setItem(DIAGNOSIS_DRAFT_STORAGE_KEY, JSON.stringify({ version: 1, answers: { style: "invalid", pantsFit: "denim" }, currentQuestionIndex: 2, completed: true }));
-    expect(readDiagnosisDraft(storage)).toEqual({ version: 1, answers: { pantsFit: "denim" }, currentQuestionIndex: 2, completed: false });
+    storage.setItem(DIAGNOSIS_DRAFT_STORAGE_KEY, JSON.stringify({ version: DIAGNOSIS_DRAFT_VERSION, answers: { style: "invalid", pantsFit: "denim" }, currentQuestionIndex: 2, completed: true }));
+    expect(readDiagnosisDraft(storage)).toEqual({ version: DIAGNOSIS_DRAFT_VERSION, answers: { pantsFit: "denim" }, currentQuestionIndex: 2, completed: false });
   });
 
   it("clamps out-of-range question indexes", () => {
     const storage = createStorage();
-    storage.setItem(DIAGNOSIS_DRAFT_STORAGE_KEY, JSON.stringify({ version: 1, answers: {}, currentQuestionIndex: 999, completed: false }));
+    storage.setItem(DIAGNOSIS_DRAFT_STORAGE_KEY, JSON.stringify({ version: DIAGNOSIS_DRAFT_VERSION, answers: {}, currentQuestionIndex: 999, completed: false }));
     expect(readDiagnosisDraft(storage)?.currentQuestionIndex).toBe(10);
-    storage.setItem(DIAGNOSIS_DRAFT_STORAGE_KEY, JSON.stringify({ version: 1, answers: {}, currentQuestionIndex: -4, completed: false }));
+    storage.setItem(DIAGNOSIS_DRAFT_STORAGE_KEY, JSON.stringify({ version: DIAGNOSIS_DRAFT_VERSION, answers: {}, currentQuestionIndex: -4, completed: false }));
     expect(readDiagnosisDraft(storage)?.currentQuestionIndex).toBe(0);
   });
 
@@ -61,6 +61,27 @@ describe("diagnosis draft", () => {
     const storage = createStorage();
     storage.setItem(DIAGNOSIS_DRAFT_STORAGE_KEY, JSON.stringify({ version: 0, answers: { style: "amekaji" }, currentQuestionIndex: 1, completed: false }));
     expect(readDiagnosisDraft(storage)).toBeNull();
+  });
+
+  it("normalizes and restores the temporary sneaker context", () => {
+    const storage = createStorage();
+    writeDiagnosisDraft(storage, {
+      answers: {},
+      currentQuestionIndex: 0,
+      completed: false,
+      context: {
+        purchasePurpose: "second_pair",
+        ownedModels: ["  PUMA Suede  ", "ＰＵＭＡ　Ｓｕｅｄｅ", "Converse One Star"],
+        dislikedModels: [],
+        dislikedSignals: ["厚底", "厚底"],
+      },
+    });
+    expect(readDiagnosisDraft(storage)?.context).toEqual({
+      purchasePurpose: "second_pair",
+      ownedModels: ["PUMA Suede", "Converse One Star"],
+      dislikedModels: [],
+      dislikedSignals: ["厚底"],
+    });
   });
 
   it("clears a saved draft", () => {

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DiagnosisAnswerId } from "../_data/preferenceDiagnosisQuestions";
 import type { CandidateResearchSource, FeedbackSentiment, PreferenceVector, RecommendationResult } from "../_lib/core-v1/types";
+import type { UserSneakerContext } from "../_lib/diagnosis/sneakerContext";
 import { buildRyoModeCandidateEvaluation, buildRyoModeContextForRecommendation } from "../_lib/ryo-mode-v4/integration";
 import { createRecommendationFeedbackId, saveRecommendationFeedback, type RecommendationFeedbackUsefulness } from "../_lib/recommendation-feedback/localStorage";
 import type { RyoPreferenceVector } from "../_lib/ryo-mode-v4/types";
@@ -11,6 +12,7 @@ import type { LiveProductUrl } from "../_lib/product-links/types";
 import { ProductReferenceLinks } from "./ProductReferenceLinks";
 import { RakutenMarketFind } from "./RakutenMarketFind";
 import { RyoModeResultPanel } from "./RyoModeResultPanel";
+import { RyoScoreBreakdown, VerifiedCandidateResult } from "./VerifiedCandidateResult";
 import { createLatestRequestGate } from "./productLinkResolution";
 
 type Props = {
@@ -18,6 +20,7 @@ type Props = {
   onRecommendationComplete?: (() => void) | undefined;
   selectedAnswerByQuestionId: Record<string, DiagnosisAnswerId | undefined>;
   ryoPreferenceVector: RyoPreferenceVector;
+  userSneakerContext: UserSneakerContext;
 };
 
 type RecommendApiResponse =
@@ -45,18 +48,18 @@ const decisionLabels: Record<RecommendationResult["decision"], string> = {
 
 const recommendationSourceLabels: Record<RecommendationResult["candidateResearch"]["source"], string> = {
   gemini: "Gemini調査",
-  fallback_catalog: "fallback catalog",
+  fallback_catalog: "Core候補",
   product_input: "入力商品",
 };
 
 const candidateSourceLabels: Record<CandidateResearchSource, string> = {
-  gemini: "Gemini調査候補",
-  fallback_catalog: "fallback catalog",
+  gemini: "Gemini確認候補",
+  fallback_catalog: "Core候補",
   product_input: "入力商品",
-  ryo_anchor: "Ryo candidate anchor",
+  ryo_anchor: "Core候補（Ryo anchor）",
 };
 
-export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPreferenceVector, selectedAnswerByQuestionId }: Props) {
+export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPreferenceVector, selectedAnswerByQuestionId, userSneakerContext }: Props) {
   const [result, setResult] = useState<RecommendationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -84,6 +87,10 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
           diagnosisAnswers: ryoContext.diagnosisAnswers,
           preferenceTags: ryoContext.preferenceTags,
           ryoModeAnswers: ryoContext.answers,
+          purchasePurpose: userSneakerContext.purchasePurpose,
+          ownedModels: userSneakerContext.ownedModels,
+          dislikedModels: userSneakerContext.dislikedModels,
+          dislikedSignals: userSneakerContext.dislikedSignals,
           mode: ryoContext.mode,
           ...(ryoContext.budgetYen === undefined ? {} : { budgetYen: ryoContext.budgetYen }),
         }),
@@ -109,7 +116,7 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
     setIsResolvingProductLinks(true);
     try {
       const response = await resolveRecommendationProductLinks({
-        productName: recommendation.candidate.name,
+        productName: recommendation.candidate.modelName ?? recommendation.candidate.name,
         directUrls: [
           ...(recommendation.candidate.evidenceLinks ?? [])
             .filter((link) => link.type !== "search_entry_url")
@@ -136,7 +143,7 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
       saveRecommendationFeedback(window.localStorage, {
         id: createRecommendationFeedbackId(now),
         createdAt: now.toISOString(),
-        resultModelName: result.candidate.name,
+        resultModelName: result.candidate.modelName ?? result.candidate.name,
         decision: result.decision,
         usefulness,
         comment: feedbackComment.trim(),
@@ -170,7 +177,7 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
 
   return (
     <section className="core-v1-panel" aria-labelledby="core-v1-recommendation-title">
-      <div className="core-v1-panel-heading"><p className="diagnosis-summary-kicker">Recommendation</p><h3 id="core-v1-recommendation-title">具体的なおすすめモデルを見る</h3><p>Gemini候補はschema・抽象名・参考URLを検証し、Coreが再スコアリングします。失敗時は具体モデルのfallback catalogを使います。</p></div>
+      <div className="core-v1-panel-heading"><p className="diagnosis-summary-kicker">Recommendation</p><h3 id="core-v1-recommendation-title">具体的なおすすめモデルを見る</h3><p>Gemini候補はモデル名・カラー名・根拠URLを分けて確認し、Coreが再スコアリングします。外部調査に失敗してもCore候補で結果を返します。</p></div>
       <p className="core-v1-provider-note">Q9で選んだ予算をCoreの候補選定とRyo Mode補助評価へ反映します。価格・在庫・購入可能性は保証しません。</p>
       <button className="diagnosis-primary-button core-v1-submit" disabled={isLoading} onClick={handleRecommend} type="button">{isLoading ? "候補を検証・再評価しています…" : "推薦結果を見る"}</button>
       {isLoading ? <div className="core-v1-loading-state" role="status" aria-live="polite"><strong>推薦記録を組み立てています</strong><span>候補を比較</span><span>Coreで再評価</span><span>理由と注意点を整理</span></div> : null}
@@ -178,9 +185,9 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
       {!result && !isLoading && !errorMessage ? <p className="core-v1-empty">11問の回答を使って推薦候補を検証します。</p> : null}
 
       {result ? <div className="core-v1-result">
-        <div className="core-v1-result-heading"><div><p className="diagnosis-summary-kicker">おすすめ</p><h4>{result.candidate.name}</h4>{result.candidate.modelType ? <p>タイプ: {result.candidate.modelType}</p> : null}<p>{result.candidate.description}</p></div><strong data-decision={result.decision}>{decisionLabels[result.decision]}</strong></div>
+        <VerifiedCandidateResult candidate={result.candidate} decisionLabel={decisionLabels[result.decision]} />
         <p className="core-v1-decision-note">最終DecisionはBalanced / Ryo score、budgetFit、リスク、情報充足度を使ってCoreが決定します。GeminiやURLは上書きできません。</p>
-        <div className="core-v1-score-grid"><ScoreCard label="Balanced Score" description="汎用性・予算・情報の確かさを含む一般向け評価" value={result.balancedScore.total} /><ScoreCard label="Ryo Score" description="カルチャーやスタイルの好みを含む評価" value={result.ryoScore.total} /></div>
+        <RyoScoreBreakdown result={result} />
         <details className="result-detail-accordion"><summary>候補の出所と参考リンクを見る</summary><div className="core-v1-supporting-details"><p className="core-v1-local-notice" data-source={result.candidate.researchSource}>{result.candidateResearch.detail}</p><p className="core-v1-provider-note" data-recommendation-source={result.candidateResearch.source}>候補調査: {recommendationSourceLabels[result.candidateResearch.source]} / 選択候補元: {candidateSourceLabels[result.candidate.researchSource ?? "fallback_catalog"]}</p><p className="core-v1-provider-note" data-ryo-reranking={result.ryoReranking.applied ? "applied" : "not-applied"}>Ryo再ランキング: {result.ryoReranking.applied ? `適用済み（候補${result.ryoReranking.candidatePoolSize}足 / Core ${Math.round(result.ryoReranking.existingCoreWeight * 100)}% + recommendationScore ${Math.round(result.ryoReranking.recommendationWeight * 100)}% / 明示回答ガード ${result.ryoReranking.selectedExplicitPreferencePenalty > 0 ? `-${result.ryoReranking.selectedExplicitPreferencePenalty}` : "適合"}）` : "未適用"}</p><p className="core-v1-provider-note">参考リンク: {formatEvidenceKinds(result.candidate.evidenceLinks)}</p><ProductReferenceLinks isLoading={isResolvingProductLinks} links={productLinks} message={productLinksMessage} /></div></details>
         <details className="result-detail-accordion"><summary>Ryoらしい評価を詳しく見る</summary><RyoModeResultPanel candidate={result.candidate} rerankingApplied={result.ryoReranking.applied} vector={ryoPreferenceVector} /></details>
         <RakutenMarketFind candidate={result.candidate} key={result.recommendationId} />
@@ -190,10 +197,6 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
       </div> : null}
     </section>
   );
-}
-
-function ScoreCard({ label, description, value }: { label: string; description: string; value: number }) {
-  return <div className="core-v1-score-card"><span>{label}</span><strong>{value}</strong><meter max="100" min="0" value={value} /><small>{description}</small></div>;
 }
 
 function ExplanationList({ title, items }: { title: string; items: string[] }) {

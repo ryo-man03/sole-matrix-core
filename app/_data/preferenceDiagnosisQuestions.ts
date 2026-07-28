@@ -33,6 +33,5 @@ export const preferenceDiagnosisQuestions: DiagnosisQuestion[] = RYO_MODE_V4_QUE
   helperText: helperTextByQuestionId[question.id],
   options: question.options.map((option) => ({
     ...option,
-    description: "この方向を診断に反映する",
   })),
 }));

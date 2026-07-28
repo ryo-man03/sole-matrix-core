@@ -4,16 +4,21 @@ import {
   type DiagnosisAnswerId,
   type PreferenceDiagnosisAnswers,
 } from "../../_data/preferenceDiagnosisQuestions";
+import {
+  normalizeUserSneakerContext,
+  type UserSneakerContext,
+} from "./sneakerContext";
 
 export const DIAGNOSIS_DRAFT_STORAGE_KEY = "sole-matrix:diagnosis-draft:v1";
 // Increment this when question IDs/options or draft semantics become incompatible.
-export const DIAGNOSIS_DRAFT_VERSION = 1 as const;
+export const DIAGNOSIS_DRAFT_VERSION = 2 as const;
 
 export type DiagnosisDraft = {
   version: typeof DIAGNOSIS_DRAFT_VERSION;
   answers: PreferenceDiagnosisAnswers;
   currentQuestionIndex: number;
   completed: boolean;
+  context?: UserSneakerContext;
 };
 
 type DiagnosisDraftInput = Omit<DiagnosisDraft, "version">;
@@ -42,7 +47,14 @@ export function readDiagnosisDraft(storage?: SessionStorage): DiagnosisDraft | n
     const requestedIndex = typeof record.currentQuestionIndex === "number" ? record.currentQuestionIndex : 0;
     const currentQuestionIndex = Math.min(maxIndex, Math.max(0, Math.trunc(requestedIndex)));
     const completed = record.completed === true && preferenceDiagnosisQuestions.every((question) => answers[question.id]);
-    return { version: DIAGNOSIS_DRAFT_VERSION, answers, currentQuestionIndex, completed };
+    const context = record.context === undefined ? undefined : normalizeUserSneakerContext(record.context);
+    return {
+      version: DIAGNOSIS_DRAFT_VERSION,
+      answers,
+      currentQuestionIndex,
+      completed,
+      ...(context ? { context } : {}),
+    };
   } catch {
     return null;
   }
@@ -54,6 +66,7 @@ export function writeDiagnosisDraft(storage: SessionStorage | undefined, draft: 
     storage.setItem(DIAGNOSIS_DRAFT_STORAGE_KEY, JSON.stringify({
       version: DIAGNOSIS_DRAFT_VERSION,
       ...draft,
+      ...(draft.context ? { context: normalizeUserSneakerContext(draft.context) } : {}),
     } satisfies DiagnosisDraft));
   } catch {
     // The diagnosis still works when browser storage is unavailable.

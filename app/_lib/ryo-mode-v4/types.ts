@@ -14,6 +14,7 @@ export type RyoModeQuestionId =
 export type RyoModeQuestionOption = {
   id: string;
   label: string;
+  description: string;
 };
 
 export type RyoModeQuestion = {
@@ -326,6 +327,22 @@ export type RyoModeScoreResult = {
   matchedSignals: string[];
   cautionSignals: string[];
   affinities?: RyoAffinityBreakdown;
+};
+
+export type RyoScoreBreakdownV2 = {
+  userFitScore: number;
+  ryoIdentityScore: number;
+  practicalFitScore: number;
+  explorationScore: number;
+  contextPenalty: number;
+  finalRecommendationScore: number;
+};
+
+export type RyoStrengthBlend = {
+  userFit: number;
+  ryoIdentity: number;
+  practicalFit: number;
+  exploration: number;
 };
 
 export type RyoOpinion = {

@@ -5,8 +5,18 @@ import type {
   GeminiResearchReasonCode,
   GeminiResearchStages,
 } from "../ai/gemini-sneaker-research";
-import type { EvidenceUrlType } from "../ai/gemini-sneaker-research-schema";
-import type { RyoCandidateMetadata, RyoRecommendationBucket, RyoSignatureMetadata } from "../ryo-mode-v4/types";
+import type {
+  ColorwayVerificationStatus,
+  EvidenceSourceQuality,
+  EvidenceUrlType,
+} from "../ai/gemini-sneaker-research-schema";
+import type {
+  RyoCandidateMetadata,
+  RyoRecommendationBucket,
+  RyoScoreBreakdownV2,
+  RyoSignatureMetadata,
+  RyoStrengthBlend,
+} from "../ryo-mode-v4/types";
 
 export type DiagnosisAnswerValue = "like" | "neutral" | "dislike";
 
@@ -61,6 +71,15 @@ export type CandidateProfile = {
   shopName?: string;
   note?: string;
   modelType?: string;
+  brand?: string;
+  modelName?: string;
+  colorwayName?: string | null;
+  styleCode?: string | null;
+  modelEvidenceUrls?: string[];
+  colorwayEvidenceUrls?: string[];
+  styleCodeEvidenceUrls?: string[];
+  verificationStatus?: ColorwayVerificationStatus;
+  sourceQuality?: EvidenceSourceQuality;
   searchKeywords?: string[];
   evidenceUrls?: string[];
   evidenceLinks?: CandidateEvidenceLink[];
@@ -180,6 +199,9 @@ export type RecommendationResult = {
     selectedExplicitPreferenceReasons: string[];
     selectedBucket?: RyoRecommendationBucket;
     selectedRyoSignature?: RyoSignatureMetadata;
+    selectedScoreBreakdownV2?: RyoScoreBreakdownV2;
+    strengthBlend?: RyoStrengthBlend;
+    selectedContextReasons?: string[];
   };
 };
 
