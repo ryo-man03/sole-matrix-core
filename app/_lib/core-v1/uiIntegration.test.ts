@@ -58,6 +58,10 @@ describe("Core v1 UI integration", () => {
     expect(diagnosisFlowSource).toContain("buildRyoPreferenceVector");
     expect(componentSource).toContain("buildRyoModeContextForRecommendation");
     expect(componentSource).toContain("ryoModeAnswers");
+    expect(componentSource).toContain("purchasePurpose");
+    expect(componentSource).toContain("ownedModels");
+    expect(diagnosisFlowSource).toContain("SneakerContextForm");
+    expect(diagnosisFlowSource).toContain("userSneakerContext={context}");
     expect(componentSource).toContain("data-ryo-reranking");
     expect(componentSource).toContain("RyoModeResultPanel");
     expect(ryoResultSource).toContain("productScore");

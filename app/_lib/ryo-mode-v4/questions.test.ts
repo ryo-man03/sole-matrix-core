@@ -14,6 +14,16 @@ describe("Ryo Mode v4 question definitions", () => {
       expect(question.options.length).toBeGreaterThan(0);
       const optionIds = question.options.map((option) => option.id);
       expect(new Set(optionIds).size).toBe(optionIds.length);
+      expect(question.options.every((option) => option.description.trim().length > 0)).toBe(true);
+      expect(question.options.every((option) => String(option.description) !== "この方向を診断に反映する")).toBe(true);
     }
+  });
+
+  it("provides a specific explanation for all 58 choices", () => {
+    const descriptions = RYO_MODE_V4_QUESTIONS.flatMap((question) =>
+      question.options.map((option) => `${question.id}:${option.id}:${option.description}`),
+    );
+    expect(descriptions).toHaveLength(58);
+    expect(new Set(descriptions).size).toBe(58);
   });
 });

@@ -1,6 +1,11 @@
 import type { SneakerTag } from "../../../src/domain/sneaker/sneakerTag";
 import { RYO_MODE_V4_QUESTIONS } from "../ryo-mode-v4/questions";
 import type { RyoModeAnswers, RyoModeQuestionId } from "../ryo-mode-v4/types";
+import {
+  normalizeContextList,
+  normalizeUserSneakerContext,
+  type PurchasePurpose,
+} from "../diagnosis/sneakerContext";
 import { normalizeDiagnosisAnswers } from "./diagnosis";
 import type {
   DiagnosisAnswer,
@@ -49,6 +54,10 @@ export type RecommendRequestInput = {
   color?: string;
   urlNameHint?: string;
   ryoModeAnswers?: RyoModeAnswers;
+  purchasePurpose?: PurchasePurpose;
+  ownedModels?: string[];
+  dislikedModels?: string[];
+  dislikedSignals?: string[];
 };
 
 export function validateRecommendRequest(
@@ -67,6 +76,12 @@ export function validateRecommendRequest(
   const color = normalizeOptionalString(value["color"], 80);
   const urlNameHint = normalizeOptionalString(value["urlNameHint"], 160);
   const ryoModeAnswers = normalizeRyoModeAnswers(value["ryoModeAnswers"]);
+  const sneakerContext = normalizeUserSneakerContext({
+    purchasePurpose: value["purchasePurpose"],
+    ownedModels: normalizeContextList(value["ownedModels"]),
+    dislikedModels: normalizeContextList(value["dislikedModels"]),
+    dislikedSignals: normalizeContextList(value["dislikedSignals"]),
+  });
 
   if (!budgetResult.ok) {
     return budgetResult;
@@ -101,6 +116,7 @@ export function validateRecommendRequest(
       ...(color ? { color } : {}),
       ...(urlNameHint ? { urlNameHint } : {}),
       ...(ryoModeAnswers ? { ryoModeAnswers } : {}),
+      ...sneakerContext,
     },
   };
 }
