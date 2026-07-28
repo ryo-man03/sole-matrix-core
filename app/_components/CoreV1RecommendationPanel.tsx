@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DiagnosisAnswerId } from "../_data/preferenceDiagnosisQuestions";
 import type { CandidateResearchSource, FeedbackSentiment, PreferenceVector, RecommendationResult } from "../_lib/core-v1/types";
+import type { UserSneakerContext } from "../_lib/diagnosis/sneakerContext";
 import { buildRyoModeCandidateEvaluation, buildRyoModeContextForRecommendation } from "../_lib/ryo-mode-v4/integration";
 import { createRecommendationFeedbackId, saveRecommendationFeedback, type RecommendationFeedbackUsefulness } from "../_lib/recommendation-feedback/localStorage";
 import type { RyoPreferenceVector } from "../_lib/ryo-mode-v4/types";
@@ -18,6 +19,7 @@ type Props = {
   onRecommendationComplete?: (() => void) | undefined;
   selectedAnswerByQuestionId: Record<string, DiagnosisAnswerId | undefined>;
   ryoPreferenceVector: RyoPreferenceVector;
+  userSneakerContext: UserSneakerContext;
 };
 
 type RecommendApiResponse =
@@ -56,7 +58,7 @@ const candidateSourceLabels: Record<CandidateResearchSource, string> = {
   ryo_anchor: "Ryo candidate anchor",
 };
 
-export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPreferenceVector, selectedAnswerByQuestionId }: Props) {
+export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPreferenceVector, selectedAnswerByQuestionId, userSneakerContext }: Props) {
   const [result, setResult] = useState<RecommendationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -84,6 +86,10 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
           diagnosisAnswers: ryoContext.diagnosisAnswers,
           preferenceTags: ryoContext.preferenceTags,
           ryoModeAnswers: ryoContext.answers,
+          purchasePurpose: userSneakerContext.purchasePurpose,
+          ownedModels: userSneakerContext.ownedModels,
+          dislikedModels: userSneakerContext.dislikedModels,
+          dislikedSignals: userSneakerContext.dislikedSignals,
           mode: ryoContext.mode,
           ...(ryoContext.budgetYen === undefined ? {} : { budgetYen: ryoContext.budgetYen }),
         }),

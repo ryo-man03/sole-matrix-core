@@ -14,6 +14,7 @@ export type RyoModeQuestionId =
 export type RyoModeQuestionOption = {
   id: string;
   label: string;
+  description: string;
 };
 
 export type RyoModeQuestion = {
