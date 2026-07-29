@@ -56,6 +56,13 @@ export type RyoRerankedCandidate = CoreScoredCandidate & {
   contextReasons: string[];
 };
 
+export type RecommendationDisplaySet = {
+  primary: RyoRerankedCandidate;
+  practicalAlternative: RyoRerankedCandidate | null;
+  ryoAlternative: RyoRerankedCandidate | null;
+  cautionCandidate: RyoRerankedCandidate | null;
+};
+
 export type ExplicitPreferenceGuard = {
   penalty: number;
   reasons: string[];
@@ -197,6 +204,149 @@ export function rerankRyoModeCandidates(
     right.ryoEvaluation.score.recommendationScore - left.ryoEvaluation.score.recommendationScore ||
     (mode === "ryo" ? right.ryoScore.total - left.ryoScore.total : right.balancedScore.total - left.balancedScore.total),
   );
+}
+
+export function selectRecommendationDisplaySet(
+  ranked: readonly RyoRerankedCandidate[],
+  userContext?: UserSneakerContext,
+): RecommendationDisplaySet | null {
+  const primary = ranked[0];
+  if (!primary) return null;
+
+  const context = normalizeUserSneakerContext(userContext);
+  const remaining = ranked.filter((entry) =>
+    entry.candidate.id !== primary.candidate.id &&
+    !isExactContextMatch(entry.candidate.name, context.ownedModels) &&
+    !isExactContextMatch(entry.candidate.name, context.dislikedModels)
+  );
+  const practicalFloor = Math.max(35, primary.finalRecommendationScore - 18);
+  const practicalPool = remaining.filter((entry) =>
+    entry.finalRecommendationScore >= practicalFloor &&
+    entry.scoreBreakdownV2.practicalFitScore >= 38 &&
+    entry.scoreBreakdownV2.contextPenalty <= 25 &&
+    entry.explicitPreferencePenalty <= 16
+  );
+  const practicalAlternative = chooseDiverseCandidate(practicalPool, [primary], "practical");
+
+  const ryoFloor = Math.max(32, primary.finalRecommendationScore - 22);
+  const ryoPool = remaining.filter((entry) =>
+    entry.candidate.id !== practicalAlternative?.candidate.id &&
+    entry.finalRecommendationScore >= ryoFloor &&
+    entry.scoreBreakdownV2.contextPenalty <= 30 &&
+    entry.explicitPreferencePenalty <= 18 &&
+    hasRyoAlternativeSignal(entry)
+  );
+  const selectedSoFar = practicalAlternative ? [primary, practicalAlternative] : [primary];
+  const ryoAlternative = chooseDiverseCandidate(ryoPool, selectedSoFar, "ryo");
+
+  const selectedIds = new Set([
+    primary.candidate.id,
+    practicalAlternative?.candidate.id,
+    ryoAlternative?.candidate.id,
+  ].filter((id): id is string => Boolean(id)));
+  const cautionCandidate = ranked.find((entry) =>
+    !selectedIds.has(entry.candidate.id) &&
+    (entry.scoreBreakdownV2.contextPenalty > 25 || entry.explicitPreferencePenalty > 16)
+  ) ?? null;
+
+  return {
+    primary,
+    practicalAlternative,
+    ryoAlternative,
+    cautionCandidate,
+  };
+}
+
+export function buildRecommendationDisplayReasons(
+  entry: RyoRerankedCandidate,
+  role: "practical" | "ryo" | "caution",
+): string[] {
+  if (role === "caution") {
+    return unique([
+      ...entry.contextReasons,
+      ...entry.explicitPreferenceReasons,
+    ]).slice(0, 3);
+  }
+
+  const signature = entry.ryoSignature;
+  const reasons = role === "practical"
+    ? [
+        entry.scoreBreakdownV2.userFitScore >= 50 ? "11問の回答との相性" : null,
+        entry.scoreBreakdownV2.practicalFitScore >= 50 ? "予算と日常での選びやすさ" : null,
+        entry.candidate.budgetFit >= 70 ? "購入予算への収まりやすさ" : null,
+      ]
+    : [
+        signature.materialStoryBonus > 0 ? "素材を履き込む楽しさ" : null,
+        signature.archiveContextBonus > 0 ? "歴史・復刻背景" : null,
+        signature.adjacentDiscoveryBonus > 0 ? "定番から少し外した発見" : null,
+        signature.colorPersonalityBonus > 0 ? "服に取り入れやすい珍しい色" : null,
+        signature.ryoTwistBonus > 0 ? "本命とは違う文化軸" : null,
+      ];
+  const displayReasons = unique(reasons.filter((reason): reason is string => Boolean(reason))).slice(0, 3);
+  return displayReasons.length ? displayReasons : ["本命とは異なる系統から選べる候補"];
+}
+
+function chooseDiverseCandidate(
+  candidates: readonly RyoRerankedCandidate[],
+  selected: readonly RyoRerankedCandidate[],
+  role: "practical" | "ryo",
+): RyoRerankedCandidate | null {
+  if (!candidates.length) return null;
+  return [...candidates].sort((left, right) => {
+    const diversityDifference =
+      diversityScore(right, selected) - diversityScore(left, selected);
+    if (diversityDifference !== 0) return diversityDifference;
+    const roleDifference = role === "practical"
+      ? right.scoreBreakdownV2.practicalFitScore - left.scoreBreakdownV2.practicalFitScore
+      : (right.scoreBreakdownV2.ryoIdentityScore + right.scoreBreakdownV2.explorationScore)
+        - (left.scoreBreakdownV2.ryoIdentityScore + left.scoreBreakdownV2.explorationScore);
+    return roleDifference ||
+      right.finalRecommendationScore - left.finalRecommendationScore ||
+      left.candidate.id.localeCompare(right.candidate.id, "en");
+  })[0] ?? null;
+}
+
+function diversityScore(
+  candidate: RyoRerankedCandidate,
+  selected: readonly RyoRerankedCandidate[],
+): number {
+  return selected.reduce((score, entry) => {
+    const parentOverlap = sharesParentModel(candidate, entry);
+    const sameBrand = candidateBrand(candidate.candidate) === candidateBrand(entry.candidate);
+    return score + (parentOverlap ? 0 : 3) + (sameBrand ? 0 : 2);
+  }, 0);
+}
+
+function sharesParentModel(
+  left: RyoRerankedCandidate,
+  right: RyoRerankedCandidate,
+): boolean {
+  const leftParents = new Set(left.candidate.ryoMetadata?.parentModelIds ?? []);
+  return (right.candidate.ryoMetadata?.parentModelIds ?? []).some((id) => leftParents.has(id));
+}
+
+function candidateBrand(candidate: CandidateProfile): string {
+  const name = candidate.brand?.trim() || candidate.name.trim();
+  const knownBrand = name.match(/^(New Balance|Last Resort AB|PRO-Keds|Nike|adidas|Converse|PUMA|Vans|Reebok)\b/iu)?.[1];
+  return (knownBrand ?? name.split(/\s+/u)[0] ?? "").toLocaleLowerCase("en-US");
+}
+
+function hasRyoAlternativeSignal(entry: RyoRerankedCandidate): boolean {
+  const signature = entry.ryoSignature;
+  return signature.bucket === "ryo_signature" ||
+    signature.bucket === "adjacent_discovery" ||
+    signature.bucket === "wildcard" ||
+    signature.materialStoryBonus > 0 ||
+    signature.archiveContextBonus > 0 ||
+    signature.colorPersonalityBonus > 0;
+}
+
+function isExactContextMatch(candidateName: string, contextNames: readonly string[]): boolean {
+  const candidate = comparableName(candidateName);
+  return contextNames.some((name) => {
+    const context = comparableName(name);
+    return candidate === context || candidate.includes(context) || context.includes(candidate);
+  });
 }
 
 export function evaluateExplicitPreferenceGuards(
@@ -395,4 +545,8 @@ function comparableName(value: string): string {
 
 function round(value: number): number {
   return Math.round(value * 10) / 10;
+}
+
+function unique(values: readonly string[]): string[] {
+  return [...new Set(values)];
 }

@@ -11,6 +11,10 @@ export type RyoCalibrationCase = {
   acceptableTopModels: string[];
   mustNotRankFirst: string[];
   expectedBuckets?: RyoRecommendationBucket[];
+  expectedVerificationStates: Array<
+    "model_and_colorway_verified" | "model_verified_colorway_unverified" | "unverified"
+  >;
+  scoreRange: { min: number; max: number };
   explanationMustInclude: string[];
   explanationMustNotInclude: string[];
 };
@@ -109,6 +113,42 @@ export const RYO_CALIBRATION_CASES: readonly RyoCalibrationCase[] = [
   calibration("avoid-tech-signal", "明示的なハイテク回避傾向", {
     style: "amekaji", pantsFit: "work_pants", techTolerance: "avoid_tech", ryoStrength: "ryo_mode",
   }, ["Converse", "PUMA", "adidas Superstar Vintage", "Vans", "Reebok", "Nike Blazer", "Nike Terminator"], ["Air Max 95", "New Balance 1906"], ["ローテク"], [], { dislikedSignals: ["ハイテク"] }),
+  calibration("balanced-first-pair-v2", "Balancedで予算を守る最初の一足", {
+    style: "normcore", pantsFit: "straight_pants", taste: "simple", budget: "under_15000", ryoStrength: "balanced",
+  }, ["Jack Purcell", "Reebok Club C", "Reebok Classic", "Vans Authentic"], ["TimeLine", "Addict"], ["予算"], [], { purchasePurpose: "first_pair" }),
+  calibration("balanced-second-pair-v2", "Balancedで定番と重複しない二足目", {
+    style: "normcore", pantsFit: "straight_pants", color: "black_white", taste: "simple", ryoStrength: "balanced",
+  }, ["Jack Purcell", "Reebok", "Vans Authentic", "PUMA", "Nike Cortez"], [], ["合わせ"], [], { purchasePurpose: "second_pair", ownedModels: ["Reebok Club C"] }),
+  calibration("ryo-strong-archive-v2", "Ryo Strongのアーカイブ収集", {
+    style: "amekaji", pantsFit: "denim", cut: "high", materialAging: "canvas_fading", budget: "premium_ok", ryoStrength: "ryo_strong",
+  }, ["TimeLine", "Addict", "All Star J VTG", "Jack Purcell 1935"], ["Converse All Star Hi Black"], ["復刻"], [], { purchasePurpose: "archive_collection" }),
+  calibration("owned-exact-all-star-j", "所有モデルとの完全一致を避ける", {
+    style: "amekaji", pantsFit: "denim", cut: "high", materialAging: "canvas_fading", ryoStrength: "ryo_mode",
+  }, ["TimeLine", "Addict", "All Star J VTG", "Converse One Star", "Nike Blazer"], ["Converse All Star J Hi"], ["重複"], [], { purchasePurpose: "second_pair", ownedModels: ["Converse All Star J Hi"] }),
+  calibration("disliked-samba-model", "避けたいSambaを1位にしない", {
+    style: "clean_casual", sportOrigin: "football", pantsFit: "straight_pants", materialAging: "suede_fading_nap", color: "cream_gum",
+  }, ["adidas Tobacco", "adidas London", "adidas Hamburg", "adidas Handball Spezial", "adidas Country", "adidas Japan"], ["adidas Samba"], ["スエード"], [], { dislikedModels: ["adidas Samba OG"] }),
+  calibration("rare-color-wearable-v2", "服装に合う珍しい色を二足目で探す", {
+    style: "amekaji", pantsFit: "work_pants", taste: "rare_color", materialAging: "suede_fading_nap", color: "rare_color", ryoStrength: "ryo_strong",
+  }, ["Converse One Star", "PUMA Suede", "PUMA Clyde", "adidas Tobacco", "Vans Half Cab"], [], ["色"], [], { purchasePurpose: "second_pair" }),
+  calibration("archive-over-budget-v2", "予算を大幅に超えるアーカイブを本命にしない", {
+    style: "amekaji", pantsFit: "denim", materialAging: "canvas_fading", budget: "under_15000", ryoStrength: "beginner_ryo",
+  }, ["Converse All Star J", "Vans Authentic", "Vans Era", "Reebok"], ["TimeLine", "Addict"], ["予算"], [], { purchasePurpose: "first_pair" }),
+  calibration("high-tech-not-allowed-v2", "ハイテク非許容でランニング候補を絞る", {
+    style: "normcore", pantsFit: "straight_pants", sportOrigin: "running", techTolerance: "avoid_tech", ryoStrength: "balanced",
+  }, ["Nike Cortez", "adidas SL 72", "Reebok Classic", "adidas Country"], ["Air Max 95", "New Balance 1906", "New Balance 2010"], ["ローテク"]),
+  calibration("high-tech-allowed-v2", "ハイテク許容時は現代ランニングも残す", {
+    style: "street", pantsFit: "wide_pants", sportOrigin: "running", wearingStyle: "volume_look", techTolerance: "airmax_nb_ok", ryoStrength: "ryo_mode",
+  }, ["New Balance", "Nike Air Max 95", "adidas Superstar Vintage"], [], ["ランニング"]),
+  calibration("football-samba-avoidance-v2", "footballでもSamba一択を避ける", {
+    style: "clean_casual", pantsFit: "straight_pants", sportOrigin: "football", materialAging: "suede_fading_nap", ryoStrength: "ryo_mode",
+  }, ["adidas Tobacco", "adidas London", "adidas Hamburg", "adidas Handball Spezial", "adidas Country"], ["adidas Samba OG"], ["フットボール"]),
+  calibration("running-parent-spread-v2", "ランニングでNB同系統だけへ偏らない", {
+    style: "clean_casual", pantsFit: "slim_pants", sportOrigin: "running", techTolerance: "heritage_tech_ok", budget: "under_20000", ryoStrength: "balanced",
+  }, ["Nike Cortez", "adidas SL 72", "adidas Country", "Reebok Classic", "New Balance"], [], ["ランニング"]),
+  calibration("converse-family-spread-v2", "Converse系だけに偏らない初心者候補", {
+    style: "normcore", pantsFit: "straight_pants", taste: "simple", materialAging: "canvas_fading", budget: "under_15000", ryoStrength: "beginner_ryo",
+  }, ["Vans Authentic", "Reebok Club C", "Reebok Classic", "Converse Jack Purcell"], ["TimeLine", "Addict"], ["合わせ"], [], { purchasePurpose: "first_pair" }),
 ] as const;
 
 function calibration(
@@ -130,6 +170,8 @@ function calibration(
     acceptableTopModels: [...expectedTopFamilies],
     mustNotRankFirst,
     expectedBuckets: ["anchor_classic", "ryo_signature", "adjacent_discovery", "practical_buy", "wildcard"],
+    expectedVerificationStates: ["unverified"],
+    scoreRange: { min: 0, max: 100 },
     explanationMustInclude,
     explanationMustNotInclude,
   };

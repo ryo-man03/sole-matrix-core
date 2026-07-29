@@ -5,11 +5,13 @@ import type { GeminiSneakerResearchCandidate } from "../ai/gemini-sneaker-resear
 import type { UntrustedUserMemoryContext } from "../user-memory/types";
 import { normalizeUserSneakerContext } from "../diagnosis/sneakerContext";
 import {
+  buildRecommendationDisplayReasons,
   createRyoModeCandidateAnchors,
   getRerankingWeights,
   mergeRyoModeCandidatePool,
   normalizeCandidateOfficialName,
   rerankRyoModeCandidates,
+  selectRecommendationDisplaySet,
   type CoreScoredCandidate,
   type RyoRerankedCandidate,
 } from "../ryo-mode-v4/candidates";
@@ -224,8 +226,14 @@ export async function recommendCoreV1(
     }
   }
 
+  const rankedRyoCandidates = ryoRerankingEnabled
+    ? rerankRyoModeCandidates(scoredCandidates, ryoPreferenceVector, input.mode, userSneakerContext)
+    : [];
+  const recommendationDisplaySet = ryoRerankingEnabled
+    ? selectRecommendationDisplaySet(rankedRyoCandidates, userSneakerContext)
+    : null;
   const best = ryoRerankingEnabled
-    ? rerankRyoModeCandidates(scoredCandidates, ryoPreferenceVector, input.mode, userSneakerContext)[0]
+    ? recommendationDisplaySet?.primary
     : scoredCandidates.sort((left, right) => {
         if (input.mode === "ryo") return right.ryoScore.total - left.ryoScore.total;
         if (input.mode === "balanced") return right.balancedScore.total - left.balancedScore.total;
@@ -303,6 +311,19 @@ export async function recommendCoreV1(
       ...(selectedStrengthBlend ? { strengthBlend: selectedStrengthBlend } : {}),
       ...(selectedContextReasons?.length ? { selectedContextReasons } : {}),
     },
+    ...(recommendationDisplaySet ? {
+      recommendationDisplaySet: {
+        practicalAlternative: recommendationDisplaySet.practicalAlternative
+          ? toDisplayCandidate(recommendationDisplaySet.practicalAlternative, "practical")
+          : null,
+        ryoAlternative: recommendationDisplaySet.ryoAlternative
+          ? toDisplayCandidate(recommendationDisplaySet.ryoAlternative, "ryo")
+          : null,
+        cautionCandidate: recommendationDisplaySet.cautionCandidate
+          ? toDisplayCandidate(recommendationDisplaySet.cautionCandidate, "caution")
+          : null,
+      },
+    } : {}),
     readiness: {
       geminiResearch: createGeminiResearchReadiness(candidateResearch),
       geminiExplanation: createGeminiExplanationReadiness(explanation, geminiConfigured),
@@ -312,6 +333,18 @@ export async function recommendCoreV1(
       listings: rakutenResult.evidence,
       feedbackPatterns: [],
     },
+  };
+}
+
+function toDisplayCandidate(
+  entry: RyoRerankedCandidate,
+  role: "practical" | "ryo" | "caution",
+) {
+  return {
+    candidate: entry.candidate,
+    finalRecommendationScore: entry.finalRecommendationScore,
+    scoreBreakdownV2: entry.scoreBreakdownV2,
+    reasons: buildRecommendationDisplayReasons(entry, role),
   };
 }
 
