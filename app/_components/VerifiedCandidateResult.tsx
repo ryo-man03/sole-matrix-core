@@ -77,7 +77,7 @@ export function VerifiedCandidateResult({
         </span>
         <strong data-decision={decisionLabel.toLowerCase()}>{decisionLabel}</strong>
       </div>
-      <p className="diagnosis-summary-kicker">おすすめモデル</p>
+      <p className="diagnosis-summary-kicker">あなたへの本命</p>
       {candidate.brand ? <p className="verified-candidate-brand">{candidate.brand}</p> : null}
       <h4 id="verified-candidate-model">{presentation.modelName}</h4>
       {presentation.colorwayName ? (
@@ -109,8 +109,8 @@ function CandidateEvidence({ candidate }: { candidate: CandidateProfile }) {
   const links = collectEvidence(candidate);
   if (!links.length) return null;
 
-  const initialLinks = links.slice(0, 2);
-  const remainingLinks = links.slice(2);
+  const initialLinks = links.slice(0, 1);
+  const remainingLinks = links.slice(1);
 
   return (
     <section className="verified-candidate-evidence" aria-labelledby="verified-candidate-evidence-title">

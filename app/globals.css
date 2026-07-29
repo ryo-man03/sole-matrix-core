@@ -2059,6 +2059,17 @@ h1 {
   font-weight: 700;
 }
 
+.core-v1-retained-result {
+  margin: 0;
+  border: 1px solid rgba(64, 84, 108, 0.18);
+  border-radius: 8px;
+  background: #f4f3ee;
+  padding: 11px 13px;
+  color: #4c5664;
+  font-size: 0.86rem;
+  line-height: 1.65;
+}
+
 .core-v1-status,
 .core-v1-empty,
 .core-v1-decision-note {
@@ -2076,6 +2087,25 @@ h1 {
   gap: 18px;
   border-top: 1px solid rgba(35, 43, 55, 0.12);
   padding-top: 22px;
+}
+
+.core-v1-explanation {
+  min-width: 0;
+  border: 1px solid rgba(35, 43, 55, 0.12);
+  border-radius: 10px;
+  background: #fff;
+  padding: 18px;
+}
+
+.core-v1-caution {
+  border-left: 3px solid #9d6918;
+  border-radius: 6px;
+  background: #fbf6e9;
+  padding: 12px 14px;
+}
+
+.core-v1-caution h5 {
+  color: #6f4c13;
 }
 
 .verified-candidate-result {

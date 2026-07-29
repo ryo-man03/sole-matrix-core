@@ -51,6 +51,10 @@ describe("Core v1 UI integration", () => {
     expect(componentSource).toContain("保存日時:");
     expect(componentSource).toContain("評価ボタンを選んでください。");
     expect(componentSource).toContain("フィードバックを保存できませんでした。もう一度試してください。");
+    expect(componentSource).toContain("前回の成功結果を表示中です");
+    expect(componentSource).toContain("回答との主な一致");
+    expect(componentSource).toContain("result.explanation.reasons.slice(0, 3)");
+    expect(componentSource).toContain("result.explanation.cautions.length");
     expect(componentSource).not.toContain("setResult(null)");
   });
 
