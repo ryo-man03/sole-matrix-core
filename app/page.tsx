@@ -3,8 +3,8 @@ import { HomeEntryCard } from "./_components/HomeEntryCard";
 import { MainContainer } from "./_components/MainContainer";
 
 const entryCards = [
-  { eyebrow: "01 / PREFERENCE", title: "11問で好みを整理する", description: "商品を決めていなくても始められます。具体的なモデル名と参考リンクまで表示します。", items: ["11問を1問ずつ進める", "候補を検証してCoreで再評価", "外部API失敗時も具体モデルを提示"], href: "/app?session=guest", actionLabel: "ゲストで診断する" },
-  { eyebrow: "02 / PRODUCT", title: "気になる一足を購入判断する", description: "商品名・URL・画像のいずれかから、買う理由と待つ理由を整理します。", items: ["URL・画像は外部参考情報として分離", "最終DecisionはCoreが決定", "楽天検索は結果を見てから手動実行"], href: "/app?session=guest", actionLabel: "商品判断を始める" },
+  { eyebrow: "01 / PREFERENCE", title: "11問で好みを整理する", description: "商品を決めていなくても始められます。具体的なモデル名と参考リンクまで表示します。", items: ["11問を1問ずつ進める", "候補を検証してCoreで再評価", "外部API失敗時も具体モデルを提示"], href: "/app?session=guest&path=diagnosis", actionLabel: "スニーカー診断を始める" },
+  { eyebrow: "02 / PRODUCT", title: "気になる一足を購入判断する", description: "商品名・URL・画像のいずれかから、買う理由と待つ理由を整理します。", items: ["URL・画像は外部参考情報として分離", "最終DecisionはCoreが決定", "楽天検索は結果を見てから手動実行"], href: "/app?session=guest&path=product", actionLabel: "商品判断を始める" },
 ] as const;
 
 export default function Page() {
@@ -13,14 +13,14 @@ export default function Page() {
       <MainContainer labelledBy="home-title">
         <section className="home-hero home-hero--landing">
           <div className="home-hero-copy">
-            <p className="home-kicker">SOLE//MATRIX — ISSUE 01</p>
-            <h1 id="home-title" className="home-title">迷っている一足を、買う前に整理する。</h1>
-            <p className="home-lead">好み、カルチャー、予算、外部情報。散らばった判断材料を一枚の推薦記録にまとめます。</p>
+            <p className="home-kicker">SOLE//MATRIX</p>
+            <h1 id="home-title" className="home-title">歴史・素材・服装から、自分に合うスニーカーを整理する。</h1>
+            <p className="home-lead">11問の好みと購入目的から候補を整理。気になる一足は、商品名・URL・画像から個別に購入判断できます。</p>
             <div className="home-hero-actions">
-              <a className="home-primary-cta" href="/login"><span>ログイン / 新規登録</span><span aria-hidden="true">→</span></a>
-              <a className="home-secondary-cta" href="/app?session=guest">ゲストで試す</a>
+              <a className="home-primary-cta" href="/app?session=guest&path=diagnosis"><span>スニーカー診断を始める</span><span aria-hidden="true">→</span></a>
+              <a className="home-secondary-cta" href="/app?session=guest&path=product">気になる一足を判断する</a>
             </div>
-            <p className="home-cta-note">ゲストでも全11問と商品判断を完走できます。プロフィールや推薦への評価を残す場合はログインしてください。</p>
+            <p className="home-cta-note">AIは候補と説明を補助し、最終判断はルールベースのCoreとあなた自身が行います。ログインなしでも試せます。</p>
           </div>
           <aside className="home-hero-ledger" aria-label="推薦で確認できる内容">
             <span className="home-hero-ledger-number">11</span>

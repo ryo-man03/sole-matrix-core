@@ -125,7 +125,12 @@ export function PreferenceDiagnosisFlow({
         <SneakerContextForm context={context} onChange={setContext} onContinue={continueFromContext} />
       ) : !summaryVisible ? (
         <>
-          <DiagnosisProgress currentIndex={currentQuestionIndex} totalCount={preferenceDiagnosisQuestions.length} answeredCount={answeredCount} />
+          <DiagnosisProgress
+            answeredCount={answeredCount}
+            category={question.category}
+            currentIndex={currentQuestionIndex}
+            totalCount={preferenceDiagnosisQuestions.length}
+          />
           <DiagnosisQuestionCard
             currentIndex={currentQuestionIndex}
             totalCount={preferenceDiagnosisQuestions.length}
@@ -134,7 +139,7 @@ export function PreferenceDiagnosisFlow({
             onSelectAnswer={(answer: DiagnosisAnswerId) => setAnswers((current) => ({ ...current, [question.id]: answer }))}
           />
           <p className="diagnosis-answer-hint">{currentAnswer ? "回答は前の質問へ戻って変更できます。" : "いずれか1つを選ぶと次へ進めます。"}</p>
-          <div className="diagnosis-actions">
+          <div className="diagnosis-actions diagnosis-actions--sticky">
             <button
               className="diagnosis-secondary-button"
               onClick={() => {
@@ -154,9 +159,11 @@ export function PreferenceDiagnosisFlow({
         <>
           <PreferenceDiagnosisSummary
             context={context}
-            onEditAnswers={() => {
+            onEditAnswer={(questionId) => {
               setSummaryVisible(false);
-              setCurrentQuestionIndex(0);
+              setCurrentQuestionIndex(
+                Math.max(0, preferenceDiagnosisQuestions.findIndex((item) => item.id === questionId)),
+              );
             }}
             onEditContext={() => {
               setSummaryVisible(false);

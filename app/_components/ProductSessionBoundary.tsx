@@ -30,6 +30,10 @@ export function ProductSessionBoundary() {
       }
     }
     const query = new URLSearchParams(window.location.search);
+    const requestedPath = query.get("path");
+    if (requestedPath === "diagnosis" || requestedPath === "product") {
+      setExperienceMode(requestedPath);
+    }
     if (query.get("session") === "guest") {
       setAuthState({ status: "guest", session: beginGuestSession(getBrowserStorage()) });
       void getAuthSession().then((result) => {

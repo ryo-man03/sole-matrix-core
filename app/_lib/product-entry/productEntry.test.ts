@@ -24,12 +24,12 @@ describe("product entry", () => {
     expect(renderToStaticMarkup(createElement(ProductAppPage))).toContain("今日は何をしますか？");
   });
 
-  it("keeps the home page as a landing page with a login CTA", () => {
+  it("keeps the home page as a landing page with direct diagnosis and product paths", () => {
     const html = renderToStaticMarkup(createElement(HomePage));
-    expect(html).toContain('href="/login"');
-    expect(html).toContain('href="/app?session=guest"');
+    expect(html).toContain('href="/app?session=guest&amp;path=diagnosis"');
+    expect(html).toContain('href="/app?session=guest&amp;path=product"');
     expect(html).toContain("はじめる");
-    expect(html).toContain("ログイン / 新規登録");
+    expect(html).toContain("スニーカー診断を始める");
     expect(html).toContain("楽天検索は推薦結果と分離して手動実行します");
     expect(html).not.toContain("recommendation-workspace");
     expect(html).not.toContain("preference-diagnosis-section");
