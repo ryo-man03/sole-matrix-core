@@ -51,6 +51,7 @@ export function ProductSessionBoundary() {
     const handlePopState = () => {
       const mode = readExperienceModeFromUrl(window.location.href);
       setExperienceModeState(mode);
+      writeStoredExperienceMode(getBrowserSessionStorage(), mode);
       if (mode) setVisitedModes((current) => ({ ...current, [mode]: true }));
     };
     window.addEventListener("popstate", handlePopState);
