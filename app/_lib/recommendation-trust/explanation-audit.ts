@@ -28,6 +28,8 @@ const factualPattern = /由来|素材|レザー|スエード|キャンバス|カ
 const inferencePattern = /回答|診断|予算|パンツ|服|合わせ|相性|適合|日常|選びやす|履きやす|使いやす/iu;
 const editorialPattern = /ryo|定番から|外し|ズラし|育てる|コレクション|二足目|発見|遊び/iu;
 const concreteColorPattern = /\b(?:black|white|navy|olive|red|blue|green|orange|cream|gum|grey|gray|brown|burgundy)\b|白黒|真っ白|黒白/iu;
+const productionCountryPattern = /made in [\p{L}]+|(?:日本|米国|英国|イタリア|中国|ベトナム|インドネシア)製/iu;
+const unsupportedSensitiveClaimPattern = /限定|希少|人気|値上がり|投資価値|投資向き|今買うべき|買うべき|売るべき|利益|儲かる|確実に(?:上が|下が)|必ず(?:上が|下が)/iu;
 
 export function auditRecommendationExplanation(
   input: ExplanationAuditInput,
@@ -93,6 +95,11 @@ export function detectExplanationContradictions(
     ...(input.candidate.ryoMetadata?.materialSignals ?? []),
   ].filter(Boolean).join(" ").toLocaleLowerCase("ja-JP");
   const contradictions: string[] = [];
+  if (unsupportedSensitiveClaimPattern.test(text)) {
+    contradictions.push(
+      "限定性・人気・値動き・投資／利益の断定を裏付ける構造化された根拠がありません。",
+    );
+  }
   const hasCanvas = input.candidate.tags.includes("canvas") || /canvas|キャンバス/u.test(candidateText);
   const hasLeather = /leather|レザー/u.test(candidateText);
   const hasSuede = /suede|スエード|スウェード/u.test(candidateText);
@@ -120,7 +127,10 @@ export function detectExplanationContradictions(
   if (input.candidate.tags.includes("basketball") && /ランニング由来|running origin/iu.test(text)) {
     contradictions.push("バスケットボール候補をランニング由来として説明しています。");
   }
-  if (!/made in (?:usa|uk)|米国製|英国製/iu.test(candidateText) && /made in (?:usa|uk)|米国製|英国製/iu.test(text)) {
+  if (
+    !productionCountryPattern.test(candidateText) &&
+    productionCountryPattern.test(text)
+  ) {
     contradictions.push("生産国の根拠がないMade説明です。");
   }
   if (input.candidate.tags.includes("running") && /古いローテク|純ローテク/iu.test(text) && !input.candidate.tags.includes("low_tech")) {

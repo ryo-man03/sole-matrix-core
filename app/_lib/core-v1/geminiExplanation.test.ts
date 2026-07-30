@@ -65,6 +65,10 @@ describe("Core v1 Gemini structured explanation", () => {
     });
 
     expect(result.source).toBe("rule_based");
+    expect(result.reasons).toContain(
+      "11問診断の好みと候補の特徴が広い範囲で合っています。",
+    );
+    expect(result.reasons.join(" ")).not.toContain("8問診断");
     expect(fetcher).not.toHaveBeenCalled();
   });
 

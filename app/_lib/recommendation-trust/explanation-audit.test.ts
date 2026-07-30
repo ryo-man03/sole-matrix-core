@@ -68,6 +68,37 @@ describe("recommendation explanation claim audit", () => {
     expect(result.displayClaims).toHaveLength(0);
   });
 
+  it.each([
+    "限定モデルなので希少です。",
+    "人気が高く、これから値上がりします。",
+    "投資価値があり、今買うべきです。",
+    "売れば利益が出て儲かる候補です。",
+  ])("hides unsupported market-sensitive claim: %s", (claim) => {
+    const result = auditRecommendationExplanation({
+      candidate: sneaker(),
+      explanation: explanation([claim]),
+      scoreBreakdown: scores(),
+    });
+    expect(result.evaluation.claims[0]).toMatchObject({
+      kind: "unsupported",
+    });
+    expect(result.evaluation.claims[0]?.contradictionReasons.join(" ")).toMatch(
+      /構造化された根拠/,
+    );
+    expect(result.displayClaims).toEqual([]);
+  });
+
+  it("hides unsupported Japanese production-country claims", () => {
+    const result = auditRecommendationExplanation({
+      candidate: sneaker(),
+      explanation: explanation(["日本製のモデルです。"]),
+    });
+    expect(result.evaluation.claims[0]?.kind).toBe("unsupported");
+    expect(result.evaluation.claims[0]?.contradictionReasons.join(" ")).toMatch(
+      /生産国/,
+    );
+  });
+
   it("deduplicates reasons and limits ordinary display to four trusted claims", () => {
     const reasons = [
       "診断回答に合います。",

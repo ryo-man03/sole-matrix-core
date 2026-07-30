@@ -15,7 +15,7 @@ const decisionSummaries: Record<Decision, string> = {
 export function createRuleBasedExplanation(input: ExplanationInput): RecommendationExplanation {
   const signature = input.candidate.ryoMetadata?.ryoSignature;
   const reasons = [`Balanced Scoreは${formatScore(input.balancedScore.total)}です。`, `Ryo Scoreは${formatScore(input.ryoScore.total)}です。`];
-  if (input.balancedScore.featureFit >= 70) reasons.push("8問診断の好みと候補の特徴が広い範囲で合っています。");
+  if (input.balancedScore.featureFit >= 70) reasons.push("11問診断の好みと候補の特徴が広い範囲で合っています。");
   if (input.ryoScore.classicRetroFit >= 70) reasons.push("クラシック・レトロの方向に相性があります。");
   if (input.ryoScore.calmStyleFit >= 70) reasons.push("落ち着いた日常スタイルに合わせやすい傾向があります。");
   if (signature) reasons.push(...buildRyoSignatureExplanationReasons(signature));
