@@ -28,6 +28,9 @@ export function buildCandidatePresentation(candidate: CandidateProfile): Candida
   const isVerifiedColorway =
     isGemini &&
     candidate.verificationStatus === "model_and_colorway_verified" &&
+    (candidate.factualVerification?.colorway === "officially_verified"
+      || candidate.factualVerification?.colorway === "independently_verified"
+      || !candidate.factualVerification) &&
     Boolean(candidate.colorwayName);
   const isVerifiedModel =
     isGemini &&
@@ -45,13 +48,18 @@ export function buildCandidatePresentation(candidate: CandidateProfile): Candida
           : "入力商品",
     badgeTone: isVerifiedColorway ? "verified" : isVerifiedModel ? "partial" : "core",
     modelName: candidate.modelName?.trim() || candidate.name,
-    colorwayName: isVerifiedColorway || isCoreCandidate
+    colorwayName: isVerifiedColorway
       ? candidate.colorwayName?.trim() || null
       : null,
-    colorwayMessage: isVerifiedColorway || (isCoreCandidate && candidate.colorwayName)
+    colorwayMessage: isVerifiedColorway
       ? null
       : "配色: 実在確認できず",
-    styleCode: isVerifiedColorway ? candidate.styleCode?.trim() || null : null,
+    styleCode: isVerifiedColorway
+      && (candidate.factualVerification?.styleCode === "officially_verified"
+        || candidate.factualVerification?.styleCode === "independently_verified"
+        || !candidate.factualVerification)
+      ? candidate.styleCode?.trim() || null
+      : null,
     sourceQualityLabel: sourceQualityLabels[candidate.sourceQuality ?? "unknown"],
   };
 }
@@ -101,8 +109,45 @@ export function VerifiedCandidateResult({
         根拠の主な出典種別: {presentation.sourceQualityLabel}
       </p>
       <CandidateEvidence candidate={candidate} />
+      <CandidateTrustReport candidate={candidate} />
     </section>
   );
+}
+
+function CandidateTrustReport({ candidate }: { candidate: CandidateProfile }) {
+  const trust = candidate.trustEvaluation;
+  if (!trust) return null;
+  const statusLabels = {
+    verified: "確認済み",
+    partially_verified: "一部確認済み",
+    needs_review: "追加確認が必要",
+    rejected: "表示対象外",
+  } as const;
+  return (
+    <details className="candidate-trust-report">
+      <summary>AI Trust Report: {statusLabels[trust.status]}</summary>
+      <dl>
+        <div><dt>モデル</dt><dd>{formatVerificationLevel(trust.factual.model)}</dd></div>
+        <div><dt>カラー</dt><dd>{formatVerificationLevel(trust.factual.colorway)}</dd></div>
+        <div><dt>Style Code</dt><dd>{formatVerificationLevel(trust.factual.styleCode)}</dd></div>
+        <div><dt>診断適合</dt><dd>{Math.round(trust.diagnosisFitScore)} / 100</dd></div>
+        <div><dt>表示から除外した説明</dt><dd>{trust.explanationTrust.unsupportedCount}件</dd></div>
+      </dl>
+      {trust.reviewReasons.length ? (
+        <ul>{trust.reviewReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+      ) : null}
+    </details>
+  );
+}
+
+function formatVerificationLevel(level: string): string {
+  return {
+    officially_verified: "公式確認",
+    independently_verified: "独立確認",
+    partially_verified: "一部確認",
+    unverified: "未確認",
+    rejected: "不一致",
+  }[level] ?? "未確認";
 }
 
 function CandidateEvidence({ candidate }: { candidate: CandidateProfile }) {

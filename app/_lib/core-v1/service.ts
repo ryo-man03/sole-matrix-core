@@ -4,6 +4,15 @@ import { researchSneakerCandidatesWithGemini } from "../ai/gemini-sneaker-resear
 import type { GeminiSneakerResearchCandidate } from "../ai/gemini-sneaker-research-schema";
 import type { UntrustedUserMemoryContext } from "../user-memory/types";
 import { auditRecommendationExplanation } from "../recommendation-trust/explanation-audit";
+import {
+  createFactualVerification,
+  createRecommendationTrustEvaluation,
+} from "../recommendation-trust/evaluation";
+import {
+  buildScoredShortlist,
+  buildTrustedCandidatePool,
+  createTrustedCandidateFunnel,
+} from "../recommendation-trust/trusted-pipeline";
 import { normalizeUserSneakerContext } from "../diagnosis/sneakerContext";
 import {
   buildRecommendationDisplayReasons,
@@ -227,6 +236,14 @@ export async function recommendCoreV1(
     }
   }
 
+  const trustedPool = buildTrustedCandidatePool(candidates);
+  const trustedIds = new Set(trustedPool.candidates.map((candidate) => candidate.id));
+  candidates = trustedPool.candidates;
+  scoredCandidates = buildScoredShortlist(
+    scoredCandidates.filter((entry) => trustedIds.has(entry.candidate.id)),
+    input.mode,
+  );
+
   const rankedRyoCandidates = ryoRerankingEnabled
     ? rerankRyoModeCandidates(scoredCandidates, ryoPreferenceVector, input.mode, userSneakerContext)
     : [];
@@ -284,6 +301,55 @@ export async function recommendCoreV1(
     context: userSneakerContext,
     ...(input.budgetYen === undefined ? {} : { budgetYen: input.budgetYen }),
   });
+  const safeExplanation = sanitizeExplanationForDisplay(explanation, explanationAudit.displayClaims);
+  const factualVerification = best.candidate.factualVerification ?? createFactualVerification({
+    model: best.candidate.researchSource === "fallback_catalog" || best.candidate.researchSource === "ryo_anchor"
+      ? "partially_verified"
+      : "unverified",
+    colorway: "unverified",
+    styleCode: "unverified",
+    modelEvidence: [],
+    colorwayEvidence: [],
+    styleCodeEvidence: [],
+    unsupportedClaims: [],
+    contradictions: [],
+  });
+  const trustEvaluation = createRecommendationTrustEvaluation({
+    factual: factualVerification,
+    diagnosisFitScore: selectedScoreBreakdownV2?.userFitScore ?? best.balancedScore.total,
+    ryoAuthenticity: {
+      historyFit: selectedRyoEvaluation.score.breakdown.historyOrigin,
+      materialStoryFit: selectedRyoEvaluation.score.breakdown.materialAging,
+      outfitFit: Math.round((
+        selectedRyoEvaluation.score.breakdown.silhouetteCutWearing
+        + selectedRyoEvaluation.score.breakdown.pantsCompatibility
+      ) / 2),
+      culturalFit: selectedRyoEvaluation.score.breakdown.styleSportContext,
+      adjacentDiscoveryFit: selectedScoreBreakdownV2?.explorationScore
+        ?? selectedRyoEvaluation.score.breakdown.playfulness,
+      collectionRoleFit: selectedRyoEvaluation.score.recommendationScore,
+      wearableColorFit: selectedRyoEvaluation.score.breakdown.colorTaste,
+      tooSafePenalty: selectedRyoSignature?.obviousnessPenalty ?? 0,
+      hypeOnlyPenalty: selectedRyoEvaluation.score.penalties.some((penalty) => /人気|hype/iu.test(penalty))
+        ? 15
+        : 0,
+      contextMismatchPenalty: selectedRyoSignature?.contextMismatchPenalty ?? 0,
+      total: selectedRyoEvaluation.score.totalRyoScore,
+      rubricVersion: "trusted-ryo-v1",
+      reasons: selectedRyoEvaluation.score.matchedSignals,
+      penalties: selectedRyoEvaluation.score.penalties,
+      matchedGoldRules: selectedContextReasons ?? [],
+    },
+    explanationTrust: explanationAudit.evaluation,
+  });
+  const displayCandidateCount = recommendationDisplaySet
+    ? [
+        recommendationDisplaySet.primary,
+        recommendationDisplaySet.practicalAlternative,
+        recommendationDisplaySet.ryoAlternative,
+      ].filter(Boolean).length
+    : 1;
+  const cautionCount = recommendationDisplaySet?.cautionCandidate ? 1 : 0;
 
   return {
     recommendationId: `core-v1:${best.candidate.id}`,
@@ -291,6 +357,8 @@ export async function recommendCoreV1(
     ...best,
     candidate: {
       ...best.candidate,
+      factualVerification,
+      trustEvaluation,
       ryoMetadata: {
         ...selectedRyoEvaluation.culture.metadata,
         ...(selectedRyoSignature ? {
@@ -299,8 +367,14 @@ export async function recommendCoreV1(
         } : {}),
       },
     },
-    explanation,
+    explanation: safeExplanation,
     explanationTrust: explanationAudit.evaluation,
+    candidateFunnel: createTrustedCandidateFunnel(
+      trustedPool.counts,
+      scoredCandidates.length,
+      displayCandidateCount,
+      cautionCount,
+    ),
     candidateResearch,
     ryoReranking: {
       applied: ryoRerankingEnabled,
@@ -342,6 +416,23 @@ export async function recommendCoreV1(
       listings: rakutenResult.evidence,
       feedbackPatterns: [],
     },
+  };
+}
+
+function sanitizeExplanationForDisplay(
+  explanation: RecommendationExplanation,
+  displayClaims: readonly { text: string }[],
+): RecommendationExplanation {
+  const allowed = new Set(displayClaims.map((claim) => claim.text));
+  const safeReasons = explanation.reasons.filter((reason) => allowed.has(reason));
+  const safeCautions = explanation.cautions.filter((caution) => allowed.has(caution));
+  const fallbackReason = "診断回答とCoreのスコアを照合して、この候補を選びました。";
+  const fallbackCaution = "価格・在庫・サイズ・真贋は販売元で確認してください。";
+  return {
+    ...explanation,
+    summary: allowed.has(explanation.summary) ? explanation.summary : fallbackReason,
+    reasons: safeReasons.length ? safeReasons : [fallbackReason],
+    cautions: safeCautions.length ? safeCautions : [fallbackCaution],
   };
 }
 

@@ -18,6 +18,7 @@ describe("recommendation explanation claim audit", () => {
       "core_inference",
       "ryo_editorial",
       "unsupported",
+      "unsupported",
     ]);
     expect(result.evaluation.claims[0]?.evidenceUrls).toHaveLength(1);
     expect(result.evaluation.claims[1]?.supportingScoreKeys).toContain("userFitScore");
@@ -81,7 +82,7 @@ describe("recommendation explanation claim audit", () => {
       explanation: explanation(reasons),
       scoreBreakdown: scores(),
     });
-    expect(result.evaluation.claims).toHaveLength(5);
+    expect(result.evaluation.claims).toHaveLength(6);
     expect(result.displayClaims).toHaveLength(4);
   });
 });

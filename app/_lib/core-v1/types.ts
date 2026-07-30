@@ -19,6 +19,7 @@ import type {
 } from "../ryo-mode-v4/types";
 import type { FactualVerification, RecommendationTrustEvaluation } from "../recommendation-trust/types";
 import type { ExplanationTrustEvaluation } from "../recommendation-trust/types";
+import type { TrustedCandidateFunnel } from "../recommendation-trust/trusted-pipeline";
 
 export type DiagnosisAnswerValue = "like" | "neutral" | "dislike";
 
@@ -175,6 +176,7 @@ export type RecommendationResult = {
   decision: Decision;
   explanation: RecommendationExplanation;
   explanationTrust?: ExplanationTrustEvaluation;
+  candidateFunnel?: TrustedCandidateFunnel;
   readiness: {
     geminiResearch: GeminiCapabilityReadiness;
     geminiExplanation: GeminiCapabilityReadiness;

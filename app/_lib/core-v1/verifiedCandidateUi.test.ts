@@ -7,6 +7,11 @@ import {
   VerifiedCandidateResult,
 } from "../../_components/VerifiedCandidateResult";
 import type { CandidateProfile } from "./types";
+import {
+  createExplanationTrustEvaluation,
+  createFactualVerification,
+  createRecommendationTrustEvaluation,
+} from "../recommendation-trust/evaluation";
 
 describe("verified candidate result UI", () => {
   it("presents the candidate as the primary recommendation", () => {
@@ -77,7 +82,7 @@ describe("verified candidate result UI", () => {
     expect(html).not.toContain("FAKE-001");
   });
 
-  it("labels fallback and Ryo anchor candidates as Core candidates", () => {
+  it("labels fallback and Ryo anchor candidates as Core candidates without asserting an unverified color", () => {
     expect(buildCandidatePresentation(createCandidate({
       researchSource: "fallback_catalog",
       verificationStatus: "unverified",
@@ -88,7 +93,7 @@ describe("verified candidate result UI", () => {
       colorwayName: "Core curated color",
     }))).toMatchObject({
       badge: "Core候補",
-      colorwayName: "Core curated color",
+      colorwayName: null,
     });
   });
 
@@ -103,6 +108,56 @@ describe("verified candidate result UI", () => {
     );
     expect(html).toContain(longModelName);
     expect(html).toContain("verified-candidate-result");
+  });
+
+  it("renders a concise AI Trust Report from the server-side evaluation", () => {
+    const factual = createFactualVerification({
+      model: "officially_verified",
+      colorway: "unverified",
+      styleCode: "unverified",
+      modelEvidence: [],
+      colorwayEvidence: [],
+      styleCodeEvidence: [],
+      unsupportedClaims: [],
+      contradictions: [],
+    });
+    const trustEvaluation = createRecommendationTrustEvaluation({
+      factual,
+      diagnosisFitScore: 82,
+      ryoAuthenticity: {
+        historyFit: 70,
+        materialStoryFit: 65,
+        outfitFit: 80,
+        culturalFit: 75,
+        adjacentDiscoveryFit: 60,
+        collectionRoleFit: 78,
+        wearableColorFit: 50,
+        tooSafePenalty: 0,
+        hypeOnlyPenalty: 0,
+        contextMismatchPenalty: 0,
+        total: 74,
+        rubricVersion: "test-v1",
+        reasons: [],
+        penalties: [],
+        matchedGoldRules: [],
+      },
+      explanationTrust: createExplanationTrustEvaluation([{
+        id: "unsupported",
+        text: "裏付けなし",
+        kind: "unsupported",
+        evidenceUrls: [],
+        supportingScoreKeys: [],
+        supportingCandidateFields: [],
+        contradictionReasons: [],
+      }]),
+    });
+    const html = renderToStaticMarkup(createElement(VerifiedCandidateResult, {
+      candidate: createCandidate({ trustEvaluation }),
+      decisionLabel: "CONSIDER",
+    }));
+    expect(html).toContain("AI Trust Report: 一部確認済み");
+    expect(html).toContain("表示から除外した説明");
+    expect(html).toContain("<dd>1件</dd>");
   });
 });
 

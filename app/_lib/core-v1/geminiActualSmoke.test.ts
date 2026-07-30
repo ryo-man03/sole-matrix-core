@@ -69,7 +69,7 @@ describe("Gemini actual generation smoke", () => {
       networkAttempted: true,
       shapeValid: true,
       summaryNonEmpty: true,
-      reasonsCount: 2,
+      reasonsCount: 1,
       cautionsIsArray: true,
       source: "gemini",
       decisionSource: "typescript",

@@ -152,14 +152,12 @@ function verificationLevel(evidence: readonly VerificationEvidence[]): Verificat
   if (evidence.some(({ sourceQuality }) => sourceQuality === "official")) {
     return "officially_verified";
   }
-  if (evidence.some(({ sourceQuality }) =>
-    sourceQuality === "authorized_retailer" ||
-    sourceQuality === "reputable_retailer" ||
-    sourceQuality === "reputable_media")) {
+  if (evidence.some(({ sourceQuality }) => sourceQuality === "authorized_retailer")) {
     return "independently_verified";
   }
   const independentDomains = new Set(evidence
-    .filter(({ sourceQuality }) => sourceQuality !== "marketplace" && sourceQuality !== "unknown")
+    .filter(({ sourceQuality }) =>
+      sourceQuality === "reputable_retailer" || sourceQuality === "reputable_media")
     .map(({ domain }) => domain));
   return independentDomains.size >= 2 ? "independently_verified" : "unverified";
 }

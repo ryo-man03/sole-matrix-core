@@ -35,6 +35,7 @@ export function auditRecommendationExplanation(
   const texts = uniqueText([
     ...input.explanation.reasons,
     ...input.explanation.cautions,
+    input.explanation.summary,
   ]);
   const claims = texts.map((text, index) => auditClaim(text, index, input));
   const evaluation = createExplanationTrustEvaluation(claims);
