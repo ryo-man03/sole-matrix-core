@@ -71,6 +71,9 @@ describe("responsive product workspace", () => {
     expect(normalizedCss).toMatch(
       /\.core-v1-panel > \*\s*\{[^}]*min-width:\s*0/s,
     );
+    expect(normalizedCss).toMatch(
+      /\.core-v1-result > \*\s*\{[^}]*min-width:\s*0/s,
+    );
   });
 
   it("lets headings wrap naturally and keeps secondary detail collapsible", () => {

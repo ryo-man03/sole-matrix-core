@@ -2094,6 +2094,10 @@ h1 {
   padding-top: 22px;
 }
 
+.core-v1-result > * {
+  min-width: 0;
+}
+
 .core-v1-explanation {
   min-width: 0;
   border: 1px solid rgba(35, 43, 55, 0.12);
