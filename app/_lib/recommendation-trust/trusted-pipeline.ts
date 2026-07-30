@@ -14,10 +14,12 @@ export const TRUSTED_CANDIDATE_LIMITS = {
 
 export const TRUSTED_SEARCH_SLOTS = [
   "hard_constraint",
+  "balanced_core",
   "ryo_core",
-  "adjacent_discovery",
-  "archive_wildcard",
+  "category_match",
+  "ryo_adjacent",
   "practical_anchor",
+  "archive_wildcard",
 ] as const;
 
 export type TrustedSearchSlot = (typeof TRUSTED_SEARCH_SLOTS)[number];

@@ -120,6 +120,150 @@ export type RyoCandidateMetadata = {
   verificationStatus: "verified" | "needs_check" | "unverified";
   recommendationBucket?: RyoRecommendationBucket;
   ryoSignature?: RyoSignatureMetadata;
+  affinityTier?: RyoAffinityTier;
+  category?: RyoModelCategory;
+  affinityReason?: string;
+};
+
+export type RyoAffinityTier =
+  | "core"
+  | "adjacent"
+  | "situational"
+  | "practical"
+  | "excluded";
+
+export type RyoModelCategory =
+  | "canvas_classic"
+  | "skate"
+  | "terrace"
+  | "retro_running"
+  | "basketball_classic"
+  | "workwear_heritage"
+  | "practical_classic"
+  | "technical_running";
+
+export type RyoBudgetBand = "value" | "standard" | "premium";
+
+export type RyoModelAffinityProfile = {
+  affinityTier: RyoAffinityTier;
+  historicalContext: string[];
+  culturalContexts: string[];
+  materialCharacter: string[];
+  agingPotential: string[];
+  wardrobeMatches: string[];
+  purposeMatches: string[];
+  category: RyoModelCategory;
+  comfortProfile: "low_tech" | "balanced" | "comfort_first";
+  silhouetteProfile: "slim" | "balanced" | "volume";
+  budgetBand: RyoBudgetBand;
+  reasonForTier: string;
+  disqualifyingConditions: string[];
+  promotionConditions: string[];
+};
+
+export type RyoEligibilityReasonCode =
+  | "affinity_core"
+  | "affinity_adjacent"
+  | "affinity_situational"
+  | "affinity_practical"
+  | "affinity_excluded"
+  | "category_interest"
+  | "category_gate_passed"
+  | "category_gate_failed"
+  | "wardrobe_match"
+  | "wardrobe_mismatch"
+  | "purpose_match"
+  | "purpose_mismatch"
+  | "culture_match"
+  | "material_match"
+  | "history_match"
+  | "budget_match"
+  | "budget_violation"
+  | "budget_unknown"
+  | "owned_duplicate"
+  | "disliked_model"
+  | "hard_constraint"
+  | "score_below_floor"
+  | "user_fit_below_floor"
+  | "ryo_identity_below_floor"
+  | "role_explanation_available"
+  | "role_overlap_primary"
+  | "role_overlap_practical";
+
+export type RyoEligibilityReason = {
+  code: RyoEligibilityReasonCode;
+  message: string;
+  evidence?: string[];
+};
+
+export type RyoCategoryGateEvaluation = {
+  category: RyoModelCategory;
+  passed: boolean;
+  matchedEvidence: string[];
+  missingEvidence: string[];
+  score: number;
+  requiredMatches: number;
+  categoryInterest: boolean;
+};
+
+export type RyoRoleEligibility = {
+  eligible: boolean;
+  affinityTier: RyoAffinityTier;
+  hardFailures: RyoEligibilityReason[];
+  softWarnings: RyoEligibilityReason[];
+  positiveReasons: RyoEligibilityReason[];
+  contextMatchScore: number;
+  wardrobeMatchScore: number;
+  purposeMatchScore: number;
+  cultureMatchScore: number;
+  materialMatchScore: number;
+  categoryGate: RyoCategoryGateEvaluation;
+};
+
+export type RecommendationSetViolationCode =
+  | "role_mismatch"
+  | "forced_slot"
+  | "unexplained_category_jump"
+  | "duplicate_narrative"
+  | "duplicate_model_family"
+  | "safe_candidate_dominance"
+  | "rare_only_bias"
+  | "practical_model_in_ryo_role"
+  | "adjacent_overpromotion"
+  | "core_underpromotion"
+  | "purpose_mismatch"
+  | "wardrobe_mismatch"
+  | "budget_violation"
+  | "ownership_duplicate"
+  | "disliked_leak"
+  | "explanation_role_mismatch"
+  | "mode_sensitivity_failure"
+  | "mode_overreaction";
+
+export type RecommendationSetViolation = {
+  code: RecommendationSetViolationCode;
+  message: string;
+  candidateId?: string;
+};
+
+export type RecommendationSetCoherence = {
+  coherent: boolean;
+  narrativeScore: number;
+  purposefulDiversityScore: number;
+  roleSeparationScore: number;
+  categoryContinuityScore: number;
+  violations: RecommendationSetViolation[];
+};
+
+export type RyoRoleExplanation = {
+  whyRyo: string;
+  matchedAnswers: string[];
+  evidence: string[];
+  whyNotPrimary: string;
+  whyNotPractical: string;
+  caution: string;
+  affinityTier: RyoAffinityTier;
+  eligible: boolean;
 };
 
 export type RyoRecommendationBucket =
