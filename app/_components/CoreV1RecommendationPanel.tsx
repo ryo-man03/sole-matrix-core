@@ -14,6 +14,10 @@ import { RakutenMarketFind } from "./RakutenMarketFind";
 import { RyoModeResultPanel } from "./RyoModeResultPanel";
 import { buildCandidatePresentation, RyoScoreBreakdown, VerifiedCandidateResult } from "./VerifiedCandidateResult";
 import { createLatestRequestGate } from "./productLinkResolution";
+import {
+  requestProviderJson,
+  type ProviderRequestFailure,
+} from "../_lib/provider-reliability/requestPolicy";
 
 type Props = {
   disabled?: boolean;
@@ -71,19 +75,24 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
   const [productLinksMessage, setProductLinksMessage] = useState("推薦後に具体モデル名から参考リンクを作成します。");
   const [isResolvingProductLinks, setIsResolvingProductLinks] = useState(false);
   const gateRef = useRef(createLatestRequestGate());
+  const recommendRequestInFlightRef = useRef(false);
   useEffect(() => () => gateRef.current.invalidate(), []);
 
   async function handleRecommend() {
+    if (recommendRequestInFlightRef.current) return;
+    recommendRequestInFlightRef.current = true;
     const ryoContext = buildRyoModeContextForRecommendation(selectedAnswerByQuestionId);
     setIsLoading(true);
     setErrorMessage("");
     setFeedbackState("idle");
     gateRef.current.invalidate();
     try {
-      const response = await fetch("/api/core-v1/recommend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const response = await requestProviderJson<RecommendApiResponse>({
+        input: "/api/core-v1/recommend",
+        init: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
           diagnosisAnswers: ryoContext.diagnosisAnswers,
           preferenceTags: ryoContext.preferenceTags,
           ryoModeAnswers: ryoContext.answers,
@@ -93,11 +102,19 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
           dislikedSignals: userSneakerContext.dislikedSignals,
           mode: ryoContext.mode,
           ...(ryoContext.budgetYen === undefined ? {} : { budgetYen: ryoContext.budgetYen }),
-        }),
+          }),
+        },
+        validate: isRecommendApiResponse,
+        timeoutMs: 30_000,
+        maxRetries: 1,
       });
-      const payload = await response.json() as RecommendApiResponse;
-      if (!response.ok || !payload.ok) {
-        setErrorMessage(payload.ok ? "推薦結果を取得できませんでした。" : payload.error.message);
+      if (!response.ok) {
+        setErrorMessage(recommendationRequestErrorMessage(response));
+        return;
+      }
+      const payload = response.data;
+      if (!payload.ok) {
+        setErrorMessage(payload.error.message);
         return;
       }
       setProductLinks([]);
@@ -108,6 +125,7 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
       setErrorMessage("推薦APIに接続できませんでした。時間をおいて再度お試しください。");
     } finally {
       setIsLoading(false);
+      recommendRequestInFlightRef.current = false;
     }
   }
 
@@ -208,6 +226,32 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
       </div> : null}
     </section>
   );
+}
+
+function isRecommendApiResponse(value: unknown): value is RecommendApiResponse {
+  if (!value || typeof value !== "object" || typeof (value as { ok?: unknown }).ok !== "boolean") {
+    return false;
+  }
+  const response = value as { ok: boolean; data?: unknown; error?: unknown };
+  if (response.ok) {
+    return Boolean(response.data && typeof response.data === "object");
+  }
+  if (!response.error || typeof response.error !== "object") return false;
+  const error = response.error as Record<string, unknown>;
+  return typeof error.code === "string" && typeof error.message === "string";
+}
+
+function recommendationRequestErrorMessage(failure: ProviderRequestFailure): string {
+  if (failure.code === "timeout") {
+    return "推薦の確認に時間がかかっています。前回の結果を残したまま終了しました。時間をおいて再度お試しください。";
+  }
+  if (failure.code === "invalid_json" || failure.code === "empty_response" || failure.code === "schema_mismatch") {
+    return "推薦結果の形式を確認できませんでした。前回の結果はそのまま表示しています。";
+  }
+  if (failure.code === "offline" || failure.code === "connection_reset") {
+    return "通信が一時的に不安定です。前回の結果を残したまま終了しました。";
+  }
+  return "推薦APIに接続できませんでした。前回の結果がある場合はそのまま表示しています。";
 }
 
 function ExplanationList({ caution = false, title, items }: { caution?: boolean; title: string; items: string[] }) {
