@@ -1,6 +1,17 @@
 export const RECOMMENDATION_FEEDBACK_STORAGE_KEY = "sole-matrix:recommendation-feedback:v1";
 
 export type RecommendationFeedbackUsefulness = "helpful" | "unsure" | "needs_improvement";
+export type RecommendationFeedbackReason =
+  | "model_mismatch"
+  | "role_mismatch"
+  | "ryo_role_mismatch"
+  | "good_as_practical"
+  | "set_incoherent"
+  | "too_safe"
+  | "rare_only"
+  | "wardrobe_mismatch"
+  | "purpose_mismatch"
+  | "owned_too_similar";
 
 export type RecommendationFeedback = {
   id: string;
@@ -8,6 +19,7 @@ export type RecommendationFeedback = {
   resultModelName: string;
   decision: string;
   usefulness: RecommendationFeedbackUsefulness;
+  reason?: RecommendationFeedbackReason;
   comment: string;
   ryoMode?: {
     templates?: string[];
@@ -59,5 +71,19 @@ function isRecommendationFeedback(value: unknown): value is RecommendationFeedba
     && typeof entry.resultModelName === "string"
     && typeof entry.decision === "string"
     && (entry.usefulness === "helpful" || entry.usefulness === "unsure" || entry.usefulness === "needs_improvement")
+    && (entry.reason === undefined || FEEDBACK_REASONS.has(entry.reason))
     && typeof entry.comment === "string";
 }
+
+const FEEDBACK_REASONS = new Set<RecommendationFeedbackReason>([
+  "model_mismatch",
+  "role_mismatch",
+  "ryo_role_mismatch",
+  "good_as_practical",
+  "set_incoherent",
+  "too_safe",
+  "rare_only",
+  "wardrobe_mismatch",
+  "purpose_mismatch",
+  "owned_too_similar",
+]);
