@@ -8,22 +8,20 @@ import { summarizeRyoPreferenceVector } from "../_lib/ryo-mode-v4/vector";
 
 export function PreferenceDiagnosisSummary({
   context,
-  onEditAnswers,
+  onEditAnswer,
   onEditContext,
   questions,
   selectedAnswerByQuestionId,
   vector,
 }: {
   context: UserSneakerContext;
-  onEditAnswers: () => void;
+  onEditAnswer: (questionId: DiagnosisQuestion["id"]) => void;
   onEditContext: () => void;
   questions: DiagnosisQuestion[];
   selectedAnswerByQuestionId: Record<string, DiagnosisAnswerId | undefined>;
   vector: RyoPreferenceVector;
 }) {
   const summary = summarizeRyoPreferenceVector(vector);
-  const summaryIds = ["style", "pantsFit", "materialAging", "color", "budget", "ryoStrength"];
-  const summaryQuestions = questions.filter((question) => summaryIds.includes(question.id));
   return (
     <section className="diagnosis-summary" aria-labelledby="diagnosis-summary-title">
       <p className="diagnosis-summary-kicker">回答サマリー</p>
@@ -34,9 +32,20 @@ export function PreferenceDiagnosisSummary({
           <dt>購入目的</dt>
           <dd>{purchasePurposeLabel(context.purchasePurpose)}</dd>
         </div>
-        {summaryQuestions.map((question) => (
+        {questions.map((question) => (
           <div className="diagnosis-summary-item" key={question.id}>
-            <dt>{question.question}</dt>
+            <dt>
+              <span>{question.category}</span>
+              {question.question}
+              <button
+                aria-label={`${question.category}の回答を編集`}
+                className="diagnosis-summary-edit"
+                onClick={() => onEditAnswer(question.id)}
+                type="button"
+              >
+                編集
+              </button>
+            </dt>
             <dd>{question.options.find((option) => option.id === selectedAnswerByQuestionId[question.id])?.label ?? "未回答"}</dd>
           </div>
         ))}
@@ -51,7 +60,6 @@ export function PreferenceDiagnosisSummary({
       </dl>
       <div className="diagnosis-summary-actions">
         <button className="diagnosis-secondary-button" onClick={onEditContext} type="button">購入目的を編集する</button>
-        <button className="diagnosis-secondary-button" onClick={onEditAnswers} type="button">11問の回答を編集する</button>
       </div>
       <div className="core-v1-provider-note" data-ryo-vector-summary>
         <strong>診断の要点</strong>

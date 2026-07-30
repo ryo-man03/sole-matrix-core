@@ -1,10 +1,12 @@
 import type { CandidateProfile } from "../core-v1/types";
 import { recommendCoreV1 } from "../core-v1/service";
 import {
+  buildRecommendationDisplayReasons,
   createRyoModeCandidateAnchors,
   getRerankingWeights,
   normalizeOfficialSneakerName,
   rerankRyoModeCandidates,
+  selectRecommendationDisplaySet,
 } from "./candidates";
 import { buildRyoModeCandidateEvaluation } from "./integration";
 import type { RyoModeAnswers } from "./types";
@@ -53,6 +55,65 @@ const screenshotRegressionAnswers = {
 } as const;
 
 describe("Ryo Mode v4 candidate pool and reranking", () => {
+  it("selects a deterministic, unique display set without replacing ranked[0]", () => {
+    const vector = buildRyoPreferenceVector(screenshotRegressionAnswers);
+    const ranked = rerankRyoModeCandidates(
+      createRyoModeCandidateAnchors(vector, 15_000)
+        .map((value, index) => scored(value, Math.max(58, 88 - index))),
+      vector,
+      "balanced",
+      {
+        purchasePurpose: "daily_rotation",
+        ownedModels: ["PUMA Suede"],
+        dislikedModels: [],
+        dislikedSignals: ["ハイテク"],
+      },
+    );
+    const displaySet = selectRecommendationDisplaySet(ranked, {
+      purchasePurpose: "daily_rotation",
+      ownedModels: ["PUMA Suede"],
+      dislikedModels: [],
+      dislikedSignals: ["ハイテク"],
+    });
+    const repeated = selectRecommendationDisplaySet(ranked, {
+      purchasePurpose: "daily_rotation",
+      ownedModels: ["PUMA Suede"],
+      dislikedModels: [],
+      dislikedSignals: ["ハイテク"],
+    });
+
+    expect(displaySet?.primary.candidate.id).toBe(ranked[0]?.candidate.id);
+    expect(repeated?.practicalAlternative?.candidate.id)
+      .toBe(displaySet?.practicalAlternative?.candidate.id);
+    expect(repeated?.ryoAlternative?.candidate.id)
+      .toBe(displaySet?.ryoAlternative?.candidate.id);
+    const visibleIds = [
+      displaySet?.primary.candidate.id,
+      displaySet?.practicalAlternative?.candidate.id,
+      displaySet?.ryoAlternative?.candidate.id,
+    ].filter(Boolean);
+    expect(new Set(visibleIds).size).toBe(visibleIds.length);
+    expect(displaySet?.practicalAlternative?.candidate.name).not.toContain("PUMA Suede");
+  });
+
+  it("turns internal signature adjustments into at most three user-facing reasons", () => {
+    const vector = buildRyoPreferenceVector(strongAnswers);
+    const ranked = rerankRyoModeCandidates(
+      createRyoModeCandidateAnchors(vector, 25_000)
+        .map((value, index) => scored(value, Math.max(60, 90 - index))),
+      vector,
+      "ryo",
+    );
+    const displaySet = selectRecommendationDisplaySet(ranked);
+    const reasons = displaySet?.ryoAlternative
+      ? buildRecommendationDisplayReasons(displaySet.ryoAlternative, "ryo")
+      : [];
+
+    expect(reasons.length).toBeGreaterThan(0);
+    expect(reasons.length).toBeLessThanOrEqual(3);
+    expect(reasons.join(" ")).not.toMatch(/Bonus|Penalty|bonus|penalty/);
+  });
+
   it("generates the expected anchors for the strong work-pants answer", () => {
     const anchors = createRyoModeCandidateAnchors(buildRyoPreferenceVector(strongAnswers), 25_000);
     const names = anchors.map((candidate) => candidate.name);

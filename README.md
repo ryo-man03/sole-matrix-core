@@ -1,5 +1,7 @@
 # SOLE//MATRIX
 
+[![CI](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml/badge.svg)](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml)
+
 スニーカーを、流行や価格だけでなく、歴史・素材・服との相性・文化背景まで含めて整理し、購入判断を補助する Web アプリです。
 
 商品名・URL・画像からの単体判断と、11問診断にもとづく推薦を分けて扱い、Gemini の候補調査、TypeScript Core / Ryo Mode の推薦判断、Rakuten `market_find` の購入サポートを明確に分離しています。価格、在庫、サイズ、購入可能性は販売元での確認を前提にしています。
@@ -18,45 +20,15 @@ SOLE//MATRIX は、好みを言語化しにくい人でも、服装・パンツ�
 
 ## 2. Screenshots
 
-以下はローカル環境で確認した画面です。実 API に依存しない確認用キャプチャを含みます。
+UI v3 のローカル確認用キャプチャです。実 API には依存せず、Core の fallback 候補で診断開始から結果比較までを確認しています。
 
-### 診断 v2 / verified colorway flow
-
-購入文脈 → 説明付き11問 → 回答サマリー → 確認済みカラーまたは安全なカラー未確認表示、という順で進みます。
-
-| State | 390px | Desktop |
+| State | Mobile | Desktop |
 | --- | --- | --- |
-| 購入文脈 | [context](docs/product/screenshots/diagnosis-v2/diagnosis-context-390.png) | — |
-| 説明付き選択肢 | [options](docs/product/screenshots/diagnosis-v2/diagnosis-options-390.png) | — |
-| 回答サマリー | [summary](docs/product/screenshots/diagnosis-v2/diagnosis-summary-390.png) | — |
-| モデル・カラー確認済み | [390px](docs/product/screenshots/diagnosis-v2/verified-colorway-result-390.png) | [1024px](docs/product/screenshots/diagnosis-v2/verified-colorway-result-1024.png) / [1440px](docs/product/screenshots/diagnosis-v2/verified-colorway-result-1440.png) |
-| モデル確認済み・カラー未確認 | [390px](docs/product/screenshots/diagnosis-v2/unverified-colorway-fallback-390.png) | — |
-
-### 11問診断の開始画面
-
-![Ryo Mode v4 start](docs/product/screenshots/ryo-mode-v4-start.png)
-
-### 回答サマリー
-
-![Ryo Mode v4 summary](docs/product/screenshots/ryo-mode-v4-summary.png)
-
-### 推薦結果のメイン画面
-
-![Ryo Mode v4 result](docs/product/screenshots/ryo-mode-v4-result.png)
-
-### Rakuten market_find の購入サポート
-
-修正後の High 条件に合う推薦を維持したまま、楽天市場の購入候補を別枠で表示します。外部 API が利用できない場合は soft error と再試行導線へ切り替わります。
-
-![Rakuten market_find](docs/product/screenshots/rakuten-market-find.png)
-
-### Ryo Mode v4 の score 表示
-
-![Ryo Mode v4 scores](docs/product/screenshots/ryo-mode-v4-scores.png)
-
-### フィードバック保存 UI
-
-![Ryo Mode v4 feedback](docs/product/screenshots/ryo-mode-v4-feedback.png)
+| ホーム / 入口の分離 | [390px](docs/product/screenshots/ui-v3/home-390.png) | — |
+| 11問診断 / 進捗と固定ナビゲーション | [390px](docs/product/screenshots/ui-v3/diagnosis-progress-390.png) | — |
+| 回答サマリー / 各回答の編集導線 | [390px](docs/product/screenshots/ui-v3/diagnosis-summary-390.png) | — |
+| 本命候補 / 理由・注意点 | [390px](docs/product/screenshots/ui-v3/result-primary-390.png) | [1024px](docs/product/screenshots/ui-v3/result-1024.png) / [1440px](docs/product/screenshots/ui-v3/result-1440.png) |
+| 現実的な別案 / Ryo Modeらしい別案 / 下げた候補 | [390px](docs/product/screenshots/ui-v3/result-alternatives-390.png) | [1440px](docs/product/screenshots/ui-v3/result-1440.png) |
 
 ## 3. Why I built this
 
@@ -73,6 +45,8 @@ SOLE//MATRIX は、AI におすすめを丸投げするためのアプリでは�
 - 商品判断（商品名 / URL / 画像）
 - `RyoPreferenceVector v4`
 - `RyoScoreBreakdownV2`（回答との相性 / Ryo Modeらしさ / 現実的な選びやすさ / 二足目・アーカイブ適性）
+- 本命・現実的な別案・Ryo Modeらしい別案・下げた候補を決定論的に選ぶ `RecommendationDisplaySet`
+- 36シナリオの calibration suite による推薦の多様性・安全性確認
 - `productScore` / `recommendationScore` / `totalRyoScore`
 - cultural recommendation metadata
 - retro running taxonomy
@@ -207,13 +181,14 @@ Supabase など、ほかの任意設定は [`.env.local.example`](.env.local.exa
 
 ## 13. Verification
 
-2026-07-28 時点で、以下をローカルで確認しました。
+2026-07-29 時点で、以下をローカルで確認しました。
 
 - TypeScript: passed
-- Tests: 75 files / 544 tests passed
-- Production build: passed
-- Browser check: passed（390x844 / 1024x900 / 1440x900。購入文脈、説明付き11問、サマリー、verified / unverified colorway、4軸スコア、楽天の別枠表示、横スクロールなし、console error 0件）
-- Gemini contract: mocked contract は検証済み。live Gemini colorway verification は未確認
+- Tests: 77 files / 554 tests passed
+- Production build: passed（21 routes）
+- Browser check: passed（360 / 390 / 430 / 768 / 1024 / 1366 / 1440 / 1920px。ホーム、設定、購入文脈、説明付き11問、サマリー、推薦の本命・別案・下げた候補を確認。横スクロールなし、console error / warning 0件）
+- GitHub Actions: `Typecheck` / `Tests` / `Production build` の3ジョブを PR、`main` push、merge queue で実行する構成
+- External API contract: CI では Gemini / Rakuten の live API を呼ばず、mock と fallback contract を検証。live Gemini colorway verification は未確認
 
 ## 14. Future improvements
 

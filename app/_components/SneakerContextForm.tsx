@@ -43,6 +43,7 @@ export function SneakerContextForm({
           <label>
             <span>持っている靴</span>
             <textarea
+              key={context.ownedModels.join("\n")}
               defaultValue={context.ownedModels.join("\n")}
               maxLength={809}
               onBlur={(event) => onChange({ ...context, ownedModels: parseContextListInput(event.currentTarget.value) })}
@@ -53,6 +54,7 @@ export function SneakerContextForm({
           <label>
             <span>避けたいモデル</span>
             <textarea
+              key={context.dislikedModels.join("\n")}
               defaultValue={context.dislikedModels.join("\n")}
               maxLength={809}
               onBlur={(event) => onChange({ ...context, dislikedModels: parseContextListInput(event.currentTarget.value) })}
@@ -85,6 +87,49 @@ export function SneakerContextForm({
           </fieldset>
         </div>
       </details>
+      {context.ownedModels.length || context.dislikedModels.length || context.dislikedSignals.length ? (
+        <div className="diagnosis-context-chips" aria-label="追加した任意条件">
+          {context.ownedModels.map((model) => (
+            <button
+              aria-label={`所有モデル「${model}」を削除`}
+              key={`owned:${model}`}
+              onClick={() => onChange({
+                ...context,
+                ownedModels: context.ownedModels.filter((item) => item !== model),
+              })}
+              type="button"
+            >
+              <span>所有</span>{model}<span aria-hidden="true">×</span>
+            </button>
+          ))}
+          {context.dislikedModels.map((model) => (
+            <button
+              aria-label={`避けたいモデル「${model}」を削除`}
+              key={`disliked:${model}`}
+              onClick={() => onChange({
+                ...context,
+                dislikedModels: context.dislikedModels.filter((item) => item !== model),
+              })}
+              type="button"
+            >
+              <span>避けたい</span>{model}<span aria-hidden="true">×</span>
+            </button>
+          ))}
+          {context.dislikedSignals.map((signal) => (
+            <button
+              aria-label={`避けたい傾向「${signal}」を削除`}
+              key={`signal:${signal}`}
+              onClick={() => onChange({
+                ...context,
+                dislikedSignals: context.dislikedSignals.filter((item) => item !== signal),
+              })}
+              type="button"
+            >
+              <span>避けたい</span>{signal}<span aria-hidden="true">×</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       <p className="diagnosis-context-note">この情報は診断中だけ利用し、長文プロフィールとして保存しません。ゲストではこのタブの一時保存だけです。</p>
       <button className="diagnosis-primary-button" onClick={onContinue} type="button">11問診断へ進む</button>
     </section>

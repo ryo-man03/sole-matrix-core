@@ -9,6 +9,16 @@ import {
 import type { CandidateProfile } from "./types";
 
 describe("verified candidate result UI", () => {
+  it("presents the candidate as the primary recommendation", () => {
+    const html = renderToStaticMarkup(
+      createElement(VerifiedCandidateResult, {
+        candidate: createCandidate(),
+        decisionLabel: "おすすめ候補",
+      }),
+    );
+    expect(html).toContain("あなたへの本命");
+  });
+
   it("shows a verified Gemini model, colorway, style code, and safe evidence links", () => {
     const candidate = createCandidate({
       researchSource: "gemini",

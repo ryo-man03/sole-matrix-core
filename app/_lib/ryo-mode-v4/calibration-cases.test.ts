@@ -3,20 +3,24 @@ import { RYO_CALIBRATION_CASES } from "./calibration-cases";
 import {
   createRyoModeCandidateAnchors,
   rerankRyoModeCandidates,
+  selectRecommendationDisplaySet,
 } from "./candidates";
 import { RYO_MODE_V4_QUESTIONS } from "./questions";
 import { RYO_STRENGTH_BLENDS } from "./score-breakdown";
 import { buildRyoPreferenceVector } from "./vector";
 
 describe("Ryo Mode v2 calibration matrix", () => {
-  it("defines at least 24 complete, uniquely identified fixed cases", () => {
-    expect(RYO_CALIBRATION_CASES.length).toBeGreaterThanOrEqual(24);
+  it("defines at least 36 complete, uniquely identified fixed cases", () => {
+    expect(RYO_CALIBRATION_CASES.length).toBeGreaterThanOrEqual(36);
     expect(new Set(RYO_CALIBRATION_CASES.map((item) => item.id)).size).toBe(RYO_CALIBRATION_CASES.length);
     for (const item of RYO_CALIBRATION_CASES) {
       expect(Object.keys(item.answers).sort()).toEqual(RYO_MODE_V4_QUESTIONS.map((question) => question.id).sort());
       expect(item.expectedTopFamilies.length).toBeGreaterThan(0);
       expect(item.acceptableTopModels.length).toBeGreaterThan(0);
       expect(item.mustNotRankFirst).toBeDefined();
+      expect(item.expectedVerificationStates.length).toBeGreaterThan(0);
+      expect(item.scoreRange.min).toBeGreaterThanOrEqual(0);
+      expect(item.scoreRange.max).toBeLessThanOrEqual(100);
     }
   });
 
@@ -41,7 +45,37 @@ describe("Ryo Mode v2 calibration matrix", () => {
         `${item.id}: ${winner?.candidate.name}`,
       ).toBe(false);
       expect(item.expectedBuckets).toContain(winner!.ryoSignature.bucket);
-      expectScoreRange(winner!.scoreBreakdownV2);
+      expect(item.expectedVerificationStates).toContain(winner!.candidate.verificationStatus ?? "unverified");
+      expectScoreRange(winner!.scoreBreakdownV2, item.scoreRange);
+    }
+  });
+
+  it("keeps display roles unique and alternatives above the calibrated score floor", () => {
+    for (const item of RYO_CALIBRATION_CASES) {
+      const vector = buildRyoPreferenceVector(item.answers);
+      const ranked = rerankRyoModeCandidates(
+        createRyoModeCandidateAnchors(vector, budget(item.answers.budget))
+          .map((candidate) => scored(candidate, item.answers)),
+        vector,
+        item.answers.ryoStrength === "balanced" ? "balanced" : "ryo",
+        item.context,
+      );
+      const displaySet = selectRecommendationDisplaySet(ranked, item.context);
+      expect(displaySet?.primary.candidate.id, item.id).toBe(ranked[0]?.candidate.id);
+      const visibleIds = [
+        displaySet?.primary.candidate.id,
+        displaySet?.practicalAlternative?.candidate.id,
+        displaySet?.ryoAlternative?.candidate.id,
+      ].filter(Boolean);
+      expect(new Set(visibleIds).size, item.id).toBe(visibleIds.length);
+      for (const alternative of [
+        displaySet?.practicalAlternative,
+        displaySet?.ryoAlternative,
+      ]) {
+        if (!alternative) continue;
+        expect(alternative.finalRecommendationScore, item.id)
+          .toBeGreaterThanOrEqual(Math.max(32, ranked[0]!.finalRecommendationScore - 22));
+      }
     }
   });
 
@@ -125,10 +159,10 @@ function expectScoreRange(score: {
   explorationScore: number;
   contextPenalty: number;
   finalRecommendationScore: number;
-}) {
+}, range: { min: number; max: number }) {
   for (const value of Object.values(score)) {
     expect(Number.isFinite(value)).toBe(true);
-    expect(value).toBeGreaterThanOrEqual(0);
-    expect(value).toBeLessThanOrEqual(100);
+    expect(value).toBeGreaterThanOrEqual(range.min);
+    expect(value).toBeLessThanOrEqual(range.max);
   }
 }

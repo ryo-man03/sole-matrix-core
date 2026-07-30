@@ -203,6 +203,18 @@ export type RecommendationResult = {
     strengthBlend?: RyoStrengthBlend;
     selectedContextReasons?: string[];
   };
+  recommendationDisplaySet?: {
+    practicalAlternative: RecommendationDisplayCandidate | null;
+    ryoAlternative: RecommendationDisplayCandidate | null;
+    cautionCandidate: RecommendationDisplayCandidate | null;
+  };
+};
+
+export type RecommendationDisplayCandidate = {
+  candidate: CandidateProfile;
+  finalRecommendationScore: number;
+  scoreBreakdownV2: RyoScoreBreakdownV2;
+  reasons: string[];
 };
 
 export type FeedbackSentiment = "helpful" | "not_helpful" | "unsure";

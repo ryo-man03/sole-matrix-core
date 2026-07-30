@@ -65,7 +65,9 @@ describe("responsive product workspace", () => {
     );
     const settingsHtml = renderToStaticMarkup(createElement(SettingsPanel));
 
-    expect(homeHtml).toContain("迷っている一足を、買う前に整理する。");
+    expect(homeHtml).toContain("歴史・素材・服装から、自分に合うスニーカーを整理する。");
+    expect(homeHtml).toContain("スニーカー診断を始める");
+    expect(homeHtml).toContain("気になる一足を判断する");
     expect(homeHtml).toContain("AIの答えではなく、あなたの購入判断をつくる。");
     expect(homeHtml).not.toContain("<br");
     expect(evidenceHtml).toContain("external-evidence-details");

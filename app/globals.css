@@ -1605,6 +1605,13 @@ h1 {
   font-size: 0.86rem;
 }
 
+.diagnosis-progress-category {
+  display: block;
+  margin-top: 7px;
+  color: #18202b;
+  font-size: 0.92rem;
+}
+
 .diagnosis-progress-track {
   width: 100%;
   height: 8px;
@@ -1745,6 +1752,10 @@ h1 {
   flex-direction: row;
   gap: 10px;
   margin-top: 18px;
+}
+
+.diagnosis-actions--sticky {
+  z-index: 4;
 }
 
 .diagnosis-primary-button,
@@ -1895,6 +1906,38 @@ h1 {
   padding: 8px 12px;
 }
 
+.diagnosis-context-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.diagnosis-context-chips button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  border: 1px solid rgba(35, 43, 55, 0.16);
+  border-radius: 999px;
+  background: #f6f3ec;
+  color: #263140;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.diagnosis-context-chips button span:first-child {
+  color: #687383;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.diagnosis-context-chips button:focus-visible,
+.diagnosis-summary-edit:focus-visible {
+  outline: 3px solid rgba(64, 84, 108, 0.28);
+  outline-offset: 3px;
+}
+
 .diagnosis-summary-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1932,6 +1975,20 @@ h1 {
   margin-right: 8px;
   color: #40546c;
   font-weight: 700;
+}
+
+.diagnosis-summary-edit {
+  min-height: 44px;
+  margin: 6px 0 0;
+  border: 0;
+  background: transparent;
+  color: #40546c;
+  cursor: pointer;
+  padding: 0 8px 0 0;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .diagnosis-summary-item dd {
@@ -2002,6 +2059,17 @@ h1 {
   font-weight: 700;
 }
 
+.core-v1-retained-result {
+  margin: 0;
+  border: 1px solid rgba(64, 84, 108, 0.18);
+  border-radius: 8px;
+  background: #f4f3ee;
+  padding: 11px 13px;
+  color: #4c5664;
+  font-size: 0.86rem;
+  line-height: 1.65;
+}
+
 .core-v1-status,
 .core-v1-empty,
 .core-v1-decision-note {
@@ -2019,6 +2087,98 @@ h1 {
   gap: 18px;
   border-top: 1px solid rgba(35, 43, 55, 0.12);
   padding-top: 22px;
+}
+
+.core-v1-explanation {
+  min-width: 0;
+  border: 1px solid rgba(35, 43, 55, 0.12);
+  border-radius: 10px;
+  background: #fff;
+  padding: 18px;
+}
+
+.core-v1-caution {
+  border-left: 3px solid #9d6918;
+  border-radius: 6px;
+  background: #fbf6e9;
+  padding: 12px 14px;
+}
+
+.core-v1-caution h5 {
+  color: #6f4c13;
+}
+
+.recommendation-alternatives {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.recommendation-alternatives > h4 {
+  margin: 0;
+}
+
+.recommendation-alternative-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.recommendation-alternative-card {
+  min-width: 0;
+  border: 1px solid rgba(35, 43, 55, 0.13);
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+}
+
+.recommendation-alternative-card[data-alternative-role="ryo"] {
+  background: linear-gradient(135deg, rgba(138, 59, 46, 0.06), transparent 58%), #fff;
+}
+
+.recommendation-alternative-card[data-alternative-role="caution"] {
+  margin-top: 10px;
+  background: #fbf6e9;
+}
+
+.recommendation-alternative-card > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.recommendation-alternative-card > div > span {
+  color: #40546c;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.recommendation-alternative-card > div > small {
+  flex: 0 1 auto;
+  color: #66717f;
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.recommendation-alternative-card h5 {
+  margin: 12px 0 0;
+  font-size: 1.1rem;
+  overflow-wrap: anywhere;
+}
+
+.recommendation-alternative-card p {
+  margin: 8px 0 0;
+}
+
+.recommendation-alternative-card ul {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0 0;
+  padding-left: 19px;
+  color: #3f4854;
+  font-size: 0.86rem;
+  line-height: 1.55;
 }
 
 .verified-candidate-result {
@@ -4602,6 +4762,22 @@ a {
     padding: 12px 14px;
   }
 
+  .preference-diagnosis-section {
+    padding-bottom: 16px;
+  }
+
+  .diagnosis-actions--sticky {
+    position: sticky;
+    bottom: 0;
+    margin-right: -8px;
+    margin-left: -8px;
+    border-top: 1px solid rgba(35, 43, 55, 0.12);
+    background: rgba(246, 243, 236, 0.96);
+    box-shadow: 0 -12px 24px rgba(35, 43, 55, 0.08);
+    padding: 12px 8px calc(12px + env(safe-area-inset-bottom));
+    backdrop-filter: blur(10px);
+  }
+
   .core-v1-result-heading {
     flex-direction: column;
   }
@@ -4612,6 +4788,7 @@ a {
   }
 
   .core-v1-score-grid-v2,
+  .recommendation-alternative-grid,
   .ryo-score-raw-values {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -5,6 +5,7 @@ export type DiagnosisAnswerId = string;
 
 export type DiagnosisQuestion = {
   id: RyoModeQuestionId;
+  category: string;
   question: string;
   helperText: string;
   options: { id: DiagnosisAnswerId; label: string; description: string }[];
@@ -27,8 +28,23 @@ const helperTextByQuestionId: Record<RyoModeQuestionId, string> = {
   ryoStrength: "ユーザーの好みとRyo Modeの判断軸の配分を選びます。",
 };
 
+const categoryByQuestionId: Record<RyoModeQuestionId, string> = {
+  style: "服装",
+  pantsFit: "パンツ",
+  taste: "雰囲気",
+  sportOrigin: "カルチャー・スポーツ背景",
+  cut: "カット",
+  wearingStyle: "履き方",
+  materialAging: "素材",
+  color: "色",
+  budget: "予算",
+  techTolerance: "ハイテク許容度",
+  ryoStrength: "Ryo Mode",
+};
+
 export const preferenceDiagnosisQuestions: DiagnosisQuestion[] = RYO_MODE_V4_QUESTIONS.map((question) => ({
   id: question.id,
+  category: categoryByQuestionId[question.id],
   question: question.title,
   helperText: helperTextByQuestionId[question.id],
   options: question.options.map((option) => ({
