@@ -12,9 +12,22 @@ import { normalizeCandidateOfficialName, normalizeOfficialSneakerName } from "./
 export { normalizeCandidateOfficialName, normalizeOfficialSneakerName } from "./names";
 import { applyRyoSignatureLayer } from "./signature-layer";
 import { buildRyoScoreBreakdownV2 } from "./score-breakdown";
+import {
+  applyRyoRoleSeparation,
+  buildRyoRoleExplanation as createRyoRoleExplanation,
+  evaluateRecommendationSetCoherence,
+  evaluateRyoRoleEligibility,
+  getRyoModelAffinityProfile,
+  modelFamily,
+  ryoEmptyStateReason,
+} from "./role-policy";
 import type {
+  RecommendationSetCoherence,
+  RyoModelAffinityProfile,
   RyoPreferenceSummary,
   RyoPreferenceVector,
+  RyoRoleEligibility,
+  RyoRoleExplanation,
   RyoScoreBreakdownV2,
   RyoSignatureMetadata,
   RyoStrengthBlend,
@@ -54,6 +67,7 @@ export type RyoRerankedCandidate = CoreScoredCandidate & {
   scoreBreakdownV2: RyoScoreBreakdownV2;
   strengthBlend: RyoStrengthBlend;
   contextReasons: string[];
+  ryoEligibility: RyoRoleEligibility;
 };
 
 export type RecommendationDisplaySet = {
@@ -61,6 +75,8 @@ export type RecommendationDisplaySet = {
   practicalAlternative: RyoRerankedCandidate | null;
   ryoAlternative: RyoRerankedCandidate | null;
   cautionCandidate: RyoRerankedCandidate | null;
+  ryoEmptyReason: string | null;
+  coherence: RecommendationSetCoherence;
 };
 
 export type ExplicitPreferenceGuard = {
@@ -176,7 +192,24 @@ export function rerankRyoModeCandidates(
       context,
       explicitPreferencePenalty: guard.penalty,
     });
-    const finalRecommendationScore = v2.breakdown.finalRecommendationScore;
+    const affinity = getRyoModelAffinityProfile(entry.candidate);
+    const contextAdjustment = displayRoleContextAdjustment(affinity, vector, context);
+    const finalRecommendationScore = round(Math.max(
+      0,
+      Math.min(100, v2.breakdown.finalRecommendationScore + contextAdjustment),
+    ));
+    const adjustedBreakdown = {
+      ...v2.breakdown,
+      finalRecommendationScore,
+    };
+    const ryoEligibility = evaluateRyoRoleEligibility({
+      candidate: entry.candidate,
+      vector,
+      userContext: context,
+      preferenceSummary: summary,
+      scoreBreakdown: adjustedBreakdown,
+      explicitPreferencePenalty: guard.penalty,
+    });
     return {
       ...entry,
       candidate: {
@@ -185,6 +218,9 @@ export function rerankRyoModeCandidates(
           ...ryoEvaluation.culture.metadata,
           recommendationBucket: ryoSignature.bucket,
           ryoSignature,
+          affinityTier: affinity.affinityTier,
+          category: affinity.category,
+          affinityReason: affinity.reasonForTier,
         },
       },
       ryoEvaluation,
@@ -192,17 +228,19 @@ export function rerankRyoModeCandidates(
       explicitPreferencePenalty: guard.penalty,
       explicitPreferenceReasons: guard.reasons,
       finalRecommendationScore,
-      scoreBreakdownV2: v2.breakdown,
+      scoreBreakdownV2: adjustedBreakdown,
       strengthBlend: v2.blend,
       contextReasons: v2.contextReasons,
+      ryoEligibility,
     };
   });
 
   ranked = enforceHighCutWinnerGuard(vector, ranked);
   return ranked.sort((left, right) =>
-    right.finalRecommendationScore - left.finalRecommendationScore ||
-    right.ryoEvaluation.score.recommendationScore - left.ryoEvaluation.score.recommendationScore ||
-    (mode === "ryo" ? right.ryoScore.total - left.ryoScore.total : right.balancedScore.total - left.balancedScore.total),
+    Number(isDisplayHardBlocked(left)) - Number(isDisplayHardBlocked(right))
+    || right.finalRecommendationScore - left.finalRecommendationScore
+    || right.ryoEvaluation.score.recommendationScore - left.ryoEvaluation.score.recommendationScore
+    || (mode === "ryo" ? right.ryoScore.total - left.ryoScore.total : right.balancedScore.total - left.balancedScore.total),
   );
 }
 
@@ -221,6 +259,8 @@ export function selectRecommendationDisplaySet(
   );
   const practicalFloor = Math.max(35, primary.finalRecommendationScore - 18);
   const practicalPool = remaining.filter((entry) =>
+    modelFamily(entry.candidate.name) !== modelFamily(primary.candidate.name) &&
+    entry.candidate.budgetFit >= 45 &&
     entry.finalRecommendationScore >= practicalFloor &&
     entry.scoreBreakdownV2.practicalFitScore >= 38 &&
     entry.scoreBreakdownV2.contextPenalty <= 25 &&
@@ -228,33 +268,98 @@ export function selectRecommendationDisplaySet(
   );
   const practicalAlternative = chooseDiverseCandidate(practicalPool, [primary], "practical");
 
-  const ryoFloor = Math.max(32, primary.finalRecommendationScore - 22);
   const ryoPool = remaining.filter((entry) =>
     entry.candidate.id !== practicalAlternative?.candidate.id &&
-    entry.finalRecommendationScore >= ryoFloor &&
-    entry.scoreBreakdownV2.contextPenalty <= 30 &&
-    entry.explicitPreferencePenalty <= 18 &&
-    hasRyoAlternativeSignal(entry)
-  );
-  const selectedSoFar = practicalAlternative ? [primary, practicalAlternative] : [primary];
-  const ryoAlternative = chooseDiverseCandidate(ryoPool, selectedSoFar, "ryo");
+    entry.ryoEligibility.eligible
+  ).map((entry) => ({
+    ...entry,
+    ryoEligibility: applyRyoRoleSeparation(
+      entry.ryoEligibility,
+      entry.candidate,
+      primary.candidate,
+      practicalAlternative?.candidate ?? null,
+    ),
+  })).filter((entry) => entry.ryoEligibility.eligible);
+  let ryoAlternative = chooseRyoCandidate(ryoPool);
 
-  const selectedIds = new Set([
+  let selectedIds = new Set([
     primary.candidate.id,
     practicalAlternative?.candidate.id,
     ryoAlternative?.candidate.id,
   ].filter((id): id is string => Boolean(id)));
-  const cautionCandidate = ranked.find((entry) =>
+  let cautionCandidate = ranked.find((entry) =>
     !selectedIds.has(entry.candidate.id) &&
     (entry.scoreBreakdownV2.contextPenalty > 25 || entry.explicitPreferencePenalty > 16)
   ) ?? null;
+
+  let coherence = evaluateRecommendationSetCoherence({
+    primary,
+    practicalAlternative,
+    ryoAlternative,
+    userContext: context,
+  });
+  if (ryoAlternative && !coherence.coherent && coherence.violations.some((violation) =>
+    violation.candidateId === ryoAlternative?.candidate.id
+  )) {
+    ryoAlternative = null;
+    selectedIds = new Set([
+      primary.candidate.id,
+      practicalAlternative?.candidate.id,
+    ].filter((id): id is string => Boolean(id)));
+    cautionCandidate = ranked.find((entry) =>
+      !selectedIds.has(entry.candidate.id) &&
+      (entry.scoreBreakdownV2.contextPenalty > 25
+        || entry.explicitPreferencePenalty > 16
+        || entry.ryoEligibility.hardFailures.length > 0)
+    ) ?? null;
+    coherence = evaluateRecommendationSetCoherence({
+      primary,
+      practicalAlternative,
+      ryoAlternative,
+      userContext: context,
+    });
+  }
 
   return {
     primary,
     practicalAlternative,
     ryoAlternative,
     cautionCandidate,
+    ryoEmptyReason: ryoAlternative ? null : ryoEmptyStateReason(remaining.map((entry) => entry.ryoEligibility)),
+    coherence,
   };
+}
+
+function displayRoleContextAdjustment(
+  affinity: RyoModelAffinityProfile,
+  vector: RyoPreferenceVector,
+  context: UserSneakerContext,
+): number {
+  let adjustment = 0;
+  if (affinity.category === "technical_running" && vector.techTolerance.airMaxNbOk > 0) {
+    adjustment += 12;
+  }
+  if (affinity.category === "retro_running" && vector.techTolerance.avoidTech > 0) {
+    adjustment += 4;
+  }
+  if (context.purchasePurpose === "first_pair") {
+    if (affinity.affinityTier === "practical") adjustment += 8;
+    if (affinity.affinityTier === "adjacent") adjustment -= 4;
+    if (affinity.budgetBand === "premium") adjustment -= 10;
+  }
+  if (context.purchasePurpose === "second_pair") {
+    if (affinity.affinityTier === "core") adjustment += 6;
+    if (affinity.affinityTier === "adjacent") adjustment -= 2;
+  }
+  if (context.purchasePurpose === "archive_collection" && affinity.historicalContext.length > 0) {
+    adjustment += affinity.affinityTier === "core" ? 6 : 2;
+  }
+  return adjustment;
+}
+
+function isDisplayHardBlocked(entry: RyoRerankedCandidate): boolean {
+  const blockingCodes = new Set(["budget_violation", "owned_duplicate", "disliked_model", "hard_constraint"]);
+  return entry.ryoEligibility.hardFailures.some((reason) => blockingCodes.has(reason.code));
 }
 
 export function buildRecommendationDisplayReasons(
@@ -268,22 +373,45 @@ export function buildRecommendationDisplayReasons(
     ]).slice(0, 3);
   }
 
-  const signature = entry.ryoSignature;
   const reasons = role === "practical"
     ? [
         entry.scoreBreakdownV2.userFitScore >= 50 ? "11問の回答との相性" : null,
         entry.scoreBreakdownV2.practicalFitScore >= 50 ? "予算と日常での選びやすさ" : null,
         entry.candidate.budgetFit >= 70 ? "購入予算への収まりやすさ" : null,
       ]
-    : [
-        signature.materialStoryBonus > 0 ? "素材を履き込む楽しさ" : null,
-        signature.archiveContextBonus > 0 ? "歴史・復刻背景" : null,
-        signature.adjacentDiscoveryBonus > 0 ? "定番から少し外した発見" : null,
-        signature.colorPersonalityBonus > 0 ? "服に取り入れやすい珍しい色" : null,
-        signature.ryoTwistBonus > 0 ? "本命とは違う文化軸" : null,
-      ];
+    : entry.ryoEligibility.positiveReasons
+        .filter((reason) =>
+          reason.code === "category_gate_passed"
+          || reason.code === "wardrobe_match"
+          || reason.code === "purpose_match"
+          || reason.code === "culture_match"
+          || reason.code === "material_match"
+          || reason.code === "history_match"
+        )
+        .map((reason) => reason.message);
   const displayReasons = unique(reasons.filter((reason): reason is string => Boolean(reason))).slice(0, 3);
-  return displayReasons.length ? displayReasons : ["本命とは異なる系統から選べる候補"];
+  return displayReasons.length ? displayReasons : ["内部根拠を確認できる別の文化・素材軸"];
+}
+
+export function buildRyoAlternativeExplanation(entry: RyoRerankedCandidate): RyoRoleExplanation {
+  return createRyoRoleExplanation(entry.candidate, entry.ryoEligibility);
+}
+
+export function getRyoModeAnchorAffinityAudit(): Array<{
+  id: string;
+  name: string;
+  profile: RyoModelAffinityProfile;
+}> {
+  return anchorCatalog.map((definition) => ({
+    id: definition.id,
+    name: definition.name,
+    profile: getRyoModelAffinityProfile({
+      name: definition.name,
+      tags: definition.tags,
+      priceYen: definition.priceYen,
+      modelType: definition.modelType,
+    }),
+  }));
 }
 
 function chooseDiverseCandidate(
@@ -304,6 +432,25 @@ function chooseDiverseCandidate(
       right.finalRecommendationScore - left.finalRecommendationScore ||
       left.candidate.id.localeCompare(right.candidate.id, "en");
   })[0] ?? null;
+}
+
+function chooseRyoCandidate(
+  candidates: readonly RyoRerankedCandidate[],
+): RyoRerankedCandidate | null {
+  const tierPriority: Record<RyoRoleEligibility["affinityTier"], number> = {
+    core: 5,
+    adjacent: 4,
+    situational: 3,
+    practical: 1,
+    excluded: 0,
+  };
+  return [...candidates].sort((left, right) =>
+    tierPriority[right.ryoEligibility.affinityTier] - tierPriority[left.ryoEligibility.affinityTier]
+    || right.ryoEligibility.contextMatchScore - left.ryoEligibility.contextMatchScore
+    || right.scoreBreakdownV2.ryoIdentityScore - left.scoreBreakdownV2.ryoIdentityScore
+    || right.finalRecommendationScore - left.finalRecommendationScore
+    || left.candidate.id.localeCompare(right.candidate.id, "en")
+  )[0] ?? null;
 }
 
 function diversityScore(
@@ -329,16 +476,6 @@ function candidateBrand(candidate: CandidateProfile): string {
   const name = candidate.brand?.trim() || candidate.name.trim();
   const knownBrand = name.match(/^(New Balance|Last Resort AB|PRO-Keds|Nike|adidas|Converse|PUMA|Vans|Reebok)\b/iu)?.[1];
   return (knownBrand ?? name.split(/\s+/u)[0] ?? "").toLocaleLowerCase("en-US");
-}
-
-function hasRyoAlternativeSignal(entry: RyoRerankedCandidate): boolean {
-  const signature = entry.ryoSignature;
-  return signature.bucket === "ryo_signature" ||
-    signature.bucket === "adjacent_discovery" ||
-    signature.bucket === "wildcard" ||
-    signature.materialStoryBonus > 0 ||
-    signature.archiveContextBonus > 0 ||
-    signature.colorPersonalityBonus > 0;
 }
 
 function isExactContextMatch(candidateName: string, contextNames: readonly string[]): boolean {
@@ -368,6 +505,11 @@ export function evaluateExplicitPreferenceGuards(
     "High指定に対してLow専用モデル",
   );
   add(
+    vector.cut.high > 0 && !traits.highCut && !traits.midCut && !traits.lowCut,
+    20,
+    "High指定に対してカットを確認できないモデル",
+  );
+  add(
     vector.cut.low > 0 && (traits.highCut || traits.midCut) && !traits.lowCut,
     22,
     "Low selected but candidate is High/Mid",
@@ -392,6 +534,12 @@ export function evaluateExplicitPreferenceGuards(
       && traits.canvas && !traits.leather && !traits.suede,
     8,
     "レザー経年変化指定に対してキャンバス素材",
+  );
+  add(
+    vector.materialAging.canvasFading > 0
+      && traits.leather && !traits.canvas,
+    20,
+    "キャンバスの退色指定に対してレザー主体のモデル",
   );
 
   return { penalty, reasons };
