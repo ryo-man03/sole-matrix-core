@@ -105,6 +105,25 @@ describe("live product URL verification", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("stops a redirect loop at the configured boundary", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://example.com/item" },
+      }),
+    );
+    const result = await verifyProductUrl("https://example.com/item", {
+      fetcher,
+      resolveHostname: publicResolver,
+      maxRedirects: 2,
+      now: fixedNow,
+    });
+
+    expect(result).toMatchObject({ status: "blocked" });
+    expect(result).not.toHaveProperty("href");
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
   it("uses a bounded GET status check when HEAD is unsupported", async () => {
     const fetcher = vi
       .fn<typeof fetch>()

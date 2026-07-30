@@ -19,11 +19,11 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "tsx": "latest",
-    "typescript": "latest",
+    "typescript": "5.9.3",
     "vitest": "latest"
   },
   "dependencies": {
-    "next": "^16.2.7",
+    "next": "^16.2.11",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   }

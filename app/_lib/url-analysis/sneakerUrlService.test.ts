@@ -47,6 +47,21 @@ describe("safe sneaker URL analysis", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  it("fails closed when the public hostname cannot be resolved", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const failedResolver: ResolveHostname = async () => {
+      throw new Error("host lookup fixture failed");
+    };
+
+    await expect(
+      analyzeSneakerUrl("https://missing.example/item", {
+        fetcher,
+        resolveHostname: failedResolver,
+      }),
+    ).rejects.toMatchObject({ code: "DNS_LOOKUP_FAILED" });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("extracts only allowed metadata from a public HTML page", async () => {
     const html = `<!doctype html><html><head>
       <title>Fallback title</title>
