@@ -1,3 +1,13 @@
+import type {
+  CanonicalSneakerIdentity,
+  SneakerVariant,
+} from "./identity";
+
+export type {
+  CanonicalSneakerIdentity,
+  SneakerVariant,
+} from "./identity";
+
 export type MarketProviderId =
   | "stockx"
   | "snkrdunk"
@@ -57,20 +67,6 @@ export type MarketCatalogSearchResult = ProviderResult<Readonly<{
   items: readonly MarketCatalogItem[];
   nextCursor: string | null;
 }>>;
-
-export type CanonicalSneakerIdentity = Readonly<{
-  brand: string;
-  modelName: string;
-  colorwayName: string | null;
-  styleCode: string | null;
-  releaseYear: number | null;
-}>;
-
-export type SneakerVariant = Readonly<{
-  sizeSystem: "US_M" | "US_W" | "JP_CM" | "UK" | "EU";
-  sizeValue: string;
-  condition: "new" | "used" | "unknown";
-}>;
 
 export type CurrentMarketObservation = Readonly<{
   provider: MarketProviderId;
@@ -208,4 +204,3 @@ export class MarketProviderRegistry {
     return { status: "ready", provider };
   }
 }
-
