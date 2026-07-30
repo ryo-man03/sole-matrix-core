@@ -68,6 +68,7 @@ abstract class MutableMarketHistoryRepository
 implements MarketHistoryRepository {
   readonly #retentionDays: number;
   readonly #now: () => Date;
+  #mutationQueue: Promise<void> = Promise.resolve();
 
   constructor(options: MarketRepositoryOptions = {}) {
     this.#retentionDays = Math.max(
@@ -87,6 +88,12 @@ implements MarketHistoryRepository {
   ): Promise<void>;
 
   async saveSnapshots(
+    snapshots: readonly MarketSnapshot[],
+  ): Promise<SaveSnapshotsResult> {
+    return this.#withMutationLock(() => this.#saveSnapshotsUnlocked(snapshots));
+  }
+
+  async #saveSnapshotsUnlocked(
     snapshots: readonly MarketSnapshot[],
   ): Promise<SaveSnapshotsResult> {
     const current = [...await this.readAll()];
@@ -132,6 +139,10 @@ implements MarketHistoryRepository {
   }
 
   async deleteBefore(cutoff: string): Promise<number> {
+    return this.#withMutationLock(() => this.#deleteBeforeUnlocked(cutoff));
+  }
+
+  async #deleteBeforeUnlocked(cutoff: string): Promise<number> {
     const cutoffTime = Date.parse(cutoff);
     if (!Number.isFinite(cutoffTime)) return 0;
     const current = await this.readAll();
@@ -144,6 +155,10 @@ implements MarketHistoryRepository {
   }
 
   async deleteSeries(seriesKey: string): Promise<number> {
+    return this.#withMutationLock(() => this.#deleteSeriesUnlocked(seriesKey));
+  }
+
+  async #deleteSeriesUnlocked(seriesKey: string): Promise<number> {
     const current = await this.readAll();
     const retained = current.filter(
       (snapshot) => getMarketSeriesKey(snapshot) !== seriesKey,
@@ -151,6 +166,20 @@ implements MarketHistoryRepository {
     const deleted = current.length - retained.length;
     if (deleted > 0) await this.writeAll(retained);
     return deleted;
+  }
+
+  async #withMutationLock<T>(operation: () => Promise<T>): Promise<T> {
+    let release: () => void = () => undefined;
+    const previous = this.#mutationQueue;
+    this.#mutationQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
   }
 }
 
@@ -221,6 +250,9 @@ extends MutableMarketHistoryRepository {
       );
       return isLocalFilePayload(value) ? value.snapshots : [];
     } catch (error) {
+      if (error instanceof SyntaxError) {
+        return [];
+      }
       if (
         typeof error === "object" &&
         error !== null &&

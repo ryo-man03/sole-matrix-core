@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -79,6 +79,19 @@ describe("normalized market history persistence", () => {
     expect(await repository.listSnapshots()).toHaveLength(3);
   });
 
+  it("serializes concurrent writes without losing a snapshot", async () => {
+    const repository = new InMemoryMarketHistoryRepository({
+      now: () => NOW,
+    });
+    await Promise.all([
+      repository.saveSnapshots([snapshot()]),
+      repository.saveSnapshots([
+        snapshot({ observedAt: "2026-07-30T01:00:00.000Z" }),
+      ]),
+    ]);
+    expect(await repository.listSnapshots()).toHaveLength(2);
+  });
+
   it("applies retention and explicit delete policies", async () => {
     const repository = new InMemoryMarketHistoryRepository({
       now: () => NOW,
@@ -113,6 +126,27 @@ describe("normalized market history persistence", () => {
     }
   });
 
+  it("recovers safely from a corrupted local history file", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sole-matrix-market-corrupt-"));
+    try {
+      const filePath = join(root, ".data", "history.json");
+      const repository = new LocalFileMarketHistoryRepository(
+        ".data/history.json",
+        root,
+        { now: () => NOW },
+      );
+      await repository.saveSnapshots([snapshot()]);
+      await writeFile(filePath, "{invalid", "utf8");
+      await expect(repository.listSnapshots()).resolves.toEqual([]);
+      await expect(repository.saveSnapshots([snapshot()])).resolves.toMatchObject({
+        saved: 1,
+      });
+      await expect(repository.listSnapshots()).resolves.toHaveLength(1);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("rejects local file paths outside the workspace", () => {
     expect(() =>
       new LocalFileMarketHistoryRepository("../history.json", "C:/workspace"),
@@ -133,4 +167,3 @@ describe("normalized market history persistence", () => {
     });
   });
 });
-
