@@ -145,6 +145,99 @@ describe("authorized StockX provider", () => {
     expect(calls).toBe(1);
   });
 
+  it("refreshes an expired OAuth token before the authorized request", async () => {
+    const urls: string[] = [];
+    const providerConfig = config(async (input) => {
+      const url = String(input);
+      urls.push(url);
+      if (url.includes("/oauth/token")) {
+        return response({
+          access_token: "refreshed-access",
+          refresh_token: "refreshed-refresh",
+          expires_in: 3600,
+        });
+      }
+      return response(STOCKX_CATALOG_FIXTURE);
+    });
+    const provider = new StockXProvider({
+      ...providerConfig,
+      tokenStore: new InMemoryStockXTokenStore({
+        accessToken: "expired-access",
+        refreshToken: "refresh-token",
+        expiresAt: "2026-07-30T11:00:00.000Z",
+      }),
+    });
+    await expect(provider.searchCatalog({ query: "Nike" }))
+      .resolves.toMatchObject({ status: "success" });
+    expect(urls).toHaveLength(2);
+    expect(urls[0]).toContain("/oauth/token");
+    expect(urls[1]).toContain("/v2/catalog/search");
+  });
+
+  it("reports not_authorized when an expired OAuth token cannot refresh", async () => {
+    const providerConfig = config(async () => response({}, 401));
+    const provider = new StockXProvider({
+      ...providerConfig,
+      tokenStore: new InMemoryStockXTokenStore({
+        accessToken: "expired-access",
+        refreshToken: "rejected-refresh",
+        expiresAt: "2026-07-30T11:00:00.000Z",
+      }),
+    });
+    await expect(provider.searchCatalog({ query: "Nike" })).resolves.toEqual({
+      status: "not_authorized",
+    });
+  });
+
+  it("maps a request timeout without logging secrets", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const provider = new StockXProvider(
+      config(async () => {
+        throw new DOMException("timed out", "TimeoutError");
+      }),
+    );
+    await expect(provider.searchCatalog({ query: "Nike" })).resolves.toEqual({
+      status: "timeout",
+    });
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it("returns not_supported when the official catalog has no exact style match", async () => {
+    const provider = new StockXProvider(
+      config(async () => response({
+        ...STOCKX_CATALOG_FIXTURE,
+        products: [{
+          ...STOCKX_CATALOG_FIXTURE.products[0],
+          styleId: "WRONG-001",
+        }],
+      })),
+    );
+    await expect(provider.getCurrentSnapshot(identity, variant)).resolves.toEqual({
+      status: "not_supported",
+    });
+  });
+
+  it("preserves missing ask and bid as no observations instead of zero", async () => {
+    const bodies = [
+      STOCKX_CATALOG_FIXTURE,
+      STOCKX_VARIANTS_FIXTURE,
+      {
+        ...STOCKX_MARKET_DATA_FIXTURE,
+        lowestAskAmount: null,
+        highestBidAmount: null,
+      },
+    ];
+    const provider = new StockXProvider(
+      config(async () => response(bodies.shift())),
+    );
+    const result = await provider.getCurrentSnapshot(identity, variant);
+    expect(result).toMatchObject({
+      status: "success",
+      data: { snapshots: [] },
+    });
+  });
+
   it("maps malformed provider JSON to schema_error", async () => {
     const provider = new StockXProvider(
       config(async () => response({ products: "not-an-array" })),

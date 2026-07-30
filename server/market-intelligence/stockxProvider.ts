@@ -359,6 +359,7 @@ export class StockXProvider implements MarketDataProvider {
   async #performRequest(path: string, allowRefresh: boolean): Promise<JsonResponse> {
     if (!this.#config.apiKey) return { status: "not_configured" };
     const tokens = await this.#getUsableTokens();
+    if (tokens === "not_authorized") return { status: "not_authorized" };
     if (!tokens) return { status: "not_configured" };
 
     let response: Response;
@@ -397,13 +398,15 @@ export class StockXProvider implements MarketDataProvider {
     }
   }
 
-  async #getUsableTokens(): Promise<StockXTokenSet | null> {
+  async #getUsableTokens(): Promise<
+    StockXTokenSet | "not_authorized" | null
+  > {
     const tokens = await this.#config.tokenStore.load();
     if (!tokens) return null;
     if (Date.parse(tokens.expiresAt) > this.#now().getTime() + 30_000) {
       return tokens;
     }
-    return this.#refreshTokens(tokens.refreshToken);
+    return await this.#refreshTokens(tokens.refreshToken) ?? "not_authorized";
   }
 
   async #refreshTokens(refreshToken: string | null): Promise<StockXTokenSet | null> {

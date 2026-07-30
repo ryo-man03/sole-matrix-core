@@ -22,7 +22,7 @@ type Props = {
   >;
 };
 
-type ContextSeries = Readonly<{
+export type ContextSeries = Readonly<{
   key: string;
   snapshots: readonly MarketSnapshot[];
   summaries: ReadonlyMap<MarketPriceType, MarketSeriesSummary>;
@@ -73,7 +73,7 @@ function verifiedCandidateIdentity(candidate: Props["candidate"]) {
   };
 }
 
-function buildContexts(snapshots: readonly MarketSnapshot[]): readonly ContextSeries[] {
+export function buildMarketContexts(snapshots: readonly MarketSnapshot[]): readonly ContextSeries[] {
   const contexts = new Map<string, MarketSnapshot[]>();
   for (const snapshot of snapshots) {
     const key = contextKey(snapshot);
@@ -121,7 +121,7 @@ export function MarketIntelligencePanel({ candidate }: Props) {
     useState<MarketUiState>("insufficient_data");
   const [activeContextKey, setActiveContextKey] = useState("");
   const candidateIdentity = verifiedCandidateIdentity(candidate);
-  const contexts = useMemo(() => buildContexts(snapshots), [snapshots]);
+  const contexts = useMemo(() => buildMarketContexts(snapshots), [snapshots]);
   const activeContext =
     contexts.find((context) => context.key === activeContextKey) ??
     contexts[0] ??
@@ -183,7 +183,7 @@ export function MarketIntelligencePanel({ candidate }: Props) {
     ];
     setSnapshots(matched);
     setRejections(nextRejections);
-    const nextContexts = buildContexts(matched);
+    const nextContexts = buildMarketContexts(matched);
     setActiveContextKey(nextContexts[0]?.key ?? "");
     setImportState(
       matched.length === 0
@@ -379,7 +379,7 @@ function ForecastCard({ currency, forecast7, forecast30, priceType }: {
   );
 }
 
-function AccessibleMarketChart({ context, currency }: {
+export function AccessibleMarketChart({ context, currency }: {
   context: ContextSeries;
   currency: string;
 }) {
@@ -454,7 +454,7 @@ function AccessibleMarketChart({ context, currency }: {
                   role="img"
                   tabIndex={0}
                 >
-                  <title>{MARKET_PRICE_LABELS[priceType]} / {formatDate(snapshot.observedAt)} / {formatMoney(snapshot.amount, currency)}</title>
+                  <title>{`${MARKET_PRICE_LABELS[priceType]} / ${formatDate(snapshot.observedAt)} / ${formatMoney(snapshot.amount, currency)}`}</title>
                 </circle>
               ))}
               {forecast ? (
