@@ -50,7 +50,7 @@ type ProviderJsonRequest<T> = {
 };
 
 const DEFAULT_TIMEOUT_MS = 30_000;
-const RETRYABLE_HTTP_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+const RETRYABLE_HTTP_STATUSES = new Set([408, 500, 502, 503, 504]);
 
 export async function requestProviderJson<T>(
   request: ProviderJsonRequest<T>,

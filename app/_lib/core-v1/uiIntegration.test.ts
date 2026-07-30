@@ -54,7 +54,7 @@ describe("Core v1 UI integration", () => {
     expect(componentSource).toContain("前回の成功結果を表示中です");
     expect(componentSource).toContain("recommendRequestInFlightRef.current");
     expect(componentSource).toContain("requestProviderJson<RecommendApiResponse>");
-    expect(componentSource).toContain("maxRetries: 1");
+    expect(componentSource).toContain("maxRetries: 0");
     expect(componentSource).toContain("setIsLoading(false)");
     expect(componentSource).toContain("前回の結果を残したまま終了しました");
     expect(componentSource).toContain("回答との主な一致");

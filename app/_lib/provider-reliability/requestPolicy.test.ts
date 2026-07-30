@@ -29,7 +29,7 @@ describe("provider request reliability policy", () => {
     [403, false],
     [404, false],
     [409, false],
-    [429, true],
+    [429, false],
     [500, true],
     [502, true],
     [503, true],
@@ -56,7 +56,7 @@ describe("provider request reliability policy", () => {
     },
   );
 
-  it.each([429, 500, 502, 503])(
+  it.each([500, 502, 503])(
     "retries temporary HTTP %i responses once and recovers",
     async (status) => {
       const fetcher = vi
@@ -72,6 +72,22 @@ describe("provider request reliability policy", () => {
       expect(fetcher).toHaveBeenCalledTimes(2);
     },
   );
+
+  it("does not retry a rate-limited request", async () => {
+    const fetcher = vi.fn(async () => jsonResponse({ error: "fixture" }, 429));
+    const result = await requestProviderJson({
+      input: "https://example.com",
+      fetcher,
+      validate: validatePayload,
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      code: "http_429",
+      attempts: 1,
+      retryable: false,
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
 
   it("caps retries at one even when a caller requests more", async () => {
     const fetcher = vi.fn(async () => jsonResponse({}, 503));
@@ -175,4 +191,3 @@ describe("provider request reliability policy", () => {
     expect(result).toEqual({ ok: true, data: validPayload, attempts: 1 });
   });
 });
-

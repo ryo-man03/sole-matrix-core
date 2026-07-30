@@ -107,7 +107,9 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
         },
         validate: isRecommendApiResponse,
         timeoutMs: 30_000,
-        maxRetries: 1,
+        // Recommendation is a non-idempotent POST. A second attempt could
+        // create duplicate provider work after a lost response.
+        maxRetries: 0,
       });
       if (!response.ok) {
         setErrorMessage(recommendationRequestErrorMessage(response));
