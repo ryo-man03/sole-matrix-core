@@ -18,6 +18,7 @@ import type {
   RyoStrengthBlend,
 } from "../ryo-mode-v4/types";
 import type { FactualVerification, RecommendationTrustEvaluation } from "../recommendation-trust/types";
+import type { ExplanationTrustEvaluation } from "../recommendation-trust/types";
 
 export type DiagnosisAnswerValue = "like" | "neutral" | "dislike";
 
@@ -173,6 +174,7 @@ export type RecommendationResult = {
   ryoScore: RyoScore;
   decision: Decision;
   explanation: RecommendationExplanation;
+  explanationTrust?: ExplanationTrustEvaluation;
   readiness: {
     geminiResearch: GeminiCapabilityReadiness;
     geminiExplanation: GeminiCapabilityReadiness;

@@ -3,6 +3,7 @@ import type { SneakerVector } from "../../../src/domain/sneaker/sneakerVector";
 import { researchSneakerCandidatesWithGemini } from "../ai/gemini-sneaker-research";
 import type { GeminiSneakerResearchCandidate } from "../ai/gemini-sneaker-research-schema";
 import type { UntrustedUserMemoryContext } from "../user-memory/types";
+import { auditRecommendationExplanation } from "../recommendation-trust/explanation-audit";
 import { normalizeUserSneakerContext } from "../diagnosis/sneakerContext";
 import {
   buildRecommendationDisplayReasons,
@@ -276,6 +277,13 @@ export async function recommendCoreV1(
   const selectedScoreBreakdownV2 = isRyoRerankedCandidate(best) ? best.scoreBreakdownV2 : undefined;
   const selectedStrengthBlend = isRyoRerankedCandidate(best) ? best.strengthBlend : undefined;
   const selectedContextReasons = isRyoRerankedCandidate(best) ? best.contextReasons : undefined;
+  const explanationAudit = auditRecommendationExplanation({
+    candidate: best.candidate,
+    explanation,
+    ...(selectedScoreBreakdownV2 ? { scoreBreakdown: selectedScoreBreakdownV2 } : {}),
+    context: userSneakerContext,
+    ...(input.budgetYen === undefined ? {} : { budgetYen: input.budgetYen }),
+  });
 
   return {
     recommendationId: `core-v1:${best.candidate.id}`,
@@ -292,6 +300,7 @@ export async function recommendCoreV1(
       },
     },
     explanation,
+    explanationTrust: explanationAudit.evaluation,
     candidateResearch,
     ryoReranking: {
       applied: ryoRerankingEnabled,
