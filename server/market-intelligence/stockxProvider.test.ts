@@ -189,6 +189,28 @@ describe("authorized StockX provider", () => {
     });
   });
 
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, 0, -1])(
+    "rejects invalid refresh expiry %s",
+    async (expiresIn) => {
+      const providerConfig = config(async () => response({
+        access_token: "refreshed-access",
+        refresh_token: "refreshed-refresh",
+        expires_in: expiresIn,
+      }));
+      const provider = new StockXProvider({
+        ...providerConfig,
+        tokenStore: new InMemoryStockXTokenStore({
+          accessToken: "expired-access",
+          refreshToken: "refresh-token",
+          expiresAt: "2026-07-30T11:00:00.000Z",
+        }),
+      });
+      await expect(provider.searchCatalog({ query: "Nike" })).resolves.toEqual({
+        status: "not_authorized",
+      });
+    },
+  );
+
   it("maps a request timeout without logging secrets", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const provider = new StockXProvider(
@@ -235,6 +257,20 @@ describe("authorized StockX provider", () => {
     expect(result).toMatchObject({
       status: "success",
       data: { snapshots: [] },
+    });
+  });
+
+  it("rejects a market response in a currency other than requested", async () => {
+    const bodies = [
+      STOCKX_CATALOG_FIXTURE,
+      STOCKX_VARIANTS_FIXTURE,
+      { ...STOCKX_MARKET_DATA_FIXTURE, currencyCode: "USD" },
+    ];
+    const provider = new StockXProvider(
+      config(async () => response(bodies.shift())),
+    );
+    await expect(provider.getCurrentSnapshot(identity, variant)).resolves.toEqual({
+      status: "schema_error",
     });
   });
 

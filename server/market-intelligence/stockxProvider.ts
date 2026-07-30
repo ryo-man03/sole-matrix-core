@@ -277,7 +277,8 @@ export class StockXProvider implements MarketDataProvider {
     if (
       !market ||
       market.productId !== product.productId ||
-      market.variantId !== stockxVariant.variantId
+      market.variantId !== stockxVariant.variantId ||
+      market.currencyCode !== this.#config.currency
     ) {
       return { status: "schema_error" };
     }
@@ -438,7 +439,9 @@ export class StockXProvider implements MarketDataProvider {
         !("access_token" in value) ||
         typeof value.access_token !== "string" ||
         !("expires_in" in value) ||
-        typeof value.expires_in !== "number"
+        typeof value.expires_in !== "number" ||
+        !Number.isFinite(value.expires_in) ||
+        value.expires_in <= 0
       ) {
         return null;
       }
