@@ -17,6 +17,7 @@ import type {
   RyoSignatureMetadata,
   RyoStrengthBlend,
 } from "../ryo-mode-v4/types";
+import type { FactualVerification, RecommendationTrustEvaluation } from "../recommendation-trust/types";
 
 export type DiagnosisAnswerValue = "like" | "neutral" | "dislike";
 
@@ -87,6 +88,8 @@ export type CandidateProfile = {
   researchCautions?: string[];
   researchSource?: CandidateResearchSource;
   ryoMetadata?: RyoCandidateMetadata;
+  factualVerification?: FactualVerification;
+  trustEvaluation?: RecommendationTrustEvaluation;
 };
 
 export type BalancedScore = {

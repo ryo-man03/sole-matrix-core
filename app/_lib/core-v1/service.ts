@@ -376,6 +376,7 @@ function mapGeminiCandidate(
     styleCodeEvidenceUrls: [...candidate.styleCodeEvidenceUrls],
     verificationStatus: candidate.verificationStatus,
     sourceQuality: candidate.sourceQuality,
+    factualVerification: candidate.factualVerification,
     searchKeywords: [...candidate.searchKeywords],
     evidenceUrls: [...candidate.evidenceUrls],
     evidenceLinks: candidate.evidenceLinks.map((link) => ({ ...link })),

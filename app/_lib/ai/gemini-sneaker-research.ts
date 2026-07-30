@@ -14,6 +14,7 @@ import {
   type GeminiSneakerResearchCandidate,
   type GeminiSneakerResearchResult,
 } from "./gemini-sneaker-research-schema";
+import { evaluateFactualCandidate } from "../recommendation-trust/factual-verification";
 
 const defaultModel = "gemini-2.5-flash";
 const requestTimeoutMs = 30_000;
@@ -389,19 +390,29 @@ function attachTrustedEvidence(
     sourceStyleCode: _sourceStyleCode,
     ...publicCandidate
   } = candidate;
-  return {
-    ...publicCandidate,
+  const factualResult = evaluateFactualCandidate({
+    brand: publicCandidate.brand,
+    modelName: publicCandidate.modelName,
     colorwayName: verifiedColorway,
     styleCode: verifiedStyleCode,
     modelEvidenceUrls,
     colorwayEvidenceUrls: verifiedColorway ? colorwayEvidenceUrls : [],
     styleCodeEvidenceUrls: verifiedStyleCode ? styleCodeEvidenceUrls : [],
+    groundingText: grounding.text,
+  });
+  if (!factualResult.acceptedForRecommendation) return null;
+  return {
+    ...publicCandidate,
+    colorwayName: factualResult.colorwayName,
+    styleCode: factualResult.styleCode,
+    modelEvidenceUrls,
+    colorwayEvidenceUrls: verifiedColorway ? colorwayEvidenceUrls : [],
+    styleCodeEvidenceUrls: verifiedStyleCode ? styleCodeEvidenceUrls : [],
     evidenceUrls,
     evidenceLinks,
-    verificationStatus: verifiedColorway
-      ? "model_and_colorway_verified"
-      : "model_verified_colorway_unverified",
+    verificationStatus: factualResult.verificationStatus,
     sourceQuality: candidateSourceQuality,
+    factualVerification: factualResult.factual,
     confidence: candidateSourceQuality === "marketplace"
       ? Math.min(publicCandidate.confidence, 0.65)
       : publicCandidate.confidence,

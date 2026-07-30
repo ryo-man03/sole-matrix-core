@@ -44,7 +44,7 @@ describe("Gemini sneaker research outcome", () => {
 
   it("uses grounding first, validates structured output, and trusts metadata URLs only", async () => {
     const fetcher = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(groundedResponse("adidas SAMBA OG は実在するクラシックモデルです。", "adidas SAMBA OG", "https://source.example/samba"))
+      .mockResolvedValueOnce(groundedResponse("adidas SAMBA OG は実在するクラシックモデルです。", "adidas SAMBA OG", "https://www.adidas.jp/samba-og"))
       .mockResolvedValueOnce(geminiResponse(JSON.stringify({ candidates: [{ ...validCandidate, evidenceUrls: ["https://untrusted.example/in-json"] }] })));
 
     const outcome = await researchSneakerCandidatesWithGemini(input, { apiKey: "test-key", fetcher });
@@ -58,7 +58,7 @@ describe("Gemini sneaker research outcome", () => {
     });
     expect(outcome.result.candidates[0]).toMatchObject({ modelName: "adidas Samba OG", researchOrigin: "gemini" });
     expect(outcome.result.candidates[0]?.evidenceLinks).toEqual([
-      { url: "https://source.example/samba", type: "gemini_citation_url" },
+      { url: "https://www.adidas.jp/samba-og", type: "gemini_citation_url" },
       { url: "https://www.google.com/search?q=adidas%20Samba%20OG", type: "search_entry_url" },
     ]);
     expect(outcome.result.candidates[0]?.evidenceUrls).not.toContain("https://untrusted.example/in-json");
@@ -148,39 +148,25 @@ describe("Gemini sneaker research outcome", () => {
     expect(outcome.result.candidates[0]?.styleCodeEvidenceUrls).toEqual([]);
   });
 
-  it("does not verify a colorway from an unknown source and caps marketplace confidence", async () => {
+  it("rejects unknown-only and marketplace-only model evidence", async () => {
     const candidate = { ...validCandidate, colorwayName: "Cloud White / Core Black", styleCode: null };
     const unknown = await runWithStructured(
       { candidates: [candidate] },
       "adidas SAMBA OG Cloud White / Core Black",
       "https://unknown.example/samba",
     );
-    expect(unknown.status).toBe("ready");
-    if (unknown.status === "ready") {
-      expect(unknown.result.candidates[0]).toMatchObject({
-        colorwayName: null,
-        verificationStatus: "model_verified_colorway_unverified",
-        sourceQuality: "unknown",
-      });
-    }
+    expect(unknown).toMatchObject({ status: "fallback", reasonCode: "no_evidence_url" });
     const marketplace = await runWithStructured(
       { candidates: [{ ...candidate, confidence: 0.92 }] },
       "adidas SAMBA OG Cloud White / Core Black",
       "https://stockx.com/adidas-samba-og",
     );
-    expect(marketplace.status).toBe("ready");
-    if (marketplace.status === "ready") {
-      expect(marketplace.result.candidates[0]).toMatchObject({
-        colorwayName: "Cloud White / Core Black",
-        sourceQuality: "marketplace",
-        confidence: 0.65,
-      });
-    }
+    expect(marketplace).toMatchObject({ status: "fallback", reasonCode: "no_evidence_url" });
   });
 
   it("repairs malformed JSON once and validates the repaired result", async () => {
     const fetcher = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(groundedResponse("adidas SAMBA OG は実在するモデルです。", "adidas SAMBA OG", "https://source.example/samba"))
+      .mockResolvedValueOnce(groundedResponse("adidas SAMBA OG は実在するモデルです。", "adidas SAMBA OG", "https://www.adidas.jp/samba-og"))
       .mockResolvedValueOnce(geminiResponse('{"candidates":['))
       .mockResolvedValueOnce(geminiResponse(JSON.stringify({ candidates: [validCandidate] })));
 
@@ -194,7 +180,7 @@ describe("Gemini sneaker research outcome", () => {
 
   it("falls back with invalid_json when one repair cannot produce JSON", async () => {
     const fetcher = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(groundedResponse("adidas SAMBA OG は実在するモデルです。", "adidas SAMBA OG", "https://source.example/samba"))
+      .mockResolvedValueOnce(groundedResponse("adidas SAMBA OG は実在するモデルです。", "adidas SAMBA OG", "https://www.adidas.jp/samba-og"))
       .mockResolvedValueOnce(geminiResponse("not json"))
       .mockResolvedValueOnce(geminiResponse("still not json"));
 
@@ -218,7 +204,7 @@ describe("Gemini sneaker research outcome", () => {
   it("uses a distinct fallback model only once after a transient failure", async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(new Response("limited", { status: 429 }))
-      .mockResolvedValueOnce(groundedResponse("adidas SAMBA OG は実在するモデルです。", "adidas SAMBA OG", "https://source.example/samba"))
+      .mockResolvedValueOnce(groundedResponse("adidas SAMBA OG は実在するモデルです。", "adidas SAMBA OG", "https://www.adidas.jp/samba-og"))
       .mockResolvedValueOnce(geminiResponse(JSON.stringify({ candidates: [validCandidate] })));
 
     const outcome = await researchSneakerCandidatesWithGemini(input, {
