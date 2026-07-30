@@ -61,7 +61,9 @@ describe("Core v1 UI integration", () => {
     expect(componentSource).toContain("result.explanation.reasons.slice(0, 3)");
     expect(componentSource).toContain("result.explanation.cautions.length");
     expect(componentSource).toContain("現実的な別案");
-    expect(componentSource).toContain("Ryo Modeらしい別案");
+    expect(componentSource).toContain("Ryoの中心候補");
+    expect(componentSource).toContain("条件が合ったRyo隣接候補");
+    expect(componentSource).toContain("data-ryo-empty-state");
     expect(componentSource).toContain("今回は下げた候補");
     expect(componentSource).toContain("recommendationDisplaySet");
     expect(componentSource).not.toContain("setResult(null)");
