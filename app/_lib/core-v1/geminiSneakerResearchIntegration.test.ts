@@ -54,6 +54,34 @@ describe("Gemini candidate research and Core re-evaluation", () => {
     expect(isGeminiResearchShowcaseReady(result)).toBe(false);
   });
 
+  it("disables every external provider for deterministic QA even when keys exist", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const result = await recommendCoreV1(
+      {
+        diagnosisAnswers: [{ questionId: "walking-comfort", value: "like" }],
+        preferenceTags: [],
+        mode: "balanced",
+      },
+      {
+        env: {
+          EXTERNAL_PROVIDERS_DISABLED: "true",
+          GEMINI_API_KEY: "configured-but-disabled",
+          RAKUTEN_APPLICATION_ID: "configured-but-disabled",
+          RAKUTEN_ACCESS_KEY: "configured-but-disabled",
+        },
+        geminiFetcher: fetcher,
+      },
+    );
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(result.candidateResearch).toMatchObject({
+      source: "fallback_catalog",
+      reasonCode: "missing_api_key",
+    });
+    expect(result.readiness.geminiExplanation.status).toBe("not_configured");
+    expect(result.readiness.rakuten.status).toBe("missing_config");
+  });
+
   it("does not mark candidate research ready when only Gemini explanation succeeds", async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(new Response("forbidden", { status: 403 }))

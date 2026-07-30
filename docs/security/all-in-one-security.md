@@ -53,4 +53,5 @@ rg -n "NEXT_PUBLIC_GEMINI|NEXT_PUBLIC_RAKUTEN|raw response|response body|searchP
 - Next.jsはActive LTSのセキュリティ修正版`16.2.11`以上を使用する
 - `sharp`は`0.35.0`、`postcss`は`8.5.18`へ固定し、既知のhigh advisoryを除外する
 - 全routeへ`nosniff`、frame拒否、referrer制限、権限無効化、same-origin openerを適用する
+- QA / CIでは`EXTERNAL_PROVIDERS_DISABLED=true`で、credentialが設定済みでも外部通信を停止できる
 - `pnpm audit --audit-level=high`を最終gateで実行する

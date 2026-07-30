@@ -70,6 +70,18 @@ export async function recommendCoreV1(
   dependencies: RecommendCoreV1Dependencies = {},
 ): Promise<RecommendationResult> {
   const env = dependencies.env ?? process.env;
+  const externalProvidersDisabled = dependencies.env
+    ? dependencies.env["EXTERNAL_PROVIDERS_DISABLED"] === "true"
+    : process.env.EXTERNAL_PROVIDERS_DISABLED === "true";
+  const providerEnv = externalProvidersDisabled
+    ? {
+        ...env,
+        GEMINI_API_KEY: undefined,
+        RAKUTEN_APPLICATION_ID: undefined,
+        RAKUTEN_ACCESS_KEY: undefined,
+        RAKUTEN_AFFILIATE_ID: undefined,
+      }
+    : env;
   const candidateRepository = dependencies.candidateRepository ?? mockCandidateRepository;
   const preferenceVector = createPreferenceVector({
     answers: input.diagnosisAnswers,
@@ -87,7 +99,7 @@ export async function recommendCoreV1(
   });
   const ryoRerankingEnabled = !isProductJudgement && input.ryoModeAnswers !== undefined;
   const rakutenCandidateProvider = dependencies.rakutenCandidateProvider ??
-    ((providerInput) => fetchRakutenCandidates(providerInput, { env }));
+    ((providerInput) => fetchRakutenCandidates(providerInput, { env: providerEnv }));
 
   const [rawFallbackCandidates, rakutenResult, geminiResearch] = await Promise.all([
     candidateRepository.listCandidates(candidateInput),
@@ -117,9 +129,9 @@ export async function recommendCoreV1(
             mode: input.mode ?? "balanced",
           },
           {
-            ...(env["GEMINI_API_KEY"] ? { apiKey: env["GEMINI_API_KEY"] } : {}),
-            ...(env["GEMINI_RESEARCH_MODEL"] ? { model: env["GEMINI_RESEARCH_MODEL"] } : {}),
-            ...(env["GEMINI_RESEARCH_FALLBACK_MODEL"] ? { fallbackModel: env["GEMINI_RESEARCH_FALLBACK_MODEL"] } : {}),
+            ...(providerEnv["GEMINI_API_KEY"] ? { apiKey: providerEnv["GEMINI_API_KEY"] } : {}),
+            ...(providerEnv["GEMINI_RESEARCH_MODEL"] ? { model: providerEnv["GEMINI_RESEARCH_MODEL"] } : {}),
+            ...(providerEnv["GEMINI_RESEARCH_FALLBACK_MODEL"] ? { fallbackModel: providerEnv["GEMINI_RESEARCH_FALLBACK_MODEL"] } : {}),
             ...(dependencies.geminiFetcher ? { fetcher: dependencies.geminiFetcher } : {}),
           },
         ),
@@ -269,7 +281,7 @@ export async function recommendCoreV1(
   const generatedExplanation = dependencies.explanationProvider
     ? await dependencies.explanationProvider(explanationInput)
     : await generateCoreV1Explanation(explanationInput, {
-        ...(env["GEMINI_API_KEY"] ? { apiKey: env["GEMINI_API_KEY"] } : {}),
+        ...(providerEnv["GEMINI_API_KEY"] ? { apiKey: providerEnv["GEMINI_API_KEY"] } : {}),
         ...(dependencies.geminiFetcher ? { fetcher: dependencies.geminiFetcher } : {}),
       });
   const researchExplanation = addResearchContext(generatedExplanation, best.candidate);
@@ -279,7 +291,7 @@ export async function recommendCoreV1(
         cautions: [...new Set([...best.contextReasons, ...researchExplanation.cautions])].slice(0, 6),
       }
     : researchExplanation;
-  const geminiConfigured = Boolean(env["GEMINI_API_KEY"]);
+  const geminiConfigured = Boolean(providerEnv["GEMINI_API_KEY"]);
   const selectedRyoEvaluation = buildRyoModeCandidateEvaluation(ryoPreferenceVector, best.candidate);
   const rerankingWeights = getRerankingWeights(ryoSummary);
   const selectedExplicitPreferencePenalty = "explicitPreferencePenalty" in best
