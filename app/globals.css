@@ -2008,6 +2008,10 @@ h1 {
   padding: 22px;
 }
 
+.core-v1-panel > * {
+  min-width: 0;
+}
+
 .core-v1-panel-heading h3,
 .core-v1-result h4,
 .core-v1-result h5 {
