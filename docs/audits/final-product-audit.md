@@ -130,3 +130,64 @@
 6. 80シナリオ以上の final evaluation を実行し、全指標0を Milestone A の必須条件にする
 
 Milestone B は上記の修正、全回帰、typecheck、production build、browser QA がすべて成功するまで開始しない。
+
+## Milestone A 最終クローズ
+
+初回監査の `BROKEN` / `PARTIAL` は、以下の実装と再検証によりすべてクローズした。
+
+| 領域 | 最終判定 | 最終根拠 |
+| --- | --- | --- |
+| App Mode state / URL / Back / Forward / Reload | PASS | 単一controller、visited modeのmounted保持、`hidden` / `inert`、session draft、history / popstate。Product入力の往復・Back・Forward・reload保持を実ブラウザ確認 |
+| Trusted recommendation | PASS | discovery 24、normalize 20、verified 16、score 8、display 3の上限、dedupe、factual verification、safe explanation、Trust Report |
+| Provider / UI recovery | PASS | 400 / 401 / 403 / 404 / 409 / 429 / 500 / 502 / 503、timeout、abort、offline、connection reset、invalid / empty / partial JSON。恒久障害はretryなし、一時障害は最大1回 |
+| Storage / upload / URL | PASS | corrupt / quota storage、JPEG / PNG / WebP、5MB、magic bytes、invalid URL、private DNS、redirect再検証・上限、host failure |
+| Security | PASS | Next.js 16.2.11、Sharp 0.35.0、PostCSS 8.5.18。high advisory 0、`.env.local` untracked、全route security headers |
+| Accessibility / performance | PASS | 本文skip link、focus-visible、`aria-busy` / live region、44px以上、reduced motion、below-fold paint defer、recommend single-flight |
+| Responsive / Japanese | PASS | 390 / 768 / 1280でHome overflow 0・小さい主要操作0。390の結果で見つけたnested grid overflowを `min-width: 0` で修正し、scrollWidth 375 = clientWidth 375へ再計測 |
+| Final evaluation | PASS | Balanced / Ryo × 4 strength × 3 purpose × 4 provider state = 96 scenarios。80件未満を拒否し、意図的な違反fixtureで全指標の検出も確認 |
+
+### FinalEvaluationMetrics
+
+```json
+{
+  "scenarioCount": 96,
+  "unsupportedModelDisplayed": 0,
+  "unsupportedColorwayDisplayed": 0,
+  "unsupportedStyleCodeDisplayed": 0,
+  "unsupportedExplanationDisplayed": 0,
+  "primaryConstraintViolation": 0,
+  "duplicateCandidateCount": 0,
+  "duplicateParentCount": 0,
+  "singleBrandTopThreeCount": 0,
+  "safeOnlySecondPairCount": 0,
+  "invalidRyoAlternativeCount": 0,
+  "modeStateLeakCount": 0,
+  "responsiveStateResetCount": 0,
+  "duplicateRequestCount": 0,
+  "unhandledErrorCount": 0,
+  "horizontalOverflowCount": 0
+}
+```
+
+### 最終ブラウザ証跡
+
+| viewport / flow | scrollWidth / clientWidth | 44px未満 | console error / warning | 判定 |
+| --- | --- | --- | --- | --- |
+| Home 390×844 | 375 / 375 | 0 | 0 | PASS |
+| Home 768×1024 | 753 / 753 | 0 | 0 | PASS |
+| Home 1280×720 | 1265 / 1265 | 0 | 0 | PASS |
+| Diagnosis 390×844、11問、二足目、reload | state保持 | 0 | 0 | PASS |
+| Recommendation 390×844、Trust Report | 375 / 375 | 0 | 0 | PASS |
+
+推薦結果は未確認カラーとStyle Codeを表示せず、`AI Trust Report: 追加確認が必要`を表示した。ブラウザ表示・自動テストとも日本語は正常UTF-8で、raw provider responseやcredentialの露出はない。
+
+### 最終ローカルゲート
+
+- `pnpm test`: 87 files / 638 tests PASS
+- `pnpm typecheck`: PASS
+- `pnpm web:build`: Next.js 16.2.11、21 static pages / 22 routes PASS
+- `pnpm audit --audit-level=high`: high 0（low 1）
+- `git diff --check`: PASS
+- `.env.local`: ignored / untracked
+
+**Milestone A 最終判定: PASS。Milestone B の開始条件を満たした。**
