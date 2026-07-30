@@ -7,7 +7,7 @@ type MainContainerProps = {
 
 export function MainContainer({ children, labelledBy }: MainContainerProps) {
   return (
-    <main className="main-container" aria-labelledby={labelledBy}>
+    <main className="main-container" aria-labelledby={labelledBy} id="main-content">
       {children}
     </main>
   );

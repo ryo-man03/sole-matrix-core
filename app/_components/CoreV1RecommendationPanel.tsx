@@ -194,7 +194,11 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
   }
 
   return (
-    <section className="core-v1-panel" aria-labelledby="core-v1-recommendation-title">
+    <section
+      aria-busy={isLoading}
+      aria-labelledby="core-v1-recommendation-title"
+      className="core-v1-panel"
+    >
       <div className="core-v1-panel-heading"><p className="diagnosis-summary-kicker">Recommendation</p><h3 id="core-v1-recommendation-title">具体的なおすすめモデルを見る</h3><p>Gemini候補はモデル名・カラー名・根拠URLを分けて確認し、Coreが再スコアリングします。外部調査に失敗してもCore候補で結果を返します。</p></div>
       <p className="core-v1-provider-note">Q9で選んだ予算をCoreの候補選定とRyo Mode補助評価へ反映します。価格・在庫・購入可能性は保証しません。</p>
       <button className="diagnosis-primary-button core-v1-submit" disabled={isLoading} onClick={handleRecommend} type="button">{isLoading ? "候補を検証・再評価しています…" : "推薦結果を見る"}</button>

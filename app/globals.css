@@ -3875,6 +3875,27 @@ a {
   outline-offset: 3px;
 }
 
+.skip-to-content {
+  position: fixed;
+  z-index: 1000;
+  top: 8px;
+  left: 8px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  border: 2px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  padding: 0 16px;
+  color: var(--accent-primary);
+  font-weight: 900;
+  transform: translateY(calc(-100% - 16px));
+}
+
+.skip-to-content:focus {
+  transform: translateY(0);
+}
+
 .site-header,
 .main-container,
 .footer-notice {
@@ -4629,6 +4650,15 @@ a {
 
 .rakuten-product-card-body h5 {
   overflow-wrap: anywhere;
+}
+
+@supports (content-visibility: auto) {
+  .core-v1-result > .result-detail-accordion,
+  .external-evidence-panel,
+  .rakuten-market-find {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 320px;
+  }
 }
 
 @media (hover: hover) {
