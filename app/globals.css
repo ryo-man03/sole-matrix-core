@@ -5048,7 +5048,9 @@ a {
 
 .market-manual-import input,
 .market-context-select select {
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
   min-height: 2.75rem;
   padding: 0.55rem;
   border: 1px solid var(--line);

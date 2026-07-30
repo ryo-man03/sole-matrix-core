@@ -52,6 +52,8 @@ describe("responsive market intelligence UI contract", () => {
     expect(source).toContain('"sold_price"');
     expect(source).toContain("tabIndex={0}");
     expect(source).toContain("実線・記号は実測、破線は予測");
+    expect(source).toContain('lowerName.endsWith(".json")');
+    expect(source).toContain("allowedMimeTypes");
     expect(source).toContain('summary ? formatMoney(summary.median, currency) : "—"');
     expect(source).not.toContain('データなし ? "0円"');
   });
@@ -64,9 +66,11 @@ describe("responsive market intelligence UI contract", () => {
     expect(css).toContain("@media (max-width: 560px)");
     expect(css).toContain(".market-chart svg");
     expect(css).toContain("width: 100%");
+    expect(css).toMatch(
+      /\.market-manual-import input,[\s\S]*?min-width:\s*0;/u,
+    );
     expect(css).not.toMatch(
       /\.market-chart\s*\{[^}]*overflow-x:\s*(auto|scroll)/su,
     );
   });
 });
-

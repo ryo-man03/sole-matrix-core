@@ -89,6 +89,48 @@ describe("compliant marketplace provider gates", () => {
     );
   });
 
+  it("rejects probable identity even when a style code is present", () => {
+    const result = importMarketData(JSON.stringify([{
+      ...validImport,
+      identityMatch: "probable",
+    }]), "json");
+    expect(result.accepted).toEqual([]);
+    expect(result.rejected[0]?.errors).toContain(
+      "identityMatch must be exact",
+    );
+  });
+
+  it.each([
+    ["formula-like CSV text", { sourceReference: '=HYPERLINK("https://example.com")' }, "sourceReference contains a formula-like value"],
+    ["unsupported currency", { currency: "YEN" }, "currency is invalid"],
+  ])("rejects %s", (_label, override, error) => {
+    const result = importMarketData(
+      JSON.stringify([{ ...validImport, ...override }]),
+      "json",
+    );
+    expect(result.accepted).toEqual([]);
+    expect(result.rejected[0]?.errors).toContain(error);
+  });
+
+  it("rejects duplicate snapshots within one import", () => {
+    const result = importMarketData(
+      JSON.stringify([validImport, validImport]),
+      "json",
+    );
+    expect(result.accepted).toHaveLength(1);
+    expect(result.rejected[0]?.errors).toContain(
+      "duplicate snapshot in import",
+    );
+  });
+
+  it("rejects oversized input before parsing", () => {
+    const result = importMarketData(" ".repeat(2_000_001), "json");
+    expect(result.accepted).toEqual([]);
+    expect(result.rejected[0]?.errors).toContain(
+      "import exceeds 2000000 byte limit",
+    );
+  });
+
   it("parses quoted CSV without confusing listing and sold prices", () => {
     const csv = [
       "provider,sourceReference,observedAt,brand,modelName,colorwayName,styleCode,releaseYear,sizeSystem,sizeValue,condition,currency,priceType,amount,sampleCount,identityMatch,includesFees,includesShipping,includesTax",
@@ -102,4 +144,3 @@ describe("compliant marketplace provider gates", () => {
     });
   });
 });
-

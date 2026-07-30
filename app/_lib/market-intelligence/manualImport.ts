@@ -1,5 +1,6 @@
 import type { MarketProviderId } from "./provider";
 import {
+  getMarketSeriesKey,
   MARKET_PRICE_TYPES,
   validateMarketSnapshot,
   type MarketPriceType,
@@ -7,8 +8,13 @@ import {
 } from "./snapshot";
 
 const MAX_IMPORT_ROWS = 1_000;
+const MAX_IMPORT_BYTES = 2_000_000;
 const SIZE_SYSTEMS = new Set(["US_M", "US_W", "JP_CM", "UK", "EU"]);
 const CONDITIONS = new Set(["new", "used", "unknown"]);
+const SUPPORTED_CURRENCIES = new Set([
+  "AUD", "CAD", "CHF", "EUR", "GBP", "HKD",
+  "JPY", "KRW", "MXN", "NZD", "SGD", "USD",
+]);
 const PROVIDERS = new Set<MarketProviderId>([
   "stockx",
   "snkrdunk",
@@ -16,6 +22,22 @@ const PROVIDERS = new Set<MarketProviderId>([
   "manual_import",
 ]);
 const PRICE_TYPES = new Set<MarketPriceType>(MARKET_PRICE_TYPES);
+const FORMULA_PREFIX = /^[\t\r\n ]*[=+\-@]/u;
+const FORMULA_SAFE_TEXT_FIELDS = [
+  "provider",
+  "sourceReference",
+  "observedAt",
+  "brand",
+  "modelName",
+  "colorwayName",
+  "styleCode",
+  "sizeSystem",
+  "sizeValue",
+  "condition",
+  "currency",
+  "priceType",
+  "identityMatch",
+] as const;
 
 export const MANUAL_IMPORT_FIELDS = [
   "provider",
@@ -161,6 +183,14 @@ function normalizeRecord(
   const includesShipping = triState(record.includesShipping);
   const includesTax = triState(record.includesTax);
 
+  for (const field of FORMULA_SAFE_TEXT_FIELDS) {
+    if (
+      typeof record[field] === "string" &&
+      FORMULA_PREFIX.test(record[field])
+    ) {
+      errors.push(`${field} contains a formula-like value`);
+    }
+  }
   if (!provider || !PROVIDERS.has(provider as MarketProviderId)) {
     errors.push("provider is invalid");
   }
@@ -175,15 +205,20 @@ function normalizeRecord(
   if (!condition || !CONDITIONS.has(condition)) {
     errors.push("condition is invalid");
   }
-  if (!currency) errors.push("currency is required");
+  if (
+    !currency ||
+    !SUPPORTED_CURRENCIES.has(currency.toUpperCase())
+  ) {
+    errors.push("currency is invalid");
+  }
   if (!priceType || !PRICE_TYPES.has(priceType as MarketPriceType)) {
     errors.push("priceType is invalid");
   }
   if (amount === null) errors.push("amount is invalid");
-  if (identityMatch !== "exact" && identityMatch !== "probable") {
-    errors.push("identityMatch must be exact or probable");
+  if (identityMatch !== "exact") {
+    errors.push("identityMatch must be exact");
   }
-  if (identityMatch === "exact" && !text(record.styleCode)) {
+  if (!text(record.styleCode)) {
     errors.push("exact identity requires styleCode");
   }
   if ([includesFees, includesShipping, includesTax].includes(undefined)) {
@@ -211,7 +246,7 @@ function normalizeRecord(
     observedAt: observedAt!,
     sourceReference,
     sampleCount,
-    identityMatch: identityMatch as "exact" | "probable",
+    identityMatch: "exact",
     sourceQuality: "manual_import",
     includesFees: includesFees!,
     includesShipping: includesShipping!,
@@ -227,6 +262,15 @@ export function importMarketData(
   input: string,
   format: "csv" | "json",
 ): ManualImportResult {
+  if (new TextEncoder().encode(input).byteLength > MAX_IMPORT_BYTES) {
+    return {
+      accepted: [],
+      rejected: [{
+        row: 1,
+        errors: [`import exceeds ${MAX_IMPORT_BYTES} byte limit`],
+      }],
+    };
+  }
   const records = format === "csv" ? csvRecords(input) : jsonRecords(input);
   if (!records) {
     return {
@@ -246,11 +290,23 @@ export function importMarketData(
 
   const accepted: MarketSnapshot[] = [];
   const rejected: ManualImportRejection[] = [];
+  const acceptedKeys = new Set<string>();
   records.forEach((record, index) => {
     const normalized = normalizeRecord(record);
-    if (normalized.snapshot) accepted.push(normalized.snapshot);
-    else rejected.push({ row: index + 2, errors: normalized.errors });
+    if (!normalized.snapshot) {
+      rejected.push({ row: index + 2, errors: normalized.errors });
+      return;
+    }
+    const key = `${getMarketSeriesKey(normalized.snapshot)}|${normalized.snapshot.observedAt}`;
+    if (acceptedKeys.has(key)) {
+      rejected.push({
+        row: index + 2,
+        errors: ["duplicate snapshot in import"],
+      });
+      return;
+    }
+    acceptedKeys.add(key);
+    accepted.push(normalized.snapshot);
   });
   return { accepted, rejected };
 }
-

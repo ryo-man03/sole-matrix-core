@@ -160,9 +160,23 @@ export function MarketIntelligencePanel({ candidate }: Props) {
       setImportState("partial");
       return;
     }
-    const format = file.name.toLocaleLowerCase("en-US").endsWith(".json")
+    const lowerName = file.name.toLocaleLowerCase("en-US");
+    const format = lowerName.endsWith(".json")
       ? "json"
-      : "csv";
+      : lowerName.endsWith(".csv")
+        ? "csv"
+        : null;
+    const allowedMimeTypes = format === "json"
+      ? new Set(["", "application/json", "text/json"])
+      : new Set(["", "text/csv", "application/csv", "text/plain"]);
+    if (!format || !allowedMimeTypes.has(file.type.toLocaleLowerCase("en-US"))) {
+      setRejections([{
+        row: 1,
+        errors: ["CSVまたはJSON形式のファイルを選択してください"],
+      }]);
+      setImportState("partial");
+      return;
+    }
     const result = importMarketData(await file.text(), format);
     const matched = candidateIdentity
       ? result.accepted.filter(

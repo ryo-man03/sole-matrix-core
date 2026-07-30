@@ -4,7 +4,9 @@ Manual import is for CSV or JSON that the user is entitled to use. It is not a w
 
 ## Required fields
 
-`provider`, `sourceReference`, `observedAt`, `brand`, `modelName`, `styleCode` for exact identity, `sizeSystem`, `sizeValue`, `condition`, `currency`, `priceType`, `amount`, and `identityMatch`.
+`provider`, `sourceReference`, `observedAt`, `brand`, `modelName`, `styleCode`, `sizeSystem`, `sizeValue`, `condition`, `currency`, `priceType`, `amount`, and `identityMatch`.
+
+Manual import accepts `identityMatch: exact` only. `probable` and model-only rows are rejected even if they contain a plausible model name. The supported currencies match the provider boundary (`AUD`, `CAD`, `CHF`, `EUR`, `GBP`, `HKD`, `JPY`, `KRW`, `MXN`, `NZD`, `SGD`, `USD`); no currency conversion is performed.
 
 Optional normalized fields include colorway, release year, sample count, and true/false/blank fee, shipping, and tax flags.
 
@@ -12,7 +14,10 @@ Allowed price types are `lowest_ask`, `highest_bid`, `listing_price`, `sold_pric
 
 ## Validation
 
-- maximum 1,000 rows and 2 MB in the browser UI;
+- maximum 1,000 rows and 2,000,000 UTF-8 bytes in both the parser and browser UI;
+- `.csv` / `.json` filename and compatible MIME checks in the browser UI;
+- formula-like text beginning with `=`, `+`, `-`, or `@` is rejected;
+- duplicate series/timestamp rows inside one import are rejected;
 - positive finite amount and uppercase-normalized three-letter currency;
 - valid ISO timestamp and non-empty source reference;
 - known size system and condition;
@@ -29,4 +34,3 @@ provider,sourceReference,observedAt,brand,modelName,colorwayName,styleCode,relea
 ```
 
 Example data must use a source reference meaningful to the user. Do not put API keys, tokens, cookies, personal buyer/seller information, or raw provider responses in an import file.
-
