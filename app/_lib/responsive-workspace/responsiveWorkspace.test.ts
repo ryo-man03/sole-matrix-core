@@ -56,6 +56,18 @@ describe("responsive product workspace", () => {
     expect(normalizedCss).toMatch(
       /\.workspace-candidate-summary h4\s*\{[^}]*overflow-wrap:\s*anywhere/s,
     );
+    expect(normalizedCss).toMatch(
+      /\.diagnosis-summary-edit\s*\{[^}]*min-width:\s*44px[^}]*min-height:\s*44px/s,
+    );
+    expect(normalizedCss).toMatch(
+      /\.verified-candidate-evidence-list a\s*\{[^}]*min-height:\s*44px/s,
+    );
+    expect(normalizedCss).toMatch(
+      /\.candidate-trust-report > summary\s*\{[^}]*min-height:\s*48px/s,
+    );
+    expect(normalizedCss).toMatch(
+      /\.candidate-trust-report dt,[\s\S]*?overflow-wrap:\s*anywhere/s,
+    );
   });
 
   it("lets headings wrap naturally and keeps secondary detail collapsible", () => {

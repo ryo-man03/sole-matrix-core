@@ -1978,6 +1978,7 @@ h1 {
 }
 
 .diagnosis-summary-edit {
+  min-width: 44px;
   min-height: 44px;
   margin: 6px 0 0;
   border: 0;
@@ -2326,6 +2327,9 @@ h1 {
 
 .verified-candidate-evidence-list a {
   min-width: 0;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   color: #284d74;
   font-weight: 800;
   overflow-wrap: anywhere;
@@ -2336,6 +2340,87 @@ h1 {
   color: #66717f;
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+.candidate-trust-report {
+  min-width: 0;
+  border: 1px solid rgba(35, 43, 55, 0.14);
+  border-radius: 8px;
+  background: #f7f6f1;
+}
+
+.candidate-trust-report > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  color: #284d74;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 900;
+  list-style: none;
+}
+
+.candidate-trust-report > summary::-webkit-details-marker {
+  display: none;
+}
+
+.candidate-trust-report > summary::after {
+  content: "+";
+  flex: 0 0 auto;
+  font-family: Georgia, serif;
+  font-size: 1.25rem;
+}
+
+.candidate-trust-report[open] > summary::after {
+  content: "−";
+}
+
+.candidate-trust-report dl {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0 12px 12px;
+}
+
+.candidate-trust-report dl div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(92px, 0.8fr) minmax(0, 1fr);
+  gap: 12px;
+  border-top: 1px solid rgba(35, 43, 55, 0.1);
+  padding-top: 8px;
+}
+
+.candidate-trust-report dt,
+.candidate-trust-report dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.candidate-trust-report dt {
+  color: #66717f;
+  font-size: 0.76rem;
+}
+
+.candidate-trust-report dd {
+  color: #252d38;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.candidate-trust-report ul {
+  display: grid;
+  gap: 6px;
+  margin: 0 12px 12px;
+  padding-left: 20px;
+  color: #66717f;
+  font-size: 0.78rem;
+  line-height: 1.65;
 }
 
 .ryo-score-breakdown {
@@ -4785,6 +4870,17 @@ a {
   .verified-candidate-topline {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .verified-candidate-evidence-list li {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .candidate-trust-report dl div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
   }
 
   .core-v1-score-grid-v2,
