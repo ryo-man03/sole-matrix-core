@@ -2,6 +2,7 @@ import type {
   CanonicalSneakerIdentity,
   SneakerVariant,
 } from "./identity";
+import type { MarketSnapshot } from "./snapshot";
 
 export type {
   CanonicalSneakerIdentity,
@@ -68,19 +69,10 @@ export type MarketCatalogSearchResult = ProviderResult<Readonly<{
   nextCursor: string | null;
 }>>;
 
-export type CurrentMarketObservation = Readonly<{
-  provider: MarketProviderId;
-  amount: number;
-  currency: string;
-  kind: string;
-  observedAt: string;
-  sourceReference: string | null;
-}>;
-
 export type MarketSnapshotResult = ProviderResult<Readonly<{
   identity: CanonicalSneakerIdentity;
   variant: SneakerVariant;
-  observations: readonly CurrentMarketObservation[];
+  snapshots: readonly MarketSnapshot[];
 }>>;
 
 export interface MarketDataProvider {
