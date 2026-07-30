@@ -191,3 +191,68 @@ Milestone B は上記の修正、全回帰、typecheck、production build、brow
 - `.env.local`: ignored / untracked
 
 **Milestone A 最終判定: PASS。Milestone B の開始条件を満たした。**
+
+## Milestone B 最終クローズ
+
+### Provider Capability
+
+| provider | 最終状態 | 認可・通信境界 | live verification |
+| --- | --- | --- | --- |
+| StockX | adapter / contract 完成 | developer approval、API key、OAuth access token がすべて揃う場合だけ公式 v2 API を利用。未設定時は `not_configured` | 承認済み credential がないため未実施 |
+| SNKRDUNK | disabled | 公式 API または書面許可を確認できないため自動通信 0。scraping、private endpoint、Cookie 利用なし | 対象外 |
+| Mercari | manual only | Mercari Shops API を一般 marketplace 相場検索へ転用しない。許可取得・再監査まで自動通信 0 | 対象外 |
+| Manual Import | PASS | 利用者が正当に取得した CSV / JSON を、exact Style Code と明示された系列属性で検証 | ブラウザ内で完結 |
+
+StockX の catalog、variant、lowest ask、highest bid は schema / fixture / contract test で確認した。`pnpm market:collect --provider stockx --limit 10 --dry-run` は credential 未設定時に `not_configured`、外部 request 0 で終了した。fixture 成功を live 成功とは扱わない。
+
+### Canonical identity / market data
+
+| 項目 | 判定 | 最終根拠 |
+| --- | --- | --- |
+| canonical identity | PASS | Style Code exact のみ標準集計。model + verified colorway は `probable`、model のみは `model_only` とし、自動統合しない |
+| variant separation | PASS | provider、identity、variant、US M / US W、size、new / used、price type、currency を系列 key に含める |
+| price semantics | PASS | `lowest_ask`、`highest_bid`、`listing_price`、`sold_price`、`recommended_sell`、`recommended_buy` を混同しない |
+| missing value | PASS | 欠損価格を 0 円へ変換しない。sample、期間、最終取得、condition、currency、source quality を表示 |
+| snapshot storage | PASS | 正規化済み snapshot のみ。当日重複排除、atomic local JSON、secret / raw response 非保存、production persistence は migration 基盤まで disabled |
+| collector | PASS | 最大100件、手動実行、dry-run、429即停止、一時障害の最大1回 retry、exact identity 限定 |
+
+### Statistics / forecast
+
+| 項目 | 判定 | 最終根拠 |
+| --- | --- | --- |
+| descriptive statistics | PASS | 平均、中央値、最小、最大、最新、7日 / 30日変化率、直近30日 volatility。外れ値は削除しない |
+| minimum condition | PASS | 30観測以上かつ21日以上のみ forecast を生成。不足時の予測件数 0 |
+| models | PASS | naive、moving average、exponential smoothing、linear trend、Holt の決定論的5モデル |
+| backtest | PASS | rolling-origin backtest。MAE、sMAPE、directional accuracy を記録 |
+| model selection | PASS | 複雑なモデルは naive より明確に良い場合だけ採用 |
+| output | PASS | 7日 / 30日の点推定、prediction interval、confidence。将来価格・実取引価格・利益を保証しない |
+
+### Market UI / browser evidence
+
+| viewport / flow | scrollWidth / clientWidth | 小さい主操作対象 | console / hydration error | 判定 |
+| --- | --- | --- | --- | --- |
+| Market panel 390px | 375 / 375 | 0 | 0 | PASS |
+| Market panel 768px | 753 / 753 | 0 | 0 | PASS |
+| Market panel 1280px | 1265 / 1265 | 0 | 0 | PASS |
+| Production Home 320 / 360 / 390 / 430 / 600px | 各幅で一致 | 0 | 0 | PASS |
+| Production Home 768 / 1024 / 1120 / 1280 / 1440 / 1920px | 各幅で一致 | 0 | 0 | PASS |
+| Production Product Judgement 390px | 375 / 375 | 0 | 0 | PASS |
+| Production Diagnosis 390 / 1280px | 各幅で一致 | radio は label 全体が操作対象 | 0 | PASS |
+| Balanced 選択 → reload | state 保持 | 0 | 0 | PASS |
+
+Market panel は推薦結果を残したまま、StockX `not_configured`、SNKRDUNK / Mercari `not_authorized`、未確認 Style Code では Manual Import disabled、データ不足時は 0 円ではなく不足理由を表示した。production status route の実測値は `stockx: not_configured`、`snkrdunk: not_authorized`、`mercari: not_authorized`、`automaticRequestMade: false`。実測線と予測線は線種・記号・文言でも区別し、SVG 観測点は keyboard focus と読み上げ label を持つ。
+
+### Milestone B final gates
+
+- `pnpm typecheck`: PASS
+- `pnpm test`: 99 files / 746 tests PASS
+- `pnpm web:build`: Next.js 16.2.11、22 pages、Market status route を含み PASS
+- `pnpm audit --audit-level=high`: high 0、low 1
+- `git diff --check`: PASS
+- `.env.local`: ignored / untracked / diff 0
+- secret scan: 実 credential 0。検出3件は既存の placeholder 2件と security scan pattern 自体1件
+- unauthorized provider request: 0
+- SNKRDUNK / Mercari scraping implementation: 0
+- raw marketplace response / Cookie / token persistence: 0
+
+**Milestone B 最終判定: PASS。StockX live だけは承認済み credential がないため未確認であり、adapter / fixture / contract 完成と明確に区別する。**
