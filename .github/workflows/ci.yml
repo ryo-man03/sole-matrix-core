@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+      - feat/final-trusted-market-intelligence-v1
   merge_group:
   workflow_dispatch:
 
