@@ -37,6 +37,7 @@ export type GeminiSneakerResearchCandidate = {
   evidenceLinks: GeminiResearchEvidenceLink[];
   verificationStatus: ColorwayVerificationStatus;
   sourceQuality: EvidenceSourceQuality;
+  factualVerification: import("../recommendation-trust/types").FactualVerification;
   confidence: number;
   researchOrigin: "gemini";
 };
@@ -54,6 +55,7 @@ export type GeminiSneakerResearchDraftCandidate = Omit<
   | "evidenceLinks"
   | "verificationStatus"
   | "sourceQuality"
+  | "factualVerification"
   | "researchOrigin"
 > & {
   sourceModelName: string;

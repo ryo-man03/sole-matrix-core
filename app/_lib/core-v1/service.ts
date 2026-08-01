@@ -3,9 +3,20 @@ import type { SneakerVector } from "../../../src/domain/sneaker/sneakerVector";
 import { researchSneakerCandidatesWithGemini } from "../ai/gemini-sneaker-research";
 import type { GeminiSneakerResearchCandidate } from "../ai/gemini-sneaker-research-schema";
 import type { UntrustedUserMemoryContext } from "../user-memory/types";
+import { auditRecommendationExplanation } from "../recommendation-trust/explanation-audit";
+import {
+  createFactualVerification,
+  createRecommendationTrustEvaluation,
+} from "../recommendation-trust/evaluation";
+import {
+  buildScoredShortlist,
+  buildTrustedCandidatePool,
+  createTrustedCandidateFunnel,
+} from "../recommendation-trust/trusted-pipeline";
 import { normalizeUserSneakerContext } from "../diagnosis/sneakerContext";
 import {
   buildRecommendationDisplayReasons,
+  buildRyoAlternativeExplanation,
   createRyoModeCandidateAnchors,
   getRerankingWeights,
   mergeRyoModeCandidatePool,
@@ -60,6 +71,18 @@ export async function recommendCoreV1(
   dependencies: RecommendCoreV1Dependencies = {},
 ): Promise<RecommendationResult> {
   const env = dependencies.env ?? process.env;
+  const externalProvidersDisabled = dependencies.env
+    ? dependencies.env["EXTERNAL_PROVIDERS_DISABLED"] === "true"
+    : process.env.EXTERNAL_PROVIDERS_DISABLED === "true";
+  const providerEnv = externalProvidersDisabled
+    ? {
+        ...env,
+        GEMINI_API_KEY: undefined,
+        RAKUTEN_APPLICATION_ID: undefined,
+        RAKUTEN_ACCESS_KEY: undefined,
+        RAKUTEN_AFFILIATE_ID: undefined,
+      }
+    : env;
   const candidateRepository = dependencies.candidateRepository ?? mockCandidateRepository;
   const preferenceVector = createPreferenceVector({
     answers: input.diagnosisAnswers,
@@ -77,7 +100,7 @@ export async function recommendCoreV1(
   });
   const ryoRerankingEnabled = !isProductJudgement && input.ryoModeAnswers !== undefined;
   const rakutenCandidateProvider = dependencies.rakutenCandidateProvider ??
-    ((providerInput) => fetchRakutenCandidates(providerInput, { env }));
+    ((providerInput) => fetchRakutenCandidates(providerInput, { env: providerEnv }));
 
   const [rawFallbackCandidates, rakutenResult, geminiResearch] = await Promise.all([
     candidateRepository.listCandidates(candidateInput),
@@ -107,9 +130,9 @@ export async function recommendCoreV1(
             mode: input.mode ?? "balanced",
           },
           {
-            ...(env["GEMINI_API_KEY"] ? { apiKey: env["GEMINI_API_KEY"] } : {}),
-            ...(env["GEMINI_RESEARCH_MODEL"] ? { model: env["GEMINI_RESEARCH_MODEL"] } : {}),
-            ...(env["GEMINI_RESEARCH_FALLBACK_MODEL"] ? { fallbackModel: env["GEMINI_RESEARCH_FALLBACK_MODEL"] } : {}),
+            ...(providerEnv["GEMINI_API_KEY"] ? { apiKey: providerEnv["GEMINI_API_KEY"] } : {}),
+            ...(providerEnv["GEMINI_RESEARCH_MODEL"] ? { model: providerEnv["GEMINI_RESEARCH_MODEL"] } : {}),
+            ...(providerEnv["GEMINI_RESEARCH_FALLBACK_MODEL"] ? { fallbackModel: providerEnv["GEMINI_RESEARCH_FALLBACK_MODEL"] } : {}),
             ...(dependencies.geminiFetcher ? { fetcher: dependencies.geminiFetcher } : {}),
           },
         ),
@@ -226,6 +249,14 @@ export async function recommendCoreV1(
     }
   }
 
+  const trustedPool = buildTrustedCandidatePool(candidates);
+  const trustedIds = new Set(trustedPool.candidates.map((candidate) => candidate.id));
+  candidates = trustedPool.candidates;
+  scoredCandidates = buildScoredShortlist(
+    scoredCandidates.filter((entry) => trustedIds.has(entry.candidate.id)),
+    input.mode,
+  );
+
   const rankedRyoCandidates = ryoRerankingEnabled
     ? rerankRyoModeCandidates(scoredCandidates, ryoPreferenceVector, input.mode, userSneakerContext)
     : [];
@@ -251,7 +282,7 @@ export async function recommendCoreV1(
   const generatedExplanation = dependencies.explanationProvider
     ? await dependencies.explanationProvider(explanationInput)
     : await generateCoreV1Explanation(explanationInput, {
-        ...(env["GEMINI_API_KEY"] ? { apiKey: env["GEMINI_API_KEY"] } : {}),
+        ...(providerEnv["GEMINI_API_KEY"] ? { apiKey: providerEnv["GEMINI_API_KEY"] } : {}),
         ...(dependencies.geminiFetcher ? { fetcher: dependencies.geminiFetcher } : {}),
       });
   const researchExplanation = addResearchContext(generatedExplanation, best.candidate);
@@ -261,7 +292,7 @@ export async function recommendCoreV1(
         cautions: [...new Set([...best.contextReasons, ...researchExplanation.cautions])].slice(0, 6),
       }
     : researchExplanation;
-  const geminiConfigured = Boolean(env["GEMINI_API_KEY"]);
+  const geminiConfigured = Boolean(providerEnv["GEMINI_API_KEY"]);
   const selectedRyoEvaluation = buildRyoModeCandidateEvaluation(ryoPreferenceVector, best.candidate);
   const rerankingWeights = getRerankingWeights(ryoSummary);
   const selectedExplicitPreferencePenalty = "explicitPreferencePenalty" in best
@@ -276,6 +307,62 @@ export async function recommendCoreV1(
   const selectedScoreBreakdownV2 = isRyoRerankedCandidate(best) ? best.scoreBreakdownV2 : undefined;
   const selectedStrengthBlend = isRyoRerankedCandidate(best) ? best.strengthBlend : undefined;
   const selectedContextReasons = isRyoRerankedCandidate(best) ? best.contextReasons : undefined;
+  const explanationAudit = auditRecommendationExplanation({
+    candidate: best.candidate,
+    explanation,
+    ...(selectedScoreBreakdownV2 ? { scoreBreakdown: selectedScoreBreakdownV2 } : {}),
+    context: userSneakerContext,
+    ...(input.budgetYen === undefined ? {} : { budgetYen: input.budgetYen }),
+  });
+  const safeExplanation = sanitizeExplanationForDisplay(explanation, explanationAudit.displayClaims);
+  const factualVerification = best.candidate.factualVerification ?? createFactualVerification({
+    model: best.candidate.researchSource === "fallback_catalog" || best.candidate.researchSource === "ryo_anchor"
+      ? "partially_verified"
+      : "unverified",
+    colorway: "unverified",
+    styleCode: "unverified",
+    modelEvidence: [],
+    colorwayEvidence: [],
+    styleCodeEvidence: [],
+    unsupportedClaims: [],
+    contradictions: [],
+  });
+  const trustEvaluation = createRecommendationTrustEvaluation({
+    factual: factualVerification,
+    diagnosisFitScore: selectedScoreBreakdownV2?.userFitScore ?? best.balancedScore.total,
+    ryoAuthenticity: {
+      historyFit: selectedRyoEvaluation.score.breakdown.historyOrigin,
+      materialStoryFit: selectedRyoEvaluation.score.breakdown.materialAging,
+      outfitFit: Math.round((
+        selectedRyoEvaluation.score.breakdown.silhouetteCutWearing
+        + selectedRyoEvaluation.score.breakdown.pantsCompatibility
+      ) / 2),
+      culturalFit: selectedRyoEvaluation.score.breakdown.styleSportContext,
+      adjacentDiscoveryFit: selectedScoreBreakdownV2?.explorationScore
+        ?? selectedRyoEvaluation.score.breakdown.playfulness,
+      collectionRoleFit: selectedRyoEvaluation.score.recommendationScore,
+      wearableColorFit: selectedRyoEvaluation.score.breakdown.colorTaste,
+      tooSafePenalty: selectedRyoSignature?.obviousnessPenalty ?? 0,
+      hypeOnlyPenalty: selectedRyoEvaluation.score.penalties.some((penalty) => /人気|hype/iu.test(penalty))
+        ? 15
+        : 0,
+      contextMismatchPenalty: selectedRyoSignature?.contextMismatchPenalty ?? 0,
+      total: selectedRyoEvaluation.score.totalRyoScore,
+      rubricVersion: "trusted-ryo-v1",
+      reasons: selectedRyoEvaluation.score.matchedSignals,
+      penalties: selectedRyoEvaluation.score.penalties,
+      matchedGoldRules: selectedContextReasons ?? [],
+    },
+    explanationTrust: explanationAudit.evaluation,
+  });
+  const displayCandidateCount = recommendationDisplaySet
+    ? [
+        recommendationDisplaySet.primary,
+        recommendationDisplaySet.practicalAlternative,
+        recommendationDisplaySet.ryoAlternative,
+      ].filter(Boolean).length
+    : 1;
+  const cautionCount = recommendationDisplaySet?.cautionCandidate ? 1 : 0;
 
   return {
     recommendationId: `core-v1:${best.candidate.id}`,
@@ -283,6 +370,8 @@ export async function recommendCoreV1(
     ...best,
     candidate: {
       ...best.candidate,
+      factualVerification,
+      trustEvaluation,
       ryoMetadata: {
         ...selectedRyoEvaluation.culture.metadata,
         ...(selectedRyoSignature ? {
@@ -291,7 +380,14 @@ export async function recommendCoreV1(
         } : {}),
       },
     },
-    explanation,
+    explanation: safeExplanation,
+    explanationTrust: explanationAudit.evaluation,
+    candidateFunnel: createTrustedCandidateFunnel(
+      trustedPool.counts,
+      scoredCandidates.length,
+      displayCandidateCount,
+      cautionCount,
+    ),
     candidateResearch,
     ryoReranking: {
       applied: ryoRerankingEnabled,
@@ -322,6 +418,8 @@ export async function recommendCoreV1(
         cautionCandidate: recommendationDisplaySet.cautionCandidate
           ? toDisplayCandidate(recommendationDisplaySet.cautionCandidate, "caution")
           : null,
+        ryoEmptyReason: recommendationDisplaySet.ryoEmptyReason,
+        coherence: recommendationDisplaySet.coherence,
       },
     } : {}),
     readiness: {
@@ -336,6 +434,23 @@ export async function recommendCoreV1(
   };
 }
 
+function sanitizeExplanationForDisplay(
+  explanation: RecommendationExplanation,
+  displayClaims: readonly { text: string }[],
+): RecommendationExplanation {
+  const allowed = new Set(displayClaims.map((claim) => claim.text));
+  const safeReasons = explanation.reasons.filter((reason) => allowed.has(reason));
+  const safeCautions = explanation.cautions.filter((caution) => allowed.has(caution));
+  const fallbackReason = "診断回答とCoreのスコアを照合して、この候補を選びました。";
+  const fallbackCaution = "価格・在庫・サイズ・真贋は販売元で確認してください。";
+  return {
+    ...explanation,
+    summary: allowed.has(explanation.summary) ? explanation.summary : fallbackReason,
+    reasons: safeReasons.length ? safeReasons : [fallbackReason],
+    cautions: safeCautions.length ? safeCautions : [fallbackCaution],
+  };
+}
+
 function toDisplayCandidate(
   entry: RyoRerankedCandidate,
   role: "practical" | "ryo" | "caution",
@@ -345,6 +460,11 @@ function toDisplayCandidate(
     finalRecommendationScore: entry.finalRecommendationScore,
     scoreBreakdownV2: entry.scoreBreakdownV2,
     reasons: buildRecommendationDisplayReasons(entry, role),
+    role,
+    ...(role === "ryo" ? {
+      ryoEligibility: entry.ryoEligibility,
+      ryoExplanation: buildRyoAlternativeExplanation(entry),
+    } : {}),
   };
 }
 
@@ -376,6 +496,7 @@ function mapGeminiCandidate(
     styleCodeEvidenceUrls: [...candidate.styleCodeEvidenceUrls],
     verificationStatus: candidate.verificationStatus,
     sourceQuality: candidate.sourceQuality,
+    factualVerification: candidate.factualVerification,
     searchKeywords: [...candidate.searchKeywords],
     evidenceUrls: [...candidate.evidenceUrls],
     evidenceLinks: candidate.evidenceLinks.map((link) => ({ ...link })),

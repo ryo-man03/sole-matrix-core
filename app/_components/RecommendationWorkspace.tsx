@@ -16,6 +16,11 @@ import type { AuthState, UserSession } from "../_lib/auth-session/types";
 import type { IntegratedRecommendationResult } from "../_lib/integrated-recommendation/types";
 import type { OnboardingPreferenceHint } from "../_lib/onboarding/types";
 import type { LiveProductUrl } from "../_lib/product-links/types";
+import {
+  readProductJudgementDraft,
+  writeProductJudgementDraft,
+  type ProductJudgementMode,
+} from "../_lib/product-judgement/productJudgementDraft";
 import { retainPreviousProductJudgementOnFailure } from "../_lib/product-judgement/resultRetention";
 import { buildRyoModeContextForRecommendation } from "../_lib/ryo-mode-v4/integration";
 import { buildRyoPreferenceVector } from "../_lib/ryo-mode-v4/vector";
@@ -53,7 +58,7 @@ export function RecommendationWorkspace({
   onboardingHint = null,
   requireSessionSelection = false,
 }: RecommendationWorkspaceProps = {}) {
-  const [mode, setMode] = useState<(typeof workspaceModes)[number]["id"]>("ryo");
+  const [mode, setMode] = useState<ProductJudgementMode>("ryo");
   const [sneakerName, setSneakerName] = useState("");
   const [productUrl, setProductUrl] = useState("");
   const [budgetText, setBudgetText] = useState("");
@@ -75,6 +80,7 @@ export function RecommendationWorkspace({
   const [workspaceStatus, setWorkspaceStatus] = useState("商品名・URL・画像のいずれかを入力してください。予算は任意です。");
   const [analysisStage, setAnalysisStage] = useState<"idle" | "analyzing" | "recommending" | "complete" | "error">("idle");
   const [isShowingRetainedResult, setIsShowingRetainedResult] = useState(false);
+  const [productDraftReady, setProductDraftReady] = useState(false);
   const requestGateRef = useRef(createLatestRequestGate());
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,6 +92,25 @@ export function RecommendationWorkspace({
   ])] : [], [result]);
 
   useEffect(() => { setAnswers(diagnosisAnswers ?? {}); }, [diagnosisAnswers]);
+  useEffect(() => {
+    const draft = readProductJudgementDraft(getBrowserSessionStorage());
+    if (draft) {
+      setMode(draft.mode);
+      setSneakerName(draft.sneakerName);
+      setProductUrl(draft.productUrl);
+      setBudgetText(draft.budgetText);
+    }
+    setProductDraftReady(true);
+  }, []);
+  useEffect(() => {
+    if (!productDraftReady) return;
+    writeProductJudgementDraft(getBrowserSessionStorage(), {
+      mode,
+      sneakerName,
+      productUrl,
+      budgetText,
+    });
+  }, [budgetText, mode, productDraftReady, productUrl, sneakerName]);
   useEffect(() => {
     if (onboardingHint?.preferredBudgetYen) setBudgetText((current) => current || String(onboardingHint.preferredBudgetYen));
   }, [onboardingHint]);
@@ -363,6 +388,14 @@ export function RecommendationWorkspace({
 
 function formatFileSize(bytes: number): string {
   return bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)}KB` : `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
+
+function getBrowserSessionStorage(): Storage | undefined {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return undefined;
+  }
 }
 
 async function createDemoSneakerFile(): Promise<File> {

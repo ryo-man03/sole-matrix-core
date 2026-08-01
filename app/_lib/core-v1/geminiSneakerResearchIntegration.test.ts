@@ -4,7 +4,7 @@ import { isGeminiResearchShowcaseReady } from "./readiness";
 describe("Gemini candidate research and Core re-evaluation", () => {
   it("validates Gemini candidates and keeps the final decision in Core", async () => {
     const fetcher = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(groundedResponse("adidas SAMBA OG は実在するクラシックモデルです。", "adidas SAMBA OG", "https://source.example/samba"))
+      .mockResolvedValueOnce(groundedResponse("adidas SAMBA OG は実在するクラシックモデルです。", "adidas SAMBA OG", "https://www.adidas.jp/samba-og"))
       .mockResolvedValueOnce(geminiResponse(JSON.stringify({ candidates: [
         { brand: "adidas", modelName: "クラシック・デイリー型", colorwayName: null, styleCode: null, modelType: "抽象", reason: "invalid", cautions: [], searchKeywords: ["クラシック・デイリー型"], confidence: 0.9 },
         { brand: "adidas", modelName: "adidas SAMBA OG", colorwayName: null, styleCode: null, modelType: "クラシック・デイリー", reason: "診断のクラシック志向に合います。", cautions: ["サイズを確認してください。"], searchKeywords: ["adidas SAMBA OG"], confidence: 0.8 },
@@ -23,11 +23,11 @@ describe("Gemini candidate research and Core re-evaluation", () => {
       colorwayName: null,
       styleCode: null,
       verificationStatus: "model_verified_colorway_unverified",
-      sourceQuality: "unknown",
+      sourceQuality: "official",
     });
     expect(result.candidate.researchSource).toBe("gemini");
     expect(result.candidate.evidenceLinks).toEqual([
-      { url: "https://source.example/samba", type: "gemini_citation_url" },
+      { url: "https://www.adidas.jp/samba-og", type: "gemini_citation_url" },
       { url: "https://www.google.com/search?q=adidas%20Samba%20OG", type: "search_entry_url" },
     ]);
     expect(result.candidateResearch).toMatchObject({ source: "gemini", reasonCode: "gemini_success", validCandidateCount: 1, coreReevaluated: true, modelUsed: "gemini-2.5-flash", usedFallbackModel: false, stages: { grounding: { status: "ready", evidenceUrlCount: 1 }, normalization: { status: "ready", repairAttempted: false, candidateCount: 1 } } });
@@ -52,6 +52,34 @@ describe("Gemini candidate research and Core re-evaluation", () => {
     expect(result.candidate.name).toMatch(/adidas|New Balance|Nike|PUMA|Vans|Converse|ASICS/);
     expect(result.candidate.evidenceUrls?.length).toBeGreaterThan(0);
     expect(isGeminiResearchShowcaseReady(result)).toBe(false);
+  });
+
+  it("disables every external provider for deterministic QA even when keys exist", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const result = await recommendCoreV1(
+      {
+        diagnosisAnswers: [{ questionId: "walking-comfort", value: "like" }],
+        preferenceTags: [],
+        mode: "balanced",
+      },
+      {
+        env: {
+          EXTERNAL_PROVIDERS_DISABLED: "true",
+          GEMINI_API_KEY: "configured-but-disabled",
+          RAKUTEN_APPLICATION_ID: "configured-but-disabled",
+          RAKUTEN_ACCESS_KEY: "configured-but-disabled",
+        },
+        geminiFetcher: fetcher,
+      },
+    );
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(result.candidateResearch).toMatchObject({
+      source: "fallback_catalog",
+      reasonCode: "missing_api_key",
+    });
+    expect(result.readiness.geminiExplanation.status).toBe("not_configured");
+    expect(result.readiness.rakuten.status).toBe("missing_config");
   });
 
   it("does not mark candidate research ready when only Gemini explanation succeeds", async () => {

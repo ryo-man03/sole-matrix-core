@@ -187,7 +187,13 @@ export function sanitizeUserReason(value: unknown): string {
 
 function resolveCorpusPath(options: CorpusOptions): string {
   const rootDir = path.resolve(
-    options.rootDir ?? path.join(process.cwd(), "data", "recommendation-feedback"),
+    /*turbopackIgnore: true*/
+    options.rootDir
+      ?? path.join(
+        /*turbopackIgnore: true*/ process.cwd(),
+        "data",
+        "recommendation-feedback",
+      ),
   );
   const fileName = options.fileName ?? defaultFileName;
   if (

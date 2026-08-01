@@ -12,11 +12,17 @@ import type {
 } from "../ai/gemini-sneaker-research-schema";
 import type {
   RyoCandidateMetadata,
+  RecommendationSetCoherence,
   RyoRecommendationBucket,
+  RyoRoleEligibility,
+  RyoRoleExplanation,
   RyoScoreBreakdownV2,
   RyoSignatureMetadata,
   RyoStrengthBlend,
 } from "../ryo-mode-v4/types";
+import type { FactualVerification, RecommendationTrustEvaluation } from "../recommendation-trust/types";
+import type { ExplanationTrustEvaluation } from "../recommendation-trust/types";
+import type { TrustedCandidateFunnel } from "../recommendation-trust/trusted-pipeline";
 
 export type DiagnosisAnswerValue = "like" | "neutral" | "dislike";
 
@@ -87,6 +93,8 @@ export type CandidateProfile = {
   researchCautions?: string[];
   researchSource?: CandidateResearchSource;
   ryoMetadata?: RyoCandidateMetadata;
+  factualVerification?: FactualVerification;
+  trustEvaluation?: RecommendationTrustEvaluation;
 };
 
 export type BalancedScore = {
@@ -170,6 +178,8 @@ export type RecommendationResult = {
   ryoScore: RyoScore;
   decision: Decision;
   explanation: RecommendationExplanation;
+  explanationTrust?: ExplanationTrustEvaluation;
+  candidateFunnel?: TrustedCandidateFunnel;
   readiness: {
     geminiResearch: GeminiCapabilityReadiness;
     geminiExplanation: GeminiCapabilityReadiness;
@@ -207,6 +217,8 @@ export type RecommendationResult = {
     practicalAlternative: RecommendationDisplayCandidate | null;
     ryoAlternative: RecommendationDisplayCandidate | null;
     cautionCandidate: RecommendationDisplayCandidate | null;
+    ryoEmptyReason: string | null;
+    coherence: RecommendationSetCoherence;
   };
 };
 
@@ -215,6 +227,9 @@ export type RecommendationDisplayCandidate = {
   finalRecommendationScore: number;
   scoreBreakdownV2: RyoScoreBreakdownV2;
   reasons: string[];
+  role: "practical" | "ryo" | "caution";
+  ryoEligibility?: RyoRoleEligibility;
+  ryoExplanation?: RyoRoleExplanation;
 };
 
 export type FeedbackSentiment = "helpful" | "not_helpful" | "unsure";

@@ -255,7 +255,8 @@ describe("Ryo Mode v4 candidate pool and reranking", () => {
       rakutenCandidateProvider: async () => ({ status: "missing_config", candidates: [], evidence: [], readiness: { provider: "rakuten", status: "missing_config", detail: "missing" }, networkAttempted: false, responseOk: false, shapeValid: false }),
     });
     expect(result.ryoReranking).toMatchObject({ applied: true, strength: "strong", existingCoreWeight: 0.3, recommendationWeight: 0.7 });
-    expect(result.ryoReranking.candidatePoolSize).toBeGreaterThan(10);
+    expect(result.ryoReranking.candidatePoolSize).toBeGreaterThanOrEqual(3);
+    expect(result.ryoReranking.candidatePoolSize).toBeLessThanOrEqual(8);
     expect(result.candidate.name).not.toMatch(/Samba|CM996/i);
     expect(result.candidate.name).not.toBe('Nike Air Force 1 Low "White/White"');
     expect(result.candidate.name).toMatch(/One Star|Jack Purcell|PUMA|Superstar|Pro Leather|Blazer|Terminator|Vans|Reebok/i);

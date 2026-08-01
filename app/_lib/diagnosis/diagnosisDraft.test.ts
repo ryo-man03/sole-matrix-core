@@ -105,7 +105,8 @@ describe("diagnosis draft", () => {
     const boundarySource = readFileSync(new URL("../../_components/ProductSessionBoundary.tsx", import.meta.url), "utf8");
     const panelSource = readFileSync(new URL("../../_components/CoreV1RecommendationPanel.tsx", import.meta.url), "utf8");
     expect(flowSource).toContain("if (draft.completed)");
-    expect(boundarySource).toContain('setExperienceMode("diagnosis")');
+    expect(boundarySource).toContain('setExperienceModeState("diagnosis")');
+    expect(boundarySource).toContain("diagnosis: true");
     expect(flowSource).not.toMatch(/if \(draft\.completed\)[\s\S]{0,500}handleRecommend\(/);
     expect(panelSource).toContain("onClick={handleRecommend}");
     expect(panelSource).not.toMatch(/useEffect\(\(\) => \{[^}]*handleRecommend\(/s);
