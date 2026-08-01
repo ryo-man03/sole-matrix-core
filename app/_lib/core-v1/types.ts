@@ -12,7 +12,10 @@ import type {
 } from "../ai/gemini-sneaker-research-schema";
 import type {
   RyoCandidateMetadata,
+  RecommendationSetCoherence,
   RyoRecommendationBucket,
+  RyoRoleEligibility,
+  RyoRoleExplanation,
   RyoScoreBreakdownV2,
   RyoSignatureMetadata,
   RyoStrengthBlend,
@@ -214,6 +217,8 @@ export type RecommendationResult = {
     practicalAlternative: RecommendationDisplayCandidate | null;
     ryoAlternative: RecommendationDisplayCandidate | null;
     cautionCandidate: RecommendationDisplayCandidate | null;
+    ryoEmptyReason: string | null;
+    coherence: RecommendationSetCoherence;
   };
 };
 
@@ -222,6 +227,9 @@ export type RecommendationDisplayCandidate = {
   finalRecommendationScore: number;
   scoreBreakdownV2: RyoScoreBreakdownV2;
   reasons: string[];
+  role: "practical" | "ryo" | "caution";
+  ryoEligibility?: RyoRoleEligibility;
+  ryoExplanation?: RyoRoleExplanation;
 };
 
 export type FeedbackSentiment = "helpful" | "not_helpful" | "unsure";

@@ -5,7 +5,12 @@ import type { DiagnosisAnswerId } from "../_data/preferenceDiagnosisQuestions";
 import type { CandidateResearchSource, FeedbackSentiment, PreferenceVector, RecommendationDisplayCandidate, RecommendationResult } from "../_lib/core-v1/types";
 import type { UserSneakerContext } from "../_lib/diagnosis/sneakerContext";
 import { buildRyoModeCandidateEvaluation, buildRyoModeContextForRecommendation } from "../_lib/ryo-mode-v4/integration";
-import { createRecommendationFeedbackId, saveRecommendationFeedback, type RecommendationFeedbackUsefulness } from "../_lib/recommendation-feedback/localStorage";
+import {
+  createRecommendationFeedbackId,
+  saveRecommendationFeedback,
+  type RecommendationFeedbackReason,
+  type RecommendationFeedbackUsefulness,
+} from "../_lib/recommendation-feedback/localStorage";
 import type { RyoPreferenceVector } from "../_lib/ryo-mode-v4/types";
 import { resolveRecommendationProductLinks } from "../_lib/apiClient";
 import type { LiveProductUrl } from "../_lib/product-links/types";
@@ -64,11 +69,28 @@ const candidateSourceLabels: Record<CandidateResearchSource, string> = {
   ryo_anchor: "Core候補（Ryo anchor）",
 };
 
+const recommendationFeedbackReasons: readonly {
+  id: RecommendationFeedbackReason;
+  label: string;
+}[] = [
+  { id: "model_mismatch", label: "このモデル自体が違う" },
+  { id: "role_mismatch", label: "モデルは良いが役割が違う" },
+  { id: "ryo_role_mismatch", label: "Ryo枠として違う" },
+  { id: "good_as_practical", label: "実用枠としては良い" },
+  { id: "set_incoherent", label: "候補同士のつながりが弱い" },
+  { id: "too_safe", label: "無難すぎる" },
+  { id: "rare_only", label: "珍しいだけに見える" },
+  { id: "wardrobe_mismatch", label: "服装に合わない" },
+  { id: "purpose_mismatch", label: "用途に合わない" },
+  { id: "owned_too_similar", label: "所有モデルと近すぎる" },
+] as const;
+
 export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPreferenceVector, selectedAnswerByQuestionId, userSneakerContext }: Props) {
   const [result, setResult] = useState<RecommendationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [feedbackComment, setFeedbackComment] = useState("");
+  const [feedbackReason, setFeedbackReason] = useState<RecommendationFeedbackReason | "">("");
   const [feedbackState, setFeedbackState] = useState<"idle" | "saving" | "saved" | "needs_usefulness" | "error">("idle");
   const [feedbackSummary, setFeedbackSummary] = useState("");
   const [feedbackSavedAt, setFeedbackSavedAt] = useState("");
@@ -86,6 +108,7 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
     setIsLoading(true);
     setErrorMessage("");
     setFeedbackState("idle");
+    setFeedbackReason("");
     gateRef.current.invalidate();
     try {
       const response = await requestProviderJson<RecommendApiResponse>({
@@ -167,6 +190,7 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
         resultModelName: result.candidate.modelName ?? result.candidate.name,
         decision: result.decision,
         usefulness,
+        ...(feedbackReason ? { reason: feedbackReason } : {}),
         comment: feedbackComment.trim(),
         ryoMode: {
           ...(evaluation.culture.metadata.templateIds ? { templates: evaluation.culture.metadata.templateIds } : {}),
@@ -185,7 +209,8 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
           source: result.candidate.researchSource ?? result.candidateResearch.source,
         },
       });
-      setFeedbackSummary(`${sentimentLabel(sentiment)} / ${feedbackComment.trim() ? "コメントあり" : "コメントなし"}`);
+      const selectedReasonLabel = recommendationFeedbackReasons.find((item) => item.id === feedbackReason)?.label;
+      setFeedbackSummary(`${sentimentLabel(sentiment)} / ${selectedReasonLabel ?? "理由未選択"} / ${feedbackComment.trim() ? "コメントあり" : "コメントなし"}`);
       setFeedbackSavedAt(now.toLocaleString("ja-JP"));
       setFeedbackState("saved");
       void fetch("/api/core-v1/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recommendationId: result.recommendationId, sentiment, ...(feedbackComment.trim() ? { comment: feedbackComment.trim() } : {}) }) }).catch(() => undefined);
@@ -230,7 +255,7 @@ export function CoreV1RecommendationPanel({ onRecommendationComplete, ryoPrefere
         <RakutenMarketFind candidate={result.candidate} key={result.recommendationId} />
         <MarketIntelligencePanel candidate={result.candidate} key={`market-${result.recommendationId}`} />
         <details className="result-detail-accordion"><summary>診断ベクトルと外部API状態を見る</summary><section className="core-v1-vector" aria-labelledby="core-v1-vector-title"><p className="diagnosis-summary-kicker">PreferenceVector</p><h4 id="core-v1-vector-title">診断ベクトル</h4><dl>{(Object.keys(vectorLabels) as (keyof PreferenceVector)[]).map((axis) => <div key={axis}><dt>{vectorLabels[axis]}</dt><dd>{result.preferenceVector[axis]}</dd></div>)}</dl></section><section className="core-v1-readiness" aria-labelledby="core-v1-readiness-title"><p className="diagnosis-summary-kicker">Readiness</p><h4 id="core-v1-readiness-title">外部APIの状態</h4><div><strong data-status={result.readiness.geminiResearch.status}>Gemini候補調査: {result.readiness.geminiResearch.status}</strong><p>{result.readiness.geminiResearch.detail}</p></div><div><strong data-research-stage="grounding" data-status={result.candidateResearch.stages.grounding.status}>Google Search Grounding: {result.candidateResearch.stages.grounding.status}</strong><p>Grounding由来の引用URL: {result.candidateResearch.stages.grounding.evidenceUrlCount}件</p></div><div><strong data-research-stage="normalization" data-status={result.candidateResearch.stages.normalization.status}>JSON整形・schema検証: {result.candidateResearch.stages.normalization.status}</strong><p>検証済み候補: {result.candidateResearch.stages.normalization.candidateCount}件 / JSON repair: {result.candidateResearch.stages.normalization.repairAttempted ? "実行" : "未実行"}</p></div><div><strong data-status={result.readiness.geminiExplanation.status}>Gemini補助説明: {result.readiness.geminiExplanation.status}</strong><p>{result.readiness.geminiExplanation.detail}</p></div><div><strong data-status={result.readiness.rakuten.status}>Rakuten: {result.readiness.rakuten.status}</strong><p>{result.readiness.rakuten.detail}</p></div></section></details>
-        <section className="core-v1-feedback" aria-labelledby="core-v1-feedback-title"><p className="diagnosis-summary-kicker">Feedback</p><h4 id="core-v1-feedback-title">この結果は役に立ちましたか？</h4><textarea maxLength={500} onChange={(event) => { setFeedbackComment(event.target.value); if (feedbackState !== "saving") setFeedbackState("idle"); }} placeholder="任意のコメント" value={feedbackComment} /><div><button onClick={() => handleFeedback("helpful")} type="button">役に立った</button><button onClick={() => handleFeedback("unsure")} type="button">まだ分からない</button><button onClick={() => handleFeedback("not_helpful")} type="button">改善してほしい</button><button onClick={handleCommentOnlySave} type="button">コメントを保存</button></div><p aria-live="polite">{feedbackState === "saving" ? "保存中…" : feedbackState === "saved" ? "フィードバックをこの端末に保存しました。" : feedbackState === "needs_usefulness" ? "評価ボタンを選んでください。" : feedbackState === "error" ? "フィードバックを保存できませんでした。もう一度試してください。" : null}</p>{feedbackState === "saved" && feedbackSummary ? <div data-feedback-saved-summary><p>保存した内容: {feedbackSummary}</p><p>保存日時: {feedbackSavedAt}</p></div> : null}</section>
+        <section className="core-v1-feedback" aria-labelledby="core-v1-feedback-title"><p className="diagnosis-summary-kicker">Feedback</p><h4 id="core-v1-feedback-title">この結果は役に立ちましたか？</h4><label>気になった点（任意）<select onChange={(event) => { setFeedbackReason(event.target.value as RecommendationFeedbackReason | ""); if (feedbackState !== "saving") setFeedbackState("idle"); }} value={feedbackReason}><option value="">選択しない</option>{recommendationFeedbackReasons.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><textarea maxLength={500} onChange={(event) => { setFeedbackComment(event.target.value); if (feedbackState !== "saving") setFeedbackState("idle"); }} placeholder="任意のコメント" value={feedbackComment} /><div><button onClick={() => handleFeedback("helpful")} type="button">役に立った</button><button onClick={() => handleFeedback("unsure")} type="button">まだ分からない</button><button onClick={() => handleFeedback("not_helpful")} type="button">改善してほしい</button><button onClick={handleCommentOnlySave} type="button">コメントを保存</button></div><p aria-live="polite">{feedbackState === "saving" ? "保存中…" : feedbackState === "saved" ? "フィードバックをこの端末に保存しました。" : feedbackState === "needs_usefulness" ? "評価ボタンを選んでください。" : feedbackState === "error" ? "フィードバックを保存できませんでした。もう一度試してください。" : null}</p>{feedbackState === "saved" && feedbackSummary ? <div data-feedback-saved-summary><p>保存した内容: {feedbackSummary}</p><p>保存日時: {feedbackSavedAt}</p></div> : null}</section>
       </div> : null}
     </section>
   );
@@ -276,7 +301,11 @@ function RecommendationAlternatives({
       ? { label: "現実的な別案", item: displaySet.practicalAlternative, tone: "practical" }
       : null,
     displaySet.ryoAlternative
-      ? { label: "Ryo Modeらしい別案", item: displaySet.ryoAlternative, tone: "ryo" }
+      ? {
+          label: ryoRoleLabel(displaySet.ryoAlternative),
+          item: displaySet.ryoAlternative,
+          tone: "ryo",
+        }
       : null,
   ].filter((entry): entry is {
     label: string;
@@ -284,10 +313,12 @@ function RecommendationAlternatives({
     tone: string;
   } => Boolean(entry));
 
-  if (!alternatives.length && !displaySet.cautionCandidate) return null;
-
   return (
-    <section className="recommendation-alternatives" aria-labelledby="recommendation-alternatives-title">
+    <section
+      className="recommendation-alternatives"
+      aria-labelledby="recommendation-alternatives-title"
+      data-recommendation-coherent={displaySet.coherence.coherent ? "true" : "false"}
+    >
       <p className="diagnosis-summary-kicker">Other routes</p>
       <h4 id="recommendation-alternatives-title">別の選び方</h4>
       {alternatives.length ? (
@@ -295,6 +326,12 @@ function RecommendationAlternatives({
           {alternatives.map(({ item, label, tone }) => (
             <AlternativeCandidateCard item={item} key={label} label={label} tone={tone} />
           ))}
+        </div>
+      ) : null}
+      {!displaySet.ryoAlternative && displaySet.ryoEmptyReason ? (
+        <div className="core-v1-empty" data-ryo-empty-state>
+          <strong>Ryo枠は空欄です</strong>
+          <p>{displaySet.ryoEmptyReason}</p>
         </div>
       ) : null}
       {displaySet.cautionCandidate ? (
@@ -331,8 +368,27 @@ function AlternativeCandidateCard({
       {presentation.colorwayName ? <p>カラー: <strong>{presentation.colorwayName}</strong></p> : null}
       {presentation.colorwayMessage ? <p className="verified-candidate-unverified">{presentation.colorwayMessage}</p> : null}
       {item.reasons.length ? <ul>{item.reasons.slice(0, 3).map((reason) => <li key={reason}>{reason}</li>)}</ul> : null}
+      {tone === "ryo" && item.ryoExplanation ? (
+        <details className="result-detail-accordion" data-ryo-role-explanation>
+          <summary>Ryo枠の根拠と注意点</summary>
+          <dl className="diagnosis-summary-list">
+            <div className="diagnosis-summary-item"><dt>なぜRyo枠か</dt><dd>{item.ryoExplanation.whyRyo}</dd></div>
+            <div className="diagnosis-summary-item"><dt>一致した回答</dt><dd>{item.ryoExplanation.matchedAnswers.join(" / ")}</dd></div>
+            <div className="diagnosis-summary-item"><dt>文化・素材・服装の根拠</dt><dd>{item.ryoExplanation.evidence.join(" / ")}</dd></div>
+            <div className="diagnosis-summary-item"><dt>Primaryではない理由</dt><dd>{item.ryoExplanation.whyNotPrimary}</dd></div>
+            <div className="diagnosis-summary-item"><dt>実用枠ではない理由</dt><dd>{item.ryoExplanation.whyNotPractical}</dd></div>
+            <div className="diagnosis-summary-item"><dt>注意点</dt><dd>{item.ryoExplanation.caution}</dd></div>
+          </dl>
+        </details>
+      ) : null}
     </article>
   );
+}
+
+function ryoRoleLabel(item: RecommendationDisplayCandidate): string {
+  if (item.ryoEligibility?.affinityTier === "core") return "Ryoの中心候補";
+  if (item.ryoEligibility?.affinityTier === "adjacent") return "条件が合ったRyo隣接候補";
+  return "条件付きRyo候補";
 }
 
 function formatEvidenceKinds(evidenceLinks: RecommendationResult["candidate"]["evidenceLinks"]): string {

@@ -16,6 +16,7 @@ import {
 import { normalizeUserSneakerContext } from "../diagnosis/sneakerContext";
 import {
   buildRecommendationDisplayReasons,
+  buildRyoAlternativeExplanation,
   createRyoModeCandidateAnchors,
   getRerankingWeights,
   mergeRyoModeCandidatePool,
@@ -417,6 +418,8 @@ export async function recommendCoreV1(
         cautionCandidate: recommendationDisplaySet.cautionCandidate
           ? toDisplayCandidate(recommendationDisplaySet.cautionCandidate, "caution")
           : null,
+        ryoEmptyReason: recommendationDisplaySet.ryoEmptyReason,
+        coherence: recommendationDisplaySet.coherence,
       },
     } : {}),
     readiness: {
@@ -457,6 +460,11 @@ function toDisplayCandidate(
     finalRecommendationScore: entry.finalRecommendationScore,
     scoreBreakdownV2: entry.scoreBreakdownV2,
     reasons: buildRecommendationDisplayReasons(entry, role),
+    role,
+    ...(role === "ryo" ? {
+      ryoEligibility: entry.ryoEligibility,
+      ryoExplanation: buildRyoAlternativeExplanation(entry),
+    } : {}),
   };
 }
 

@@ -2036,6 +2036,7 @@ h1 {
 }
 
 .core-v1-budget-field input,
+.core-v1-feedback select,
 .core-v1-feedback textarea {
   width: 100%;
   border: 1px solid rgba(35, 43, 55, 0.16);
@@ -2092,6 +2093,19 @@ h1 {
   gap: 18px;
   border-top: 1px solid rgba(35, 43, 55, 0.12);
   padding-top: 22px;
+}
+
+.core-v1-feedback > label {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  color: #252d38;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.core-v1-feedback select {
+  min-height: 44px;
 }
 
 .core-v1-result > * {

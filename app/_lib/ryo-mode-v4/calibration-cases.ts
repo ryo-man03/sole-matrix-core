@@ -49,7 +49,7 @@ export const RYO_CALIBRATION_CASES: readonly RyoCalibrationCase[] = [
   }, ["All Star J", "TimeLine", "Addict"], ["Converse All Star Hi Black"], ["キャンバス", "デニム"]),
   calibration("normcore-first-pair", "ノームコア・予算1万円台・最初の一足", {
     style: "normcore", pantsFit: "straight_pants", taste: "simple", budget: "under_15000", ryoStrength: "beginner_ryo",
-  }, ["Jack Purcell", "Reebok Club C", "Reebok Classic", "Vans Authentic"], ["TimeLine", "Addict"], ["予算"]),
+  }, ["Jack Purcell", "Reebok Club C", "Reebok Classic", "Vans Authentic", "Nike Cortez Leather"], ["TimeLine", "Addict"], ["予算"]),
   calibration("street-wide-black-basketball", "ストリート・太め・白黒・バスケット", {
     style: "street", pantsFit: "wide_pants", sportOrigin: "basketball", cut: "high", color: "black_white", ryoStrength: "ryo_mode",
   }, ["Air Jordan 1 High", "Terminator High", "Superstar Vintage", "PUMA Suede"], ['Air Force 1 Low "White/White"'], ["バスケット"]),
@@ -73,7 +73,7 @@ export const RYO_CALIBRATION_CASES: readonly RyoCalibrationCase[] = [
   }, ["Converse", "PUMA", "adidas", "Vans", "Reebok", "Nike Cortez"], ["Air Max 95", "New Balance 1906", "New Balance 9060"], ["クラシック"], ["Ryo classic"]),
   calibration("first-pair-tennis", "テニス由来の最初の一足", {
     style: "clean_casual", sportOrigin: "tennis", taste: "simple", budget: "under_15000", ryoStrength: "beginner_ryo",
-  }, ["Reebok Club C", "Converse Jack Purcell", "Reebok Classic Leather"], ["TimeLine", "Addict"], ["合わせ"]),
+  }, ["Reebok Club C", "Converse Jack Purcell", "Reebok Classic Leather", "Nike Cortez Leather"], ["TimeLine", "Addict"], ["合わせ"]),
   calibration("daily-black-white", "普段使いの白黒ローテーション", {
     style: "normcore", color: "black_white", taste: "simple", budget: "under_20000",
   }, ["Jack Purcell", "Reebok", "Vans Authentic", "PUMA"], [], ["白黒"]),
@@ -124,7 +124,7 @@ export const RYO_CALIBRATION_CASES: readonly RyoCalibrationCase[] = [
   }, ["TimeLine", "Addict", "All Star J VTG", "Jack Purcell 1935"], ["Converse All Star Hi Black"], ["復刻"], [], { purchasePurpose: "archive_collection" }),
   calibration("owned-exact-all-star-j", "所有モデルとの完全一致を避ける", {
     style: "amekaji", pantsFit: "denim", cut: "high", materialAging: "canvas_fading", ryoStrength: "ryo_mode",
-  }, ["TimeLine", "Addict", "All Star J VTG", "Converse One Star", "Nike Blazer"], ["Converse All Star J Hi"], ["重複"], [], { purchasePurpose: "second_pair", ownedModels: ["Converse All Star J Hi"] }),
+  }, ["TimeLine", "Addict", "All Star J VTG", "Converse One Star", "Vans Authentic", "Vans Era"], ["Converse All Star J Hi"], ["重複"], [], { purchasePurpose: "second_pair", ownedModels: ["Converse All Star J Hi"] }),
   calibration("disliked-samba-model", "避けたいSambaを1位にしない", {
     style: "clean_casual", sportOrigin: "football", pantsFit: "straight_pants", materialAging: "suede_fading_nap", color: "cream_gum",
   }, ["adidas Tobacco", "adidas London", "adidas Hamburg", "adidas Handball Spezial", "adidas Country", "adidas Japan"], ["adidas Samba"], ["スエード"], [], { dislikedModels: ["adidas Samba OG"] }),
