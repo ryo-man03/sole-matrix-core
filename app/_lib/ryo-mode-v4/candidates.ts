@@ -1,5 +1,6 @@
 import type { SneakerTag } from "../../../src/domain/sneaker/sneakerTag";
 import type { SneakerVector } from "../../../src/domain/sneaker/sneakerVector";
+import { matchesCanonicalContextName } from "../../../src/domain/identity/canonicalSneaker";
 import { calculateLocalBudgetFit } from "../core-v1/repository";
 import type { BalancedScore, CandidateProfile, Decision, RyoScore } from "../core-v1/types";
 import {
@@ -479,11 +480,7 @@ function candidateBrand(candidate: CandidateProfile): string {
 }
 
 function isExactContextMatch(candidateName: string, contextNames: readonly string[]): boolean {
-  const candidate = comparableName(candidateName);
-  return contextNames.some((name) => {
-    const context = comparableName(name);
-    return candidate === context || candidate.includes(context) || context.includes(candidate);
-  });
+  return contextNames.some((name) => matchesCanonicalContextName(candidateName, name));
 }
 
 export function evaluateExplicitPreferenceGuards(

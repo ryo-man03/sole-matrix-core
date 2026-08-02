@@ -1,4 +1,5 @@
 import type { CandidateProfile } from "../core-v1/types";
+import { matchesCanonicalContextName } from "../../../src/domain/identity/canonicalSneaker";
 import {
   normalizeUserSneakerContext,
   type UserSneakerContext,
@@ -665,11 +666,7 @@ function dedupeReasons(reasons: readonly RyoEligibilityReason[]): RyoEligibility
 }
 
 function isContextMatch(candidateName: string, contextNames: readonly string[]): boolean {
-  const candidate = comparable(candidateName);
-  return contextNames.some((name) => {
-    const context = comparable(name);
-    return candidate === context || candidate.includes(context) || context.includes(candidate);
-  });
+  return contextNames.some((name) => matchesCanonicalContextName(candidateName, name));
 }
 
 function sameModelFamily(left: string, right: string): boolean {
