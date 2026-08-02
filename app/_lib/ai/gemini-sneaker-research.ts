@@ -15,6 +15,11 @@ import {
   type GeminiSneakerResearchResult,
 } from "./gemini-sneaker-research-schema";
 import { evaluateFactualCandidate } from "../recommendation-trust/factual-verification";
+import {
+  colorwaySourceTypeFromQuality,
+  verifyColorwayProposal,
+  type ColorwayEvidence,
+} from "../recommendation-trust/colorway-verification";
 
 const defaultModel = "gemini-2.5-flash";
 const requestTimeoutMs = 30_000;
@@ -365,19 +370,39 @@ function attachTrustedEvidence(
     ...modelEvidenceUrls,
     ...colorwayEvidenceUrls,
   ]);
-  const verifiedColorway = candidate.colorwayName
-    && colorwayEvidenceUrls.length > 0
-    && candidateSourceQuality !== "unknown"
-    ? candidate.colorwayName
-    : null;
   const styleCodeEvidenceUrls = candidate.sourceStyleCode
     ? findStyleCodeEvidenceUrls(candidate.sourceStyleCode, modelTokens, grounding)
     : [];
-  const verifiedStyleCode = styleCodeEvidenceUrls.length > 0 ? candidate.styleCode : null;
+  const evidenceUrlSet = validateEvidenceUrls([
+    ...modelEvidenceUrls,
+    ...colorwayEvidenceUrls,
+    ...styleCodeEvidenceUrls,
+  ]);
+  const colorwayEvidence: ColorwayEvidence[] = evidenceUrlSet.map((url) => ({
+    sourceType: colorwaySourceTypeFromQuality(classifyEvidenceSourceQuality([url])),
+    url,
+    modelName: candidate.modelName,
+    colorwayName: colorwayEvidenceUrls.includes(url) ? candidate.colorwayName : null,
+    styleCode: styleCodeEvidenceUrls.includes(url) ? candidate.styleCode : null,
+    sourceTitle: grounding.chunks.find((chunk) => chunk?.url === url)?.title ?? null,
+    fetchedAt: new Date().toISOString(),
+    supportsModel: modelEvidenceUrls.includes(url),
+    supportsColorway: colorwayEvidenceUrls.includes(url),
+    supportsStyleCode: styleCodeEvidenceUrls.includes(url),
+  }));
+  const colorwayVerification = verifyColorwayProposal({
+    proposedModelName: candidate.modelName,
+    proposedColorwayName: candidate.colorwayName,
+    proposedStyleCode: candidate.styleCode,
+    searchAliases: candidate.searchKeywords,
+    proposedReasons: [candidate.reason],
+    sourceHints: evidenceUrlSet.map((url) => ({ url, sourceType: classifyEvidenceSourceQuality([url]) })),
+    confidence: candidate.confidence >= 0.8 ? "high" : candidate.confidence >= 0.5 ? "medium" : "low",
+  }, colorwayEvidence);
   const evidenceUrls = validateEvidenceUrls([
     ...modelEvidenceUrls,
-    ...(verifiedColorway ? colorwayEvidenceUrls : []),
-    ...(verifiedStyleCode ? styleCodeEvidenceUrls : []),
+    ...(colorwayVerification.colorwayName ? colorwayEvidenceUrls : []),
+    ...(colorwayVerification.styleCode ? styleCodeEvidenceUrls : []),
   ]);
 
   const evidenceLinks: GeminiResearchEvidenceLink[] = [
@@ -393,11 +418,11 @@ function attachTrustedEvidence(
   const factualResult = evaluateFactualCandidate({
     brand: publicCandidate.brand,
     modelName: publicCandidate.modelName,
-    colorwayName: verifiedColorway,
-    styleCode: verifiedStyleCode,
+    colorwayName: colorwayVerification.colorwayName,
+    styleCode: colorwayVerification.styleCode,
     modelEvidenceUrls,
-    colorwayEvidenceUrls: verifiedColorway ? colorwayEvidenceUrls : [],
-    styleCodeEvidenceUrls: verifiedStyleCode ? styleCodeEvidenceUrls : [],
+    colorwayEvidenceUrls: colorwayVerification.colorwayName ? colorwayEvidenceUrls : [],
+    styleCodeEvidenceUrls: colorwayVerification.styleCode ? styleCodeEvidenceUrls : [],
     groundingText: grounding.text,
   });
   if (!factualResult.acceptedForRecommendation) return null;
@@ -406,8 +431,8 @@ function attachTrustedEvidence(
     colorwayName: factualResult.colorwayName,
     styleCode: factualResult.styleCode,
     modelEvidenceUrls,
-    colorwayEvidenceUrls: verifiedColorway ? colorwayEvidenceUrls : [],
-    styleCodeEvidenceUrls: verifiedStyleCode ? styleCodeEvidenceUrls : [],
+    colorwayEvidenceUrls: colorwayVerification.colorwayName ? colorwayEvidenceUrls : [],
+    styleCodeEvidenceUrls: colorwayVerification.styleCode ? styleCodeEvidenceUrls : [],
     evidenceUrls,
     evidenceLinks,
     verificationStatus: factualResult.verificationStatus,

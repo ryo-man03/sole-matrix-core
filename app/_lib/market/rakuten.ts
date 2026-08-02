@@ -136,10 +136,10 @@ export async function searchRakutenProducts(
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetchRakutenWithPolicy(url, {
       method: "GET",
       headers,
-      next: { revalidate: 60 * 30 },
+      cache: "no-store",
     });
   } catch {
     throw new RakutenApiError("Rakuten API request failed.", "network_error");
@@ -174,6 +174,22 @@ export async function searchRakutenProducts(
     .filter(isRecord)
     .map((item) => normalizeRakutenItem(item, query, fetchedAt))
     .filter((item): item is MarketProductCandidate => item !== null);
+}
+
+async function fetchRakutenWithPolicy(url: URL, init: RequestInit): Promise<Response> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(url, { ...init, signal: AbortSignal.timeout(8_000) });
+      if ((response.status === 502 || response.status === 503) && attempt === 0) continue;
+      return response;
+    } catch (error) {
+      const timeout = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+      const reset = error instanceof Error && /ECONNRESET|connection reset/iu.test(`${error.message} ${String(error.cause ?? "")}`);
+      if ((timeout || reset) && attempt === 0) continue;
+      throw error;
+    }
+  }
+  throw new Error("Rakuten API request failed.");
 }
 
 export function normalizeRakutenItem(
