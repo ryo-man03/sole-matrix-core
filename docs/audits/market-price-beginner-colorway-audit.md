@@ -43,13 +43,13 @@ StockXとaliasは承認待ち、SNKRDUNKとGrailedはdisabled、Mercari一般商
 
 ## Live smoke
 
-Providerごとに最大1検索という上限を守り、再試行していない。3 Providerは同時に起動したが、実行ラッパーが最初の非zero終了で集約結果を中断したため、監査可能な出力は楽天だけである。
+2026-08-02にYahooとeBayを新しい独立sessionとして各1回だけ実行した。失敗後の再実行、paging、raw payload・token・credential・商品URL一覧の出力、結果の永続化は行っていない。Rakutenは2026-08-01の記録を維持した。
 
-- Rakuten: `temporarily_unavailable`、normalized/exact/high/related/rejectedはすべて0、credential exposure 0、10,670ms
-- Yahoo: 起動済みだが結果未記録。成功扱いにしない
-- eBay: 起動済みだが結果未記録。成功扱いにしない
-- AI colorway: 未実行。成功扱いにしない
+- Rakuten: `temporarily_unavailable`、10,670ms。normalized/exact/high/related/rejectedはすべて0、currenciesは空、credential exposure 0。実レスポンス正規化は未確認
+- Yahoo: `timeout`、16,007ms。normalized/exact/high/related/rejectedはすべて0、currenciesは空、新品・中古・不明はいずれも0、不足size・condition・shippingはいずれも0、credential exposure 0、raw payload persistence 0
+- eBay: `timeout`、16,022ms。normalized/exact/high/related/rejectedはすべて0、currenciesは空、新品・中古・不明およびauction・fixed・unknownはいずれも0、不足size・condition・shippingはいずれも0、credential exposure 0、persistent write 0、forecast use 0
+- AI colorway: credentialをプロセス内だけへ渡して既存の安全なsmokeを1回実行し、`fallback / api_error`。verification stateとevidenceは生成されず、成功扱いにしない。credential exposure 0、raw response persistence 0
 
-ブランチ`feat/market-price-beginner-colorway-v1`のoriginへのpushは成功した。Draft PR作成はGitHub連携が403を返し、ログイン済みブラウザのフォーム操作も継続的にタイムアウトしたため未完了である。PRが存在しないためautomatic pull-request CIも未実行である。
+fixture・schema contract・決定論的colorway評価は成功しているが、これはlive成功を意味しない。価格意味はRakuten/Yahoo=`current_retail_price`、eBay=`current_listing_price`のまま分離し、marketplace-only evidenceはverified colorwayに昇格させない。AI提案、colorway verification、Style Code verification、market listing matchは引き続き別契約である。
 
-ローカル実装ゲートは合格しているが、live smoke成功、Draft PR、automatic pull-request CI成功が未確認のため、この時点の総合判定は`NOT READY`である。
+ローカル実装ゲートは合格している。live failureは安全に処理されたAccepted Limitationとして記録する。Draft PRとautomatic pull-request CIの最新状態はGitHubを正とし、両方が完了するまでは総合判定を`NOT READY`とする。
