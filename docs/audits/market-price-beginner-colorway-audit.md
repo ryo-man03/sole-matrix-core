@@ -50,4 +50,6 @@ Providerごとに最大1検索という上限を守り、再試行していな�
 - eBay: 起動済みだが結果未記録。成功扱いにしない
 - AI colorway: 未実行。成功扱いにしない
 
-ローカル実装ゲートは合格しているが、live smoke成功とautomatic pull-request CI成功が未確認のため、この時点の総合判定は`NOT READY`である。
+ブランチ`feat/market-price-beginner-colorway-v1`のoriginへのpushは成功した。Draft PR作成はGitHub連携が403を返し、ログイン済みブラウザのフォーム操作も継続的にタイムアウトしたため未完了である。PRが存在しないためautomatic pull-request CIも未実行である。
+
+ローカル実装ゲートは合格しているが、live smoke成功、Draft PR、automatic pull-request CI成功が未確認のため、この時点の総合判定は`NOT READY`である。
