@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-describe("Rakuten market_find result UI", () => {
+describe("beginner market price result UI", () => {
   const panelSource = readFileSync(
     new URL("../../_components/CoreV1RecommendationPanel.tsx", import.meta.url),
     "utf8",
@@ -11,30 +11,30 @@ describe("Rakuten market_find result UI", () => {
     new URL("../../_components/RakutenMarketFind.tsx", import.meta.url),
     "utf8",
   );
+  const beginnerSource = readFileSync(new URL("./beginner.ts", import.meta.url), "utf8");
 
-  it("renders a separate, click-to-search Rakuten section", () => {
+  it("keeps market search manual and separate from recommendation ranking", () => {
     expect(panelSource).toContain("RakutenMarketFind");
-    expect(marketSource).toContain("楽天で近い商品を探す");
-    expect(marketSource).toContain("楽天市場の購入参考候補");
+    expect(marketSource).toContain("現在価格を確認");
     expect(marketSource).toContain("onClick={searchProducts}");
     expect(marketSource).not.toContain("useEffect(");
-    expect(marketSource).toContain("/api/market/rakuten?q=");
+    expect(marketSource).toContain("/api/market/search");
+    expect(marketSource).toContain("推薦順位やスコアは変更していません");
   });
 
-  it("renders product details, a safe link, and the required disclaimer", () => {
-    expect(marketSource).toContain("product.title");
-    expect(marketSource).toContain("product.shopName");
-    expect(marketSource).toContain("formatPrice(product.price)");
+  it("explains price semantics and purchase risks before technical detail", () => {
+    expect(marketSource).toContain("最初に見る4項目");
+    expect(beginnerSource).toContain("現在の出品価格");
+    expect(marketSource).toContain("未確認（無料ではありません）");
+    expect(marketSource).toContain("税・関税込み総額は未確認");
+    expect(marketSource).toContain("技術的な取得詳細");
     expect(marketSource).toContain('target="_blank" rel="noreferrer"');
-    expect(marketSource).toContain("価格・在庫・サイズは変動します。購入前に販売ページで確認してください。");
   });
 
-  it("keeps empty and API failure states soft and separate from recommendations", () => {
-    expect(marketSource).toContain('status: "empty"');
-    expect(marketSource).toContain('status: "error"');
-    expect(marketSource).toContain("推薦結果には影響ありません。");
-    expect(marketSource).not.toContain("公式確認済み");
-    expect(marketSource).not.toContain("検証済みモデル");
-    expect(marketSource).not.toContain("在庫あり確定");
+  it("retains the previous result and separates related listings", () => {
+    expect(marketSource).toContain("前回取得した情報を表示しています");
+    expect(marketSource).toContain("比較用の関連候補");
+    expect(marketSource).toContain("推薦結果には影響しません");
+    expect(marketSource).toContain("カラーは表示しません");
   });
 });

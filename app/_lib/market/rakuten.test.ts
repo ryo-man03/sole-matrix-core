@@ -78,8 +78,7 @@ describe("Rakuten market product search", () => {
     expect(requestHeaders.get("accept")).toBe("application/json");
     expect(requestHeaders.get("accessKey")).toBe("access-key");
     expect(requestHeaders.get("origin")).toBeNull();
-    expect((init as RequestInit & { next?: { revalidate?: number } }).next?.revalidate)
-      .toBe(60 * 30);
+    expect(init?.cache).toBe("no-store");
   });
 
   it("normalizes the live 2026 Rakuten Items response shape", async () => {
