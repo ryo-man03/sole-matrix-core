@@ -15,6 +15,7 @@ export default defineConfig({
       "src/**/*.test.ts",
       "app/**/*.test.ts",
       "server/**/*.test.ts",
+      "supabase/**/*.test.ts",
     ],
   },
 });
