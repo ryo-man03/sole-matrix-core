@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MarketSearchContext } from "./contracts";
 import { toPricePresentation } from "./contracts";
 import { styleCodeFromTitle } from "./listing-match";
-import { searchEbayListings, searchYahooListings } from "./providers";
+import { MARKET_PROVIDER_CAPABILITIES, searchEbayListings, searchYahooListings } from "./providers";
 import { fetchMarketJson, MarketProviderRequestError } from "./provider-request";
 
 afterEach(() => {
@@ -12,6 +12,14 @@ afterEach(() => {
 });
 
 describe("current market provider adapters", () => {
+  it("distinguishes implemented adapters from live-verified providers", () => {
+    const currentPriceProviders = MARKET_PROVIDER_CAPABILITIES.filter(({ provider }) => (
+      provider === "rakuten" || provider === "yahoo" || provider === "ebay"
+    ));
+    expect(currentPriceProviders.every(({ status }) => status === "implemented_unverified")).toBe(true);
+    expect(currentPriceProviders.some(({ status }) => status === "live_verified")).toBe(false);
+  });
+
   it("normalizes Yahoo retail price and keeps unknown shipping unknown", async () => {
     vi.stubEnv("YAHOO_SHOPPING_APP_ID", "secret-app-id");
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json({ hits: [{

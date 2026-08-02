@@ -4,6 +4,12 @@ import { buildMarketSearchContext, matchLabel, priceSemanticLabel, verificationL
 import type { MarketListing, MarketProviderId } from "./contracts";
 import { toPricePresentation } from "./contracts";
 import { isSafePublicHttpsUrl, matchMarketListing } from "./listing-match";
+import {
+  countMarketProviderPolicyBreaches,
+  countRawProviderResponsePersistence,
+  countRecommendationRankingMutations,
+  countSensitiveMarketValueExposures,
+} from "./provider-policy";
 import { verifyColorwayProposal, type AiSneakerProposal, type ColorwayEvidence } from "../recommendation-trust/colorway-verification";
 
 describe("market / beginner / colorway final deterministic matrix", () => {
@@ -106,6 +112,22 @@ describe("market / beginner / colorway final deterministic matrix", () => {
       }
       counts.adversarial += 1;
     }
+
+    metrics.recommendationRankingMutationCount += countRecommendationRankingMutations(
+      ["recommendation-1", "recommendation-2"],
+      ["recommendation-1", "recommendation-2"],
+    );
+    metrics.credentialExposureCount += countSensitiveMarketValueExposures(
+      { providers: ["rakuten", "yahoo", "ebay"] },
+      ["server-only-secret"],
+    );
+    metrics.rawResponsePersistenceCount += countRawProviderResponsePersistence({ providers: [] });
+    metrics.eBayPersistentWriteCount += countMarketProviderPolicyBreaches([
+      { provider: "ebay", operation: "persist", allowed: false },
+    ]);
+    metrics.eBayForecastUseCount += countMarketProviderPolicyBreaches([
+      { provider: "ebay", operation: "forecast", allowed: false },
+    ]);
 
     expect(counts).toEqual({ providerPrice: 100, beginner: 80, colorway: 80, adversarial: 40 });
     expect(Object.values(counts).reduce((sum, value) => sum + value, 0)).toBe(300);

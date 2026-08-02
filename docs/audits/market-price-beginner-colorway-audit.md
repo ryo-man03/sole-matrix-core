@@ -53,3 +53,14 @@ StockXとaliasは承認待ち、SNKRDUNKとGrailedはdisabled、Mercari一般商
 fixture・schema contract・決定論的colorway評価は成功しているが、これはlive成功を意味しない。価格意味はRakuten/Yahoo=`current_retail_price`、eBay=`current_listing_price`のまま分離し、marketplace-only evidenceはverified colorwayに昇格させない。AI提案、colorway verification、Style Code verification、market listing matchは引き続き別契約である。
 
 ローカル実装ゲートは合格している。live failureは安全に処理されたAccepted Limitationとして記録する。Draft PRとautomatic pull-request CIの最新状態はGitHubを正とし、両方が完了するまでは総合判定を`NOT READY`とする。
+
+## 2026-08-02 PR #28 最終diffレビュー対応
+
+- `MarketListing`の全フィールドをクライアント境界で実行時検証し、不正listingは該当Providerだけ`schema_error`へ分離する。欠損・不正な配列、送料、総額、状態、サイズ、販売形式のfixtureを追加した。
+- 楽天・Yahoo・eBayの実装状態を`implemented_unverified`へ変更し、1回の検索結果`success`とProvider全体の`live_verified`を分離した。
+- Provider・request・search境界へ`server-only`ガードを追加した。
+- eBayの`persist`、`forecast`、`recommendation_score`を拒否し、`temporary_display`だけを許可するpolicy gateを追加した。推薦順位変更、credential露出、raw response保存、eBay永続化、eBay forecastの各metricは安全fixtureで0、意図的に壊したfixtureで非0になることを確認した。
+- 初心者向け初期表示からCore/Ryo ScoreとStyle Codeを外し、商品確認内容と既存Market Intelligenceを折りたたみへ移動した。
+- live smokeは再実行していない。上記のAccepted Limitationは変更しない。
+
+ローカル再検証はTypecheck成功、108 test files / 1,072 tests成功、Production build成功（23 routes・pages）。PR CIは新しいheadをpushした後に確認する。

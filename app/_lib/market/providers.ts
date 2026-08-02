@@ -1,3 +1,5 @@
+import "server-only";
+
 import {
   RakutenApiError,
   RakutenCredentialsMissingError,
@@ -26,16 +28,16 @@ import { fetchMarketJson, MarketProviderRequestError } from "./provider-request"
 
 export type MarketProviderCapability = Readonly<{
   provider: MarketProviderId | "stockx" | "alias" | "snkrdunk" | "mercari" | "grailed";
-  status: "live" | "contract_only" | "pending_approval" | "disabled" | "manual_only";
+  status: "implemented_unverified" | "live_verified" | "contract_only" | "pending_approval" | "disabled" | "manual_only";
   priceSemantics: readonly string[];
   automatedSearch: boolean;
   persistentStorage: boolean;
 }>;
 
 export const MARKET_PROVIDER_CAPABILITIES: readonly MarketProviderCapability[] = [
-  { provider: "rakuten", status: "live", priceSemantics: ["current_retail_price"], automatedSearch: true, persistentStorage: false },
-  { provider: "yahoo", status: "live", priceSemantics: ["current_retail_price"], automatedSearch: true, persistentStorage: false },
-  { provider: "ebay", status: "live", priceSemantics: ["current_listing_price"], automatedSearch: true, persistentStorage: false },
+  { provider: "rakuten", status: "implemented_unverified", priceSemantics: ["current_retail_price"], automatedSearch: true, persistentStorage: false },
+  { provider: "yahoo", status: "implemented_unverified", priceSemantics: ["current_retail_price"], automatedSearch: true, persistentStorage: false },
+  { provider: "ebay", status: "implemented_unverified", priceSemantics: ["current_listing_price"], automatedSearch: true, persistentStorage: false },
   { provider: "stockx", status: "pending_approval", priceSemantics: ["lowest_ask", "highest_bid"], automatedSearch: false, persistentStorage: false },
   { provider: "alias", status: "pending_approval", priceSemantics: [], automatedSearch: false, persistentStorage: false },
   { provider: "snkrdunk", status: "disabled", priceSemantics: [], automatedSearch: false, persistentStorage: false },

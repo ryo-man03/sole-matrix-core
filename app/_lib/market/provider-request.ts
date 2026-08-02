@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { MarketProviderStatus } from "./contracts";
 
 const MAX_RESPONSE_BYTES = 1_500_000;

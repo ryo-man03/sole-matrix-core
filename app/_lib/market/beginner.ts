@@ -8,6 +8,7 @@ import type {
   MarketSearchContext,
   MarketSearchResponse,
 } from "./contracts";
+import { emptyProviderAudit } from "./contracts";
 import { isSafePublicHttpsUrl } from "./listing-match";
 import { buildRakutenMarketQuery } from "./ui";
 
@@ -17,7 +18,7 @@ type BeginnerCandidate = Pick<
 >;
 
 export const BEGINNER_PURCHASE_CHECKLIST = [
-  "モデル名・カラー・Style Codeが商品ページと一致するか",
+  "商品名とカラーが販売ページと一致するか",
   "メンズ／ウィメンズ表記とサイズ基準が自分に合うか",
   "新品・中古・再生品のどれか",
   "送料・税・関税を含む支払総額はいくらか",
@@ -81,15 +82,15 @@ export function verifiedColorwayState(candidate: BeginnerCandidate): ColorwayVer
 }
 
 export function verificationLabel(state: ColorwayVerificationState): string {
-  if (state === "model_color_style_verified") return "モデル・カラー・Style Code確認済み";
-  if (state === "model_color_verified") return "モデル・カラー確認済み";
-  if (state === "model_only") return "モデルのみ確認済み（カラー未確認）";
-  return "候補の事実確認が必要";
+  if (state === "model_color_style_verified") return "商品情報を確認済み";
+  if (state === "model_color_verified") return "カラーまで確認済み";
+  if (state === "model_only") return "カラーは確認できませんでした";
+  return "商品情報を確認中";
 }
 
 export function matchLabel(level: MarketListing["matchLevel"]): string {
-  if (level === "exact") return "推薦モデルと完全一致";
-  if (level === "high") return "推薦モデルと一致する可能性が高い（Style Code未確認）";
+  if (level === "exact") return "おすすめ商品と一致";
+  if (level === "high") return "おすすめ商品と一致する可能性が高い";
   return "関連候補：別カラー・別世代・別サイズの可能性";
 }
 
@@ -110,22 +111,37 @@ export function providerStatusMessage(status: MarketProviderStatus): string {
 
 export function parseMarketSearchResponse(value: unknown): MarketSearchResponse | null {
   if (!isRecord(value) || typeof value["query"] !== "string" || typeof value["searchedAt"] !== "string"
-    || value["recommendationRankingChanged"] !== false || !Array.isArray(value["providers"])) return null;
-  const providers = value["providers"].flatMap((item): MarketProviderResult[] => {
-    const parsed = parseProvider(item);
-    return parsed ? [parsed] : [];
-  });
-  if (providers.length !== value["providers"].length || providers.length > 3) return null;
+    || !isDateString(value["searchedAt"])
+    || value["recommendationRankingChanged"] !== false || !Array.isArray(value["providers"])
+    || value["providers"].length > 3) return null;
+  const providers: MarketProviderResult[] = [];
+  const seenProviders = new Set<MarketProviderId>();
+  for (const item of value["providers"]) {
+    if (!isRecord(item) || !isProvider(item["provider"]) || seenProviders.has(item["provider"])) return null;
+    seenProviders.add(item["provider"]);
+    providers.push(parseProvider(item, item["provider"]));
+  }
   return { query: value["query"], searchedAt: value["searchedAt"], recommendationRankingChanged: false, providers };
 }
 
-function parseProvider(value: unknown): MarketProviderResult | null {
-  if (!isRecord(value) || !isProvider(value["provider"]) || !isProviderStatus(value["status"])
-    || !Array.isArray(value["listings"]) || typeof value["message"] !== "string" || !isAudit(value["audit"], value["provider"])) return null;
-  const listings = value["listings"].filter(isListing).slice(0, 10);
-  if (listings.length !== value["listings"].length) return null;
+function parseProvider(value: Record<string, unknown>, provider: MarketProviderId): MarketProviderResult {
+  if (!isProviderStatus(value["status"]) || !Array.isArray(value["listings"])
+    || value["listings"].length > 10 || typeof value["message"] !== "string"
+    || !isAudit(value["audit"], provider)
+    || !value["listings"].every((listing) => isListing(listing, provider))) return schemaErrorProvider(provider);
+  const listings = value["listings"] as MarketListing[];
   const audit = value["audit"] as MarketProviderResult["audit"];
-  return { provider: value["provider"], status: value["status"], listings, audit, message: value["message"].slice(0, 240) };
+  return { provider, status: value["status"], listings, audit, message: value["message"].slice(0, 240) };
+}
+
+function schemaErrorProvider(provider: MarketProviderId): MarketProviderResult {
+  return {
+    provider,
+    status: "schema_error",
+    listings: [],
+    audit: emptyProviderAudit(provider),
+    message: "価格情報を安全に検証できなかったため、この販売先の結果だけを表示していません。",
+  };
 }
 
 function isAudit(value: unknown, provider: MarketProviderId): value is MarketProviderResult["audit"] {
@@ -140,15 +156,54 @@ function isAudit(value: unknown, provider: MarketProviderId): value is MarketPro
     && Object.entries(value["currencyCount"]).every(([currency, count]) => /^[A-Z]{3}$/u.test(currency) && Number.isSafeInteger(count) && Number(count) >= 0);
 }
 
-function isListing(value: unknown): value is MarketListing {
-  if (!isRecord(value) || !isProvider(value["provider"]) || typeof value["title"] !== "string"
+function isListing(value: unknown, provider: MarketProviderId): value is MarketListing {
+  if (!isRecord(value) || value["provider"] !== provider
+    || !isNullableString(value["providerItemId"])
+    || typeof value["title"] !== "string" || value["title"].trim().length === 0
+    || !isNullableString(value["modelName"])
+    || !isNullableString(value["colorwayName"])
+    || !isNullableString(value["styleCode"])
+    || !isNullableString(value["productFamily"])
+    || !(value["releaseYear"] === null || (Number.isSafeInteger(value["releaseYear"]) && Number(value["releaseYear"]) >= 1900 && Number(value["releaseYear"]) <= 2200))
+    || !["men", "women", "unisex", "kids", "unknown"].includes(String(value["gender"]))
     || typeof value["price"] !== "number" || !Number.isFinite(value["price"]) || value["price"] < 0
     || typeof value["currency"] !== "string" || !/^[A-Z]{3}$/u.test(value["currency"])
+    || !isNullableMoney(value["shippingPrice"])
+    || !isNullableMoney(value["totalDisplayedPrice"])
     || typeof value["itemUrl"] !== "string" || !isSafePublicHttpsUrl(value["itemUrl"])
-    || !["current_retail_price", "current_listing_price"].includes(String(value["priceType"]))
+    || !isProviderPriceType(value["priceType"], provider)
+    || !["fixed_price", "auction", "unknown"].includes(String(value["listingFormat"]))
+    || !["new", "used", "refurbished", "unknown"].includes(String(value["condition"]))
+    || !["US_M", "US_W", "UK", "EU", "JP", "UNKNOWN"].includes(String(value["sizeSystem"]))
+    || !isNullableString(value["size"])
+    || !(value["inStock"] === null || typeof value["inStock"] === "boolean")
+    || !isNullableString(value["shopName"])
     || !["exact", "high", "related"].includes(String(value["matchLevel"]))
-    || typeof value["fetchedAt"] !== "string") return false;
+    || !isStringArray(value["matchReasons"])
+    || !isStringArray(value["mismatchWarnings"])
+    || !isDateString(value["fetchedAt"])
+    || !(value["cacheExpiresAt"] === null || isDateString(value["cacheExpiresAt"]))) return false;
   return value["imageUrl"] === null || (typeof value["imageUrl"] === "string" && isSafePublicHttpsUrl(value["imageUrl"]));
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function isNullableMoney(value: unknown): value is number | null {
+  return value === null || (typeof value === "number" && Number.isFinite(value) && value >= 0);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length <= 40 && value.every((item) => typeof item === "string" && item.length <= 500);
+}
+
+function isDateString(value: unknown): value is string {
+  return typeof value === "string" && value.length <= 64 && Number.isFinite(Date.parse(value));
+}
+
+function isProviderPriceType(value: unknown, provider: MarketProviderId): value is MarketListing["priceType"] {
+  return provider === "ebay" ? value === "current_listing_price" : value === "current_retail_price";
 }
 
 function isProvider(value: unknown): value is MarketProviderId {

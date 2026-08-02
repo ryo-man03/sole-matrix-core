@@ -47,7 +47,7 @@ export function RakutenMarketFind({ candidate }: Props) {
       if (!response.ok || !parsed) throw new Error("invalid_market_response");
       setResult(parsed);
       setStatus("success");
-      setMessage("価格検索が完了しました。推薦順位やスコアは変更していません。");
+      setMessage("価格検索が完了しました。おすすめの順番や評価には影響しません。");
     } catch {
       if (activeRequest.current !== requestId) return;
       setStatus("error");
@@ -63,7 +63,7 @@ export function RakutenMarketFind({ candidate }: Props) {
         <div>
           <p className="diagnosis-summary-kicker">購入前の価格確認</p>
           <h4 id="market-price-title">販売先の現在価格を比べる</h4>
-          <p>価格は購入判断の参考情報です。安い順に推薦を入れ替えたり、Core ScoreやRyo Scoreを変更したりしません。</p>
+          <p>価格情報は、おすすめの順番や評価には影響しません。</p>
         </div>
         <button className="diagnosis-secondary-button" disabled={status === "loading"} onClick={searchProducts} type="button">
           {status === "loading" ? "価格を確認中…" : result ? "価格を再確認" : "現在価格を確認"}
@@ -72,8 +72,16 @@ export function RakutenMarketFind({ candidate }: Props) {
 
       <div className="market-verification-summary" data-state={context.identity.verificationState} role="status">
         <strong>{verificationLabel(context.identity.verificationState)}</strong>
-        <span>{context.identity.colorwayName ?? "カラーは表示しません"}{context.identity.styleCode ? ` / ${context.identity.styleCode}` : ""}</span>
+        <span>{context.identity.colorwayName ?? "確認できていないカラーは表示しません"}</span>
       </div>
+      <details className="market-verification-details">
+        <summary>商品情報の確認内容を見る</summary>
+        <dl>
+          <div><dt>確認状態</dt><dd>{context.identity.verificationState}</dd></div>
+          <div><dt>商品番号（Style Code）</dt><dd>{context.identity.styleCode ?? "未確認"}</dd></div>
+          <div><dt>確認済みカラー</dt><dd>{context.identity.colorwayName ?? "未確認"}</dd></div>
+        </dl>
+      </details>
 
       <div className="beginner-market-guide">
         <strong>最初に見る4項目</strong>

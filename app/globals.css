@@ -2809,6 +2809,7 @@ h1 {
 }
 
 .market-verification-summary,
+.market-verification-details,
 .beginner-market-guide,
 .market-provider-result {
   border: 1px solid rgba(35, 43, 55, 0.12);
@@ -2846,12 +2847,14 @@ h1 {
 }
 
 .beginner-market-guide details,
+.market-verification-details,
 .market-related-listings,
 .market-technical-details {
   margin-top: 12px;
 }
 
 .beginner-market-guide summary,
+.market-verification-details summary,
 .market-related-listings summary,
 .market-technical-details summary {
   min-height: 44px;
@@ -2921,6 +2924,7 @@ h1 {
 }
 
 .market-listing-facts,
+.market-verification-details dl,
 .market-technical-details dl {
   display: grid;
   gap: 6px;
@@ -2928,6 +2932,7 @@ h1 {
 }
 
 .market-listing-facts > div,
+.market-verification-details dl > div,
 .market-technical-details dl > div {
   display: grid;
   grid-template-columns: minmax(74px, auto) 1fr;
@@ -2935,12 +2940,14 @@ h1 {
 }
 
 .market-listing-facts dt,
+.market-verification-details dt,
 .market-technical-details dt {
   color: #68727e;
   font-size: 0.72rem;
 }
 
 .market-listing-facts dd,
+.market-verification-details dd,
 .market-technical-details dd {
   margin: 0;
   font-size: 0.76rem;

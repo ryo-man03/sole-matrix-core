@@ -80,9 +80,9 @@ Every capability defaults to disabled until the revised evidence is committed. S
 
 | Provider | 状態 | 自動検索 | 価格の意味 | 保存 |
 | --- | --- | --- | --- | --- |
-| 楽天市場 | live | 明示クリック時のみ | 現在の販売価格 | しない |
-| Yahoo!ショッピング | live | 明示クリック時のみ | 現在の販売価格 | しない |
-| eBay Production Browse API | live | 明示クリック時のみ | 現在の出品価格 | しない |
+| 楽天市場 | implemented_unverified | 明示クリック時のみ | 現在の販売価格 | しない |
+| Yahoo!ショッピング | implemented_unverified | 明示クリック時のみ | 現在の販売価格 | しない |
+| eBay Production Browse API | implemented_unverified | 明示クリック時のみ | 現在の出品価格 | しない |
 | StockX | developer access承認待ち | しない | lowest ask / highest bid contractのみ | しない |
 | alias | API承認待ち | しない | 未確定 | しない |
 | SNKRDUNK | disabled | しない | なし | しない |
@@ -90,3 +90,5 @@ Every capability defaults to disabled until the revised evidence is committed. S
 | Grailed | disabled | しない | なし | しない |
 
 この表のcurrent-price検索は既存の履歴／forecast subsystemと分離する。eBayの現在出品価格を履歴やforecastへ渡さない。
+
+`implemented_unverified`は実装済みだがliveレスポンスの正規化成功を未確認という意味である。個別検索の`success`は、その1リクエストの結果状態であり、Provider実装全体の`live_verified`とは分けて扱う。
