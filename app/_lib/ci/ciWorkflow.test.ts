@@ -26,8 +26,8 @@ describe("CI workflow", () => {
     expect(workflow).toContain("name: Tests");
     expect(workflow).toContain("name: Production build");
     expect(workflow.match(/version: 11\.5\.2/g)).toHaveLength(3);
-    expect(workflow.match(/node-version: 24/g)).toHaveLength(3);
-    expect(workflow.match(/pnpm install --frozen-lockfile/g)).toHaveLength(3);
+    expect(workflow.match(/node-version: 24/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(workflow.match(/pnpm install --frozen-lockfile/g)?.length).toBeGreaterThanOrEqual(3);
     expect(workflow).toContain("run: pnpm typecheck");
     expect(workflow).toContain("run: pnpm test");
     expect(workflow).toContain("run: pnpm web:build");

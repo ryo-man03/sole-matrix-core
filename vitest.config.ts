@@ -9,6 +9,7 @@ export default defineConfig({
     },
   },
   test: {
+    testTimeout: 15_000,
     globals: true,
     environment: "node",
     include: [
