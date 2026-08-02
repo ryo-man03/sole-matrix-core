@@ -1,0 +1,2 @@
+import { describe,expect,it } from "vitest";import { detectBrokenFixture,zeroDetectors } from "./detectors";
+describe("active security detectors",()=>{it.each(Object.entries(zeroDetectors()))("normal fixture keeps %s at zero",(_key,value)=>expect(value).toBe(0));it.each([["cross_user_read","crossUserReadCount"],["partial_style","partialStyleCodeAcceptedCount"],["external_today","externalRequestOnTodayCount"],["fixture_production","fixtureDataProductionLeakCount"]] as const)("broken %s trips %s",(fixture,key)=>expect(detectBrokenFixture(fixture)[key]).toBeGreaterThan(0))});
