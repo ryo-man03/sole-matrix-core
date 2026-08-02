@@ -1,18 +1,8 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { callSupabaseAuth, getSupabaseAuthConfig, readSafeAuthUser } from "../../../_lib/auth-session/supabaseAuthServer";
+import { NextResponse } from "next/server";
+import { getAuthenticatedUser } from "../../../../src/infrastructure/auth/supabase/server";
 
-export async function GET(request: NextRequest) {
-  const config = getSupabaseAuthConfig();
-  if (!config) return NextResponse.json({ ok: true, data: { configured: false, status: "signed_out" } });
-  const accessToken = request.cookies.get("smx_access_token")?.value;
-  if (!accessToken) return NextResponse.json({ ok: true, data: { configured: true, status: "signed_out" } });
-  const result = await callSupabaseAuth(config, "user", { method: "GET", headers: { Authorization: `Bearer ${accessToken}` } });
-  const user = result.ok ? readSafeAuthUser(result.data) : null;
-  if (!user) {
-    const response = NextResponse.json({ ok: true, data: { configured: true, status: "signed_out" } });
-    response.cookies.delete("smx_access_token");
-    response.cookies.delete("smx_refresh_token");
-    return response;
-  }
-  return NextResponse.json({ ok: true, data: { configured: true, status: "user", user } });
+export async function GET() {
+  const { configured, user } = await getAuthenticatedUser();
+  if (!user) return NextResponse.json({ ok: true, data: { configured, status: "signed_out" } });
+  return NextResponse.json({ ok: true, data: { configured, status: "user", user: { userId: user.id, email: user.email, displayName: typeof user.user_metadata?.display_name === "string" ? user.user_metadata.display_name.slice(0, 80) : undefined } } });
 }

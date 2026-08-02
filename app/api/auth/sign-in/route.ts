@@ -1,35 +1,19 @@
 import { NextResponse } from "next/server";
-import { authErrorMessage, callSupabaseAuth, getSupabaseAuthConfig, readAuthTokens } from "../../../_lib/auth-session/supabaseAuthServer";
+import { createSupabaseServerClient } from "../../../../src/infrastructure/auth/supabase/server";
+import { validateMutationRequest } from "../../../../src/application/http/requestSecurity";
 
 export async function POST(request: Request) {
-  const config = getSupabaseAuthConfig();
-  if (!config) return unavailable();
-  const body = await safeJson(request);
-  const email = isRecord(body) ? text(body["email"], 254) : null;
-  const password = isRecord(body) ? text(body["password"], 200) : null;
-  if (!email || !password) return invalid();
-
-  const result = await callSupabaseAuth(config, "token?grant_type=password", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
-  });
-  const tokens = result.ok ? readAuthTokens(result.data) : null;
-  if (!tokens) {
-    return NextResponse.json({ ok: false, error: { code: "AUTH_FAILED", message: authErrorMessage(result.status) } }, { status: result.status >= 500 ? 503 : 401 });
-  }
-  const response = NextResponse.json({ ok: true, data: { user: tokens.user } });
-  setAuthCookies(response, tokens);
-  return response;
+  const guard = validateMutationRequest(request, { key: "sign-in", limit: 10 });
+  if (!guard.ok) return NextResponse.json({ ok: false, error: { code: guard.code } }, { status: guard.status });
+  const body = await request.json().catch(() => null);
+  if (!isRecord(body) || typeof body.email !== "string" || typeof body.password !== "string" || body.email.length > 254 || body.password.length > 200) return invalid();
+  const client = await createSupabaseServerClient();
+  if (!client) return unavailable();
+  const { data, error } = await client.auth.signInWithPassword({ email: body.email.trim(), password: body.password });
+  if (error || !data.user) return NextResponse.json({ ok: false, error: { code: "AUTH_FAILED", message: "メールアドレスまたはパスワードを確認してください。" } }, { status: 401 });
+  return NextResponse.json({ ok: true, data: { user: safeUser(data.user) } });
 }
-
-function setAuthCookies(response: NextResponse, tokens: NonNullable<ReturnType<typeof readAuthTokens>>) {
-  const secure = process.env.NODE_ENV === "production";
-  response.cookies.set("smx_access_token", tokens.accessToken, { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: tokens.expiresIn });
-  if (tokens.refreshToken) response.cookies.set("smx_refresh_token", tokens.refreshToken, { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: 60 * 60 * 24 * 30 });
-}
-
-async function safeJson(request: Request): Promise<unknown> { try { return await request.json(); } catch { return null; } }
-function text(value: unknown, max: number): string | null { return typeof value === "string" && value.trim() && value.trim().length <= max ? value.trim() : null; }
-function invalid() { return NextResponse.json({ ok: false, error: { code: "INVALID_AUTH_INPUT", message: "メールアドレスとパスワードを確認してください。" } }, { status: 400 }); }
-function unavailable() { return NextResponse.json({ ok: false, error: { code: "AUTH_NOT_CONFIGURED", message: "認証は現在準備中です。ゲストモードは引き続き利用できます。" } }, { status: 503 }); }
+function safeUser(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }) { return { userId: user.id, ...(user.email ? { email: user.email } : {}), ...(typeof user.user_metadata?.display_name === "string" ? { displayName: user.user_metadata.display_name.slice(0, 80) } : {}) }; }
+function invalid() { return NextResponse.json({ ok: false, error: { code: "INVALID_AUTH_INPUT", message: "入力内容を確認してください。" } }, { status: 400 }); }
+function unavailable() { return NextResponse.json({ ok: false, error: { code: "AUTH_NOT_CONFIGURED", message: "認証は現在準備中です。" } }, { status: 503 }); }
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
