@@ -1,0 +1,1 @@
+import { AppShell } from "../_components/AppShell";import { HistoryPanel } from "../_components/HistoryPanel";import { MainContainer } from "../_components/MainContainer";export default function Page(){return <AppShell><MainContainer labelledBy="history-title"><h1 id="history-title">おすすめ履歴</h1><HistoryPanel/></MainContainer></AppShell>}
