@@ -1,0 +1,1 @@
+import { AppShell } from "../../_components/AppShell";import { MainContainer } from "../../_components/MainContainer";import { NotificationForm } from "../../_components/PersonalizationForms";export default function Page(){return <AppShell><MainContainer labelledBy="notifications-title"><h1 id="notifications-title">通知設定</h1><NotificationForm/></MainContainer></AppShell>}
