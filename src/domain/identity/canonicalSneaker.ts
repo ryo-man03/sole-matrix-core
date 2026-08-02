@@ -5,7 +5,8 @@ export type CanonicalMatch="exact_style_code"|"exact_model"|"family_related"|"no
 export function canonicalSneakerKey(input:{brand:string;modelName:string;modelFamily?:string|null;generation?:string|null;styleCode?:string|null;audience?:SneakerAudience}):CanonicalSneakerKey{
  const parsed=parseKnownModel(input.modelName);return {brandSlug:slug(input.brand),modelFamily:slug(input.modelFamily||parsed.family),generation:normalizeGeneration(input.generation??parsed.generation),styleCode:normalizeStyleCode(input.styleCode),audience:input.audience??inferAudience(input.modelName)};
 }
-export function canonicalSneakerKeyFromName(name:string):CanonicalSneakerKey{const brand=detectBrand(name);return canonicalSneakerKey({brand,modelName:name.slice(brand.length).trim(),audience:inferAudience(name)});}
+const nameCache=new Map<string,CanonicalSneakerKey>();
+export function canonicalSneakerKeyFromName(name:string):CanonicalSneakerKey{const cached=nameCache.get(name);if(cached)return cached;const brand=detectBrand(name);const key=canonicalSneakerKey({brand,modelName:name.slice(brand.length).trim(),audience:inferAudience(name)});if(nameCache.size<1000)nameCache.set(name,key);return key;}
 export function compareCanonicalSneakers(a:CanonicalSneakerKey,b:CanonicalSneakerKey):CanonicalMatch{
  if(a.styleCode||b.styleCode)return a.styleCode!==null&&b.styleCode!==null&&a.styleCode===b.styleCode?"exact_style_code":"none";
  if(a.brandSlug!==b.brandSlug||a.modelFamily!==b.modelFamily)return "none";
