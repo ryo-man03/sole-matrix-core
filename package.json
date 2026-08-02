@@ -8,6 +8,7 @@
     "demo": "tsx src/demo/runRecommendationDemo.ts",
     "demo:gemini": "tsx src/demo/runGeminiRecommendationDemo.ts",
     "market:collect": "tsx scripts/market-collect.ts",
+    "market:smoke": "tsx scripts/market-smoke.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
