@@ -1,0 +1,1 @@
+import { AppShell } from "../../_components/AppShell";import { MainContainer } from "../../_components/MainContainer";import { PreferencesForm } from "../../_components/PersonalizationForms";export default function Page(){return <AppShell><MainContainer labelledBy="preferences-title"><h1 id="preferences-title">好みと予算</h1><PreferencesForm/></MainContainer></AppShell>}
