@@ -35,6 +35,10 @@
     sans-serif;
 }
 
+.today-grid { display: grid; gap: 1rem; padding-left: 1.25rem; }
+.today-grid button { min-height: 44px; margin: .25rem; }
+.today-grid code { overflow-wrap: anywhere; }
+
 * {
   box-sizing: border-box;
 }

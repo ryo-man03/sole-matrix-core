@@ -1,0 +1,1 @@
+import { AppShell } from "../_components/AppShell";import { MainContainer } from "../_components/MainContainer";import { TodayPanel } from "../_components/TodayPanel";export default function Page(){return <AppShell><MainContainer labelledBy="today-title"><h1 id="today-title">今日のおすすめ</h1><TodayPanel/></MainContainer></AppShell>}
