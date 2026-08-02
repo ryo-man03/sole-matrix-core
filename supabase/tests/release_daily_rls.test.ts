@@ -1,0 +1,7 @@
+import { readFileSync } from "node:fs";import { describe,expect,it } from "vitest";const sql=readFileSync("supabase/migrations/202608020004_release_daily_picks.sql","utf8").toLowerCase();
+describe("release daily migration",()=>{
+ it.each(["release_items","release_variants","release_evidence","daily_pick_batches","daily_picks","daily_pick_feedback"])("creates and enables RLS %s",(table)=>{expect(sql).toContain(`create table public.${table}`);expect(sql).toContain(`alter table public.${table} enable row level security`)});
+ it.each(["release_items_authenticated_read","release_variants_authenticated_read","release_evidence_authenticated_read","daily_pick_batches_select_own","daily_picks_select_own","daily_pick_feedback_own"])("defines %s",(policy)=>expect(sql).toContain(policy));
+ it.each(["unique(user_id,target_date,algorithm_version)","unique(batch_id,rank)","unique(batch_id,release_item_id)","auth.uid()","exists(select 1 from public.daily_pick_batches","source_confidence","verification_state","information_state","score_breakdown","algorithm_version","from anon","to authenticated","on delete cascade"])("contains %s",(clause)=>expect(sql).toContain(clause));
+ it.each(["service_role","provider_response","market_listing","drop table","truncate ","disable row level security","for insert to authenticated using(true)","grant insert on public.release_items"])("excludes unsafe %s",(clause)=>expect(sql).not.toContain(clause));
+});
