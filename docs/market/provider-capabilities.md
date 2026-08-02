@@ -76,3 +76,17 @@ Re-run this audit before enabling a provider when any of the following changes:
 - a new price type or marketplace is introduced.
 
 Every capability defaults to disabled until the revised evidence is committed. Secrets, raw provider responses, and authorization tokens must never be committed or persisted as normalized market history.
+# Current-price provider capabilities (2026-08-01)
+
+| Provider | 状態 | 自動検索 | 価格の意味 | 保存 |
+| --- | --- | --- | --- | --- |
+| 楽天市場 | live | 明示クリック時のみ | 現在の販売価格 | しない |
+| Yahoo!ショッピング | live | 明示クリック時のみ | 現在の販売価格 | しない |
+| eBay Production Browse API | live | 明示クリック時のみ | 現在の出品価格 | しない |
+| StockX | developer access承認待ち | しない | lowest ask / highest bid contractのみ | しない |
+| alias | API承認待ち | しない | 未確定 | しない |
+| SNKRDUNK | disabled | しない | なし | しない |
+| Mercari一般商品 | manual only | しない | なし | しない |
+| Grailed | disabled | しない | なし | しない |
+
+この表のcurrent-price検索は既存の履歴／forecast subsystemと分離する。eBayの現在出品価格を履歴やforecastへ渡さない。

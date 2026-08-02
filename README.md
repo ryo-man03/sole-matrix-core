@@ -253,6 +253,33 @@ Supabase など、ほかの任意設定は [`.env.example`](.env.example) を参
 
 ## 13. Submission / demo notes
 
+## Current market prices and verified colorways
+
+推薦結果の「現在価格を確認」を押すと、楽天市場・Yahoo!ショッピングの現在の販売価格と、eBayの現在の出品価格を別々に表示します。価格検索は推薦順位、Core Score、Ryo Scoreを変更しません。送料・状態・サイズ・総額が不明な場合は不明のまま表示し、0円や送料無料へ補完しません。
+
+AIが提案したモデル名・カラー名・Style Codeはそのまま表示しません。公式／正規取扱店、または独立した高品質ソースで検証し、モデルのみ確認できた場合はカラーとStyle Codeを非表示にします。楽天・Yahoo・eBayの出品情報だけで公式カラー確認済みにはしません。
+
+Server-only environment names:
+
+```env
+YAHOO_SHOPPING_APP_ID=
+EBAY_PRODUCTION_CLIENT_ID=
+EBAY_PRODUCTION_CLIENT_SECRET=
+EBAY_PRODUCTION_DEV_ID=
+EBAY_PRODUCTION_MARKETPLACE_ID=
+EXTERNAL_PROVIDERS_DISABLED=true
+```
+
+通常テストとCIでは`EXTERNAL_PROVIDERS_DISABLED=true`を使います。ローカルlive smokeはProviderごとに最大1検索です。
+
+```powershell
+pnpm market:smoke --provider rakuten
+pnpm market:smoke --provider yahoo
+pnpm market:smoke --provider ebay
+```
+
+eBay OAuth tokenとAPI raw responseは保存せず、クライアントへ返しません。
+
 - 基本デモはゲスト導線で、11問診断 → 回答サマリー → Ryo Mode v4 推薦結果まで確認できます。
 - Gemini が利用できない場合は具体モデルの fallback、Rakuten が利用できない場合は推薦結果を維持した soft error になります。
 - Rakuten の商品カードは推薦候補そのものではなく、推薦後に確認する購入候補です。
@@ -260,14 +287,14 @@ Supabase など、ほかの任意設定は [`.env.example`](.env.example) を参
 
 ## 14. Verification
 
-2026-07-30 時点で、以下をローカルで確認しました。
+2026-08-01 時点で、以下をローカルで確認しました。
 
 - TypeScript: passed
-- Tests: 99 files / 746 tests passed
-- Production build: passed（22 pages / market status routeを含む）
-- Market browser check: passed（390 / 768 / 1280px。推薦後のnot configured / provider disabled / insufficient dataを確認。横overflow、小さい操作対象、console/hydration error 0件）
+- Tests: 105 files / 1,060 tests passed（market / beginner / colorwayの新規決定論的評価300件を含む）
+- Production build: passed（23 routes/pages、`/api/market/search`を含む）
+- Market browser check: passed（320 / 360 / 390 / 430 / 600 / 768 / 1024 / 1280 / 1440 / 1920px。横overflow、console error、hydration error 0件）
 - GitHub Actions: `Typecheck` / `Tests` / `Production build` の3ジョブを PR、`main` push、merge queue で実行する構成
-- External API contract: CI では Gemini / Rakuten / StockX のlive APIを呼ばず、fixture・mock・schema・deterministic forecastを検証。StockX liveは未確認
+- External API contract: CIではlive APIを呼ばない。2026-08-01のlive smokeは楽天が一時利用不可、Yahoo/eBayは結果未記録、AI colorwayは未実行のため、成功扱いにしていない
 
 ## 15. Future improvements
 

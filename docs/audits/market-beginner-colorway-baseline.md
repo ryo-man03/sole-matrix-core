@@ -1,6 +1,6 @@
 # Market / Beginner / Colorway baseline
 
-実施日: 2026-08-01（Asia/Tokyo）  
+実施日: 2026-08-01（Asia/Tokyo）
 開始 SHA: `76a9f47f9206caca9ba1c7bb4723cd4fa5efe01d`
 
 ## 実行結果
