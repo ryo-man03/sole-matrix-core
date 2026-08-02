@@ -1,9 +1,1 @@
-import { getUserProfileRequest } from "../../../../../server/routes/users";
-
-export async function GET(
-  _request: Request,
-  context: { params: Promise<{ userId: string }> },
-) {
-  const { userId } = await context.params;
-  return getUserProfileRequest(userId);
-}
+export async function GET(){return Response.json({ok:false,error:{code:"LEGACY_LOCAL_MEMORY_DISABLED",message:"新しいプロフィールAPIを利用してください。"}},{status:410})}
