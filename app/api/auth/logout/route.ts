@@ -1,14 +1,11 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { callSupabaseAuth, getSupabaseAuthConfig } from "../../../_lib/auth-session/supabaseAuthServer";
+import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "../../../../src/infrastructure/auth/supabase/server";
+import { validateMutationRequest } from "../../../../src/application/http/requestSecurity";
 
-export async function POST(request: NextRequest) {
-  const config = getSupabaseAuthConfig();
-  const accessToken = request.cookies.get("smx_access_token")?.value;
-  if (config && accessToken) {
-    await callSupabaseAuth(config, "logout", { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: "{}" });
-  }
-  const response = NextResponse.json({ ok: true, data: { signedOut: true } });
-  response.cookies.delete("smx_access_token");
-  response.cookies.delete("smx_refresh_token");
-  return response;
+export async function POST(request: Request) {
+  const guard = validateMutationRequest(request, { key: "logout", bodyRequired: false });
+  if (!guard.ok) return NextResponse.json({ ok: false, error: { code: guard.code } }, { status: guard.status });
+  const client = await createSupabaseServerClient();
+  if (client) await client.auth.signOut();
+  return NextResponse.json({ ok: true, data: { signedOut: true } });
 }
