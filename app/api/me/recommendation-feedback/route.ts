@@ -1,2 +1,55 @@
-import { NextResponse } from "next/server";import { canonicalSneakerKey } from "../../../../src/domain/identity/canonicalSneaker";import { saveRecommendationFeedback } from "../../../../src/infrastructure/repositories/recommendationHistoryRepository";import { failure,guard,privateUser,unauthenticated,validUuid } from "../../../../src/application/personalization/routeHelpers";
-export async function POST(r:Request){const g=guard(r,"recommendation-feedback");if(!g.ok)return NextResponse.json({ok:false},{status:g.status});const u=await privateUser();if(!u)return unauthenticated();try{const b=await r.json();if(typeof b!=="object"||b===null||Array.isArray(b)||Object.keys(b).some((k)=>!["snapshotId","sentiment","reasonCodes","comment","sneaker"].includes(k)))throw new Error("INVALID_FEEDBACK");const v=b as Record<string,unknown>;if(typeof v.snapshotId!=="string"||!validUuid(v.snapshotId)||!["liked","disliked","saved","hidden","purchased"].includes(String(v.sentiment))||!Array.isArray(v.reasonCodes)||v.reasonCodes.length>10||typeof v.sneaker!=="object"||v.sneaker===null)throw new Error("INVALID_FEEDBACK");const s=v.sneaker as Record<string,unknown>;const key=canonicalSneakerKey({brand:String(s.brand??""),modelName:String(s.modelName??""),modelFamily:typeof s.modelFamily==="string"?s.modelFamily:null,generation:typeof s.generation==="string"?s.generation:null,styleCode:typeof s.styleCode==="string"?s.styleCode:null,audience:(s.audience??"unknown") as never});const result=await saveRecommendationFeedback(u.id,{snapshotId:v.snapshotId,canonicalKey:key,sentiment:String(v.sentiment),reasonCodes:v.reasonCodes.filter((x):x is string=>typeof x==="string").slice(0,10),comment:typeof v.comment==="string"?v.comment.slice(0,500):null});return NextResponse.json({ok:true,data:result},{status:201})}catch(e){return failure(e)}}
+import { NextResponse } from "next/server";
+import { canonicalSneakerKey } from "../../../../src/domain/identity/canonicalSneaker";
+import { saveRecommendationFeedback } from "../../../../src/infrastructure/repositories/recommendationHistoryRepository";
+import { failure, guard, privateUser, unauthenticated, validUuid } from "../../../../src/application/personalization/routeHelpers";
+
+export async function POST(request: Request) {
+  const mutationGuard = guard(request, "recommendation-feedback");
+  if (!mutationGuard.ok) return NextResponse.json({ ok: false }, { status: mutationGuard.status });
+  const user = await privateUser();
+  if (!user) return unauthenticated();
+
+  try {
+    const body: unknown = await request.json();
+    if (!isRecord(body) || Object.keys(body).some((key) => !["snapshotId", "sentiment", "reasonCodes", "comment", "sneaker"].includes(key))) {
+      throw new Error("INVALID_FEEDBACK");
+    }
+    if (
+      typeof body.snapshotId !== "string"
+      || !validUuid(body.snapshotId)
+      || !["liked", "disliked", "saved", "hidden", "purchased"].includes(String(body.sentiment))
+      || !Array.isArray(body.reasonCodes)
+      || body.reasonCodes.length > 10
+      || !isRecord(body.sneaker)
+    ) {
+      throw new Error("INVALID_FEEDBACK");
+    }
+
+    const sneaker = body.sneaker;
+    const canonicalKey = canonicalSneakerKey({
+      brand: String(sneaker.brand ?? ""),
+      modelName: String(sneaker.modelName ?? ""),
+      modelFamily: typeof sneaker.modelFamily === "string" ? sneaker.modelFamily : null,
+      generation: typeof sneaker.generation === "string" ? sneaker.generation : null,
+      styleCode: typeof sneaker.styleCode === "string" ? sneaker.styleCode : null,
+      audience: (sneaker.audience ?? "unknown") as never,
+    });
+    const result = await saveRecommendationFeedback(user.id, {
+      snapshotId: body.snapshotId,
+      canonicalKey,
+      sentiment: String(body.sentiment),
+      reasonCodes: body.reasonCodes.filter((value): value is string => typeof value === "string").slice(0, 10),
+      comment: typeof body.comment === "string" ? body.comment.slice(0, 500) : null,
+    });
+    return NextResponse.json({ ok: true, data: result }, { status: 201 });
+  } catch (error) {
+    if (error instanceof Error && error.message === "SNAPSHOT_NOT_FOUND") {
+      return NextResponse.json({ ok: false, error: { code: "NOT_FOUND" } }, { status: 404 });
+    }
+    return failure(error);
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
