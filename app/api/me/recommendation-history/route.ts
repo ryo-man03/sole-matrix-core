@@ -1,0 +1,2 @@
+import { NextResponse } from "next/server";import { privateUser,unauthenticated,failure } from "../../../../src/application/personalization/routeHelpers";import { listRecommendationHistory } from "../../../../src/infrastructure/repositories/recommendationHistoryRepository";
+export async function GET(){const u=await privateUser();if(!u)return unauthenticated();try{return NextResponse.json({ok:true,data:{history:await listRecommendationHistory(u.id)}})}catch(e){return failure(e)}}

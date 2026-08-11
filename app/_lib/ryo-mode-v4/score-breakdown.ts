@@ -1,4 +1,5 @@
 import type { UserSneakerContext } from "../diagnosis/sneakerContext";
+import { canonicalSneakerKeyFromName, compareCanonicalSneakers } from "../../../src/domain/identity/canonicalSneaker";
 import type { CoreScoredCandidate } from "./candidates";
 import type { RyoModeCandidateEvaluation } from "./integration";
 import type {
@@ -129,18 +130,20 @@ export function calculateUserContextPenalty(
   for (const owned of context.ownedModels) {
     const normalized = comparable(owned);
     if (!normalized) continue;
-    if (candidate === normalized || candidate.includes(normalized) || normalized.includes(candidate)) {
+    const canonicalMatch = compareCanonicalSneakers(canonicalSneakerKeyFromName(candidateName), canonicalSneakerKeyFromName(owned));
+    if (canonicalMatch === "exact_style_code" || canonicalMatch === "exact_model") {
       exactOwnedMatch = true;
       penalty = Math.max(penalty, context.purchasePurpose === "second_pair" ? 34 : 26);
       reasons.push(`所有モデルと重複: ${owned}`);
-    } else if (modelFamily(normalized) === family) {
+    } else if (canonicalMatch === "family_related" || modelFamily(normalized) === family) {
       penalty = Math.max(penalty, context.purchasePurpose === "second_pair" ? 16 : 10);
       reasons.push(`所有モデルと近い系統: ${owned}`);
     }
   }
   for (const disliked of context.dislikedModels) {
     const normalized = comparable(disliked);
-    if (normalized && (candidate.includes(normalized) || normalized.includes(candidate))) {
+    const canonicalMatch = compareCanonicalSneakers(canonicalSneakerKeyFromName(candidateName), canonicalSneakerKeyFromName(disliked));
+    if (normalized && (canonicalMatch === "exact_style_code" || canonicalMatch === "exact_model")) {
       penalty += 50;
       reasons.push(`避けたいモデルに一致: ${disliked}`);
     }

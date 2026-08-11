@@ -9,6 +9,7 @@ export async function registerUserRequest(
   request: Request,
   service: UserMemoryService = userMemoryService,
 ): Promise<Response> {
+  if (process.env.NODE_ENV === "production") return localMemoryDisabled();
   try {
     const body = await readJsonRecord(request);
     const data = await service.registerUser({
@@ -25,6 +26,7 @@ export async function getUserProfileRequest(
   userId: string,
   service: UserMemoryService = userMemoryService,
 ): Promise<Response> {
+  if (process.env.NODE_ENV === "production") return localMemoryDisabled();
   try {
     const data = await service.getUserMemory(userId);
     return Response.json({ ok: true, data });
@@ -38,6 +40,7 @@ export async function saveUserFeedbackRequest(
   userId: string,
   service: UserMemoryService = userMemoryService,
 ): Promise<Response> {
+  if (process.env.NODE_ENV === "production") return localMemoryDisabled();
   try {
     const body = await readJsonRecord(request);
     const data = await service.saveFeedback(userId, {
@@ -53,6 +56,10 @@ export async function saveUserFeedbackRequest(
   } catch (error) {
     return userErrorResponse(error, "フィードバックを保存できませんでした。");
   }
+}
+
+function localMemoryDisabled() {
+  return Response.json({ ok: false, error: { code: "LOCAL_MEMORY_DISABLED", message: "ローカルメモリは開発環境専用です。" } }, { status: 410 });
 }
 
 function userErrorResponse(error: unknown, fallbackMessage: string): Response {
