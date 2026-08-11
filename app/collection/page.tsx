@@ -1,0 +1,1 @@
+import { AppShell } from "../_components/AppShell";import { MainContainer } from "../_components/MainContainer";import { SneakerCollection } from "../_components/PersonalizationForms";export default function Page(){return <AppShell><MainContainer labelledBy="collection-title"><h1 id="collection-title">所有しているスニーカー</h1><SneakerCollection kind="owned"/></MainContainer></AppShell>}
