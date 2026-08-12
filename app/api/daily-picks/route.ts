@@ -1,0 +1,2 @@
+import { NextResponse } from "next/server";import { privateUser,unauthenticated,failure } from "../../../src/application/personalization/routeHelpers";import { getDailyPickBatch } from "../../../src/infrastructure/repositories/dailyPickRepository";
+export const dynamic="force-dynamic";export async function GET(){const u=await privateUser();if(!u)return unauthenticated();try{return NextResponse.json({ok:true,data:{batch:await getDailyPickBatch(u.id),externalRequests:0}})}catch(e){return failure(e)}}
