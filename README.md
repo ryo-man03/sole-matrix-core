@@ -1,5 +1,11 @@
 # SOLE//MATRIX
 
+## Pre-API personalization foundation
+
+The application now includes Supabase SSR session refresh, RLS-backed profiles and consent, structured preferences and sizes, private collection/wishlist/history, canonical sneaker identity, and deterministic daily picks at `/today`. Database changes are additive migrations under `supabase/migrations`; run `pnpm test:migrations` and `pnpm test:rls` before applying them to a local Supabase stack.
+
+Release data is fixture/manual-seed only. Login and `/today` never call an external Release Provider, market search, or AI service. Fixture releases are disabled in production. Production migration and deployment are intentionally outside this change; the authorized-provider next phase is documented in `docs/roadmap/authorized-release-provider-handoff.md`.
+
 [![CI](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml/badge.svg)](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml)
 
 スニーカーを、流行や価格だけでなく、歴史・素材・服との相性・文化背景まで含めて整理し、購入判断を補助する Web アプリです。

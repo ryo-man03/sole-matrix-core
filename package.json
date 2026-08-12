@@ -13,12 +13,18 @@
     "test:watch": "vitest",
     "test:db": "vitest run supabase/tests",
     "test:rls": "vitest run supabase/tests",
+    "lint": "tsc --noEmit",
+    "e2e": "playwright test",
+    "test:a11y": "playwright test --grep @a11y",
+    "test:migrations": "tsx scripts/verify-migrations.ts",
+    "test:security": "vitest run src/application/security",
     "typecheck": "tsc --noEmit",
     "web:dev": "next dev",
     "web:build": "next build",
     "web:start": "next start"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "latest",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
