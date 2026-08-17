@@ -72,7 +72,7 @@ function isGender(value: unknown): value is MarketSearchContext["gender"] {
 }
 
 function isCondition(value: unknown): value is MarketSearchContext["condition"] {
-  return typeof value === "string" && ["new", "used", "refurbished", "unknown"].includes(value);
+  return typeof value === "string" && ["new", "used", "unknown"].includes(value);
 }
 
 function isSizeSystem(value: unknown): value is MarketSizeSystem {

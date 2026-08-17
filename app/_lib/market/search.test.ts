@@ -22,7 +22,7 @@ describe("searchCurrentMarketPrices", () => {
 });
 
 function emptyResult(provider: "rakuten" | "yahoo" | "ebay"): MarketProviderResult {
-  return { provider, status: "empty", listings: [], audit: emptyProviderAudit(provider), message: "empty" };
+  return { provider, status: "empty", listings: [], fetchedAt: null, audit: emptyProviderAudit(provider), message: "empty" };
 }
 
 function context(): MarketSearchContext {

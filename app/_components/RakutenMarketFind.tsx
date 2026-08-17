@@ -109,11 +109,11 @@ function ProviderSection({ provider }: { provider: MarketProviderResult }) {
         <div><h5 id={`market-provider-${provider.provider}`}>{PROVIDER_LABELS[provider.provider]}</h5><p>{PROVIDER_PRICE_EXPLANATIONS[provider.provider]}</p></div>
         <span>{providerStatusMessage(provider.status)}</span>
       </div>
-      {primary.length ? <div className="rakuten-market-find-grid">{primary.map((listing) => <MarketListingCard key={listing.providerItemId ?? listing.itemUrl} listing={listing} />)}</div> : null}
-      {related.length ? <details className="market-related-listings"><summary>比較用の関連候補 {related.length}件</summary><p>推薦モデルそのものとは限りません。別カラー・別世代・別サイズとして確認してください。</p><div className="rakuten-market-find-grid">{related.map((listing) => <MarketListingCard key={listing.providerItemId ?? listing.itemUrl} listing={listing} />)}</div></details> : null}
+      {primary.length ? <div className="rakuten-market-find-grid">{primary.map((listing) => <MarketListingCard key={listing.externalId ?? listing.itemUrl} listing={listing} />)}</div> : null}
+      {related.length ? <details className="market-related-listings"><summary>比較用の関連候補 {related.length}件</summary><p>推薦モデルそのものとは限りません。別カラー・別世代・別サイズとして確認してください。</p><div className="rakuten-market-find-grid">{related.map((listing) => <MarketListingCard key={listing.externalId ?? listing.itemUrl} listing={listing} />)}</div></details> : null}
       <details className="market-technical-details"><summary>技術的な取得詳細</summary><dl>
         <div><dt>正規化</dt><dd>{provider.audit.normalizedCount}件</dd></div>
-        <div><dt>一致度</dt><dd>完全 {provider.audit.exactCount} / 高 {provider.audit.highCount} / 関連 {provider.audit.relatedCount} / 除外 {provider.audit.rejectedCount}</dd></div>
+        <div><dt>一致度</dt><dd>完全 {provider.audit.exactCount} / 高確度 {provider.audit.probableCount} / 関連 {provider.audit.relatedCount} / 除外 {provider.audit.rejectedCount}</dd></div>
         <div><dt>不足情報</dt><dd>サイズ {provider.audit.missingSizeCount} / 状態 {provider.audit.missingConditionCount} / 送料 {provider.audit.missingShippingCount}</dd></div>
         <div><dt>通貨</dt><dd>{Object.entries(provider.audit.currencyCount).map(([currency, count]) => `${currency} ${count}`).join(" / ") || "なし"}</dd></div>
       </dl></details>
@@ -155,7 +155,6 @@ function shippingLabel(price: ReturnType<typeof toPricePresentation>): string {
 function conditionLabel(condition: MarketListing["condition"]): string {
   if (condition === "new") return "新品";
   if (condition === "used") return "中古";
-  if (condition === "refurbished") return "再生品";
   return "未確認";
 }
 
