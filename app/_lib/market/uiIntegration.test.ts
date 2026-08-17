@@ -35,6 +35,7 @@ describe("beginner market price result UI", () => {
     expect(marketSource).toContain("商品情報の確認内容を見る");
     expect(panelSource).toContain("相場データ・履歴・技術情報を見る");
     expect(marketSource).toContain('target="_blank" rel="noreferrer"');
+    expect(marketSource).toContain("Supported by Rakuten Developers");
   });
 
   it("retains the previous result and separates related listings", () => {

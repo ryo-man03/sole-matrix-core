@@ -142,6 +142,7 @@ export type RecommendationExplanation = {
 
 export type ProviderReadinessStatus =
   | "ready"
+  | "manual_only"
   | "fallback"
   | "missing_config"
   | "blocked_forbidden"

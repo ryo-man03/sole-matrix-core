@@ -18,6 +18,16 @@ describe("market provider operation policy", () => {
     }
   });
 
+  it.each(["rakuten", "yahoo"] as const)(
+    "keeps %s listings request-scoped and non-persistent",
+    (provider) => {
+      expect(() => assertMarketProviderOperationAllowed(provider, "temporary_display"))
+        .not.toThrow();
+      expect(() => assertMarketProviderOperationAllowed(provider, "persist"))
+        .toThrow(MarketProviderOperationDeniedError);
+    },
+  );
+
   it("makes every safety metric react to an intentionally broken fixture", () => {
     expect(countRecommendationRankingMutations(["one", "two"], ["two", "one"])).toBeGreaterThan(0);
     expect(countSensitiveMarketValueExposures(

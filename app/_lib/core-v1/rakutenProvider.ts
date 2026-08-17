@@ -38,7 +38,7 @@ export type RakutenCandidateProvider = (
 ) => Promise<RakutenCandidateProviderResult>;
 
 const itemSearchEndpoint =
-  "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401";
+  "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701";
 
 export async function fetchRakutenCandidates(
   input: RakutenCandidateProviderInput,
@@ -51,6 +51,7 @@ export async function fetchRakutenCandidates(
   const env = options.env ?? process.env;
   const applicationId = env["RAKUTEN_APPLICATION_ID"]?.trim();
   const accessKey = env["RAKUTEN_ACCESS_KEY"]?.trim();
+  const requestOrigin = normalizeHttpOrigin(env["RAKUTEN_REQUEST_ORIGIN"]);
 
   if (!applicationId || !accessKey) {
     return failure("missing_config", false, false, false);
@@ -84,7 +85,13 @@ export async function fetchRakutenCandidates(
   try {
     response = await fetcher(url, {
       method: "GET",
-      headers: { accessKey },
+      headers: {
+        accessKey,
+        ...(requestOrigin
+          ? { Origin: requestOrigin, Referer: `${requestOrigin}/` }
+          : {}),
+      },
+      cache: "no-store",
       signal: AbortSignal.timeout(8_000),
     });
   } catch {
@@ -225,6 +232,17 @@ function normalizeSearchPart(value: string | undefined): string | undefined {
     .trim()
     .slice(0, 50);
   return normalized || undefined;
+}
+
+function normalizeHttpOrigin(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length > 512) return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    return url.origin;
+  } catch {
+    return undefined;
+  }
 }
 
 function createCandidateVector(

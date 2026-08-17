@@ -2,6 +2,8 @@
 
 Live smoke is a local, read-only verification step. It is never run in CI, login, `/today`, or page rendering. Run it only after checking the current provider terms and placing approved credentials in `.env.local`.
 
+For a website-restricted Rakuten application, also set `RAKUTEN_REQUEST_ORIGIN` to the exact origin registered under Allowed Websites. The adapter derives both `Origin` and root `Referer` from this value. Do not guess a domain or put credentials in this variable.
+
 ```powershell
 pnpm market:smoke --provider rakuten --live
 pnpm market:smoke --provider yahoo --live
@@ -13,3 +15,5 @@ Each command performs one provider invocation. The shared request layer limits e
 The output is a bounded JSON summary: provider status, normalized/match counts, currencies, missing fields, elapsed time, and one normalized sample containing title, price, currency, condition, and match level. It does not include credentials, authorization headers, raw responses, URLs, or tokens.
 
 Interpret status literally. `success` and `empty` prove that a live response passed the current schema boundary. `not_configured`, `unauthorized`, `rate_limited`, `timeout`, `schema_error`, and `temporarily_unavailable` are not live verification success. Record the date and safe status in `provider-access-status.md`; never paste raw provider bodies into the repository.
+
+Rakuten recovery is limited to at most three calls in one verification session: a known model, an exact Style Code, and a negative query. Stop earlier when a provider-local configuration or authorization error is conclusive.

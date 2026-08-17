@@ -132,6 +132,7 @@ export async function searchRakutenProducts(
   };
   if (requestOrigin) {
     headers.Origin = requestOrigin;
+    headers.Referer = `${requestOrigin}/`;
   }
 
   let response: Response;
@@ -153,7 +154,14 @@ export async function searchRakutenProducts(
       response.status,
     );
   }
-  if (!body || body.error) {
+  if (!body) {
+    throw new RakutenApiError(
+      "Rakuten API returned an invalid response.",
+      "invalid_response",
+      response.status,
+    );
+  }
+  if (body.error) {
     throw new RakutenApiError(
       safeApiMessage(body, "Rakuten API returned an invalid response."),
       responseErrorCode(body),

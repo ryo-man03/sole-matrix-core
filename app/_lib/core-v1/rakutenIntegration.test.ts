@@ -18,7 +18,29 @@ const input = {
   budgetYen: 20_000,
 };
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("Core v1 Rakuten candidate integration", () => {
+  it("keeps the production default manual and performs no Rakuten request", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetcher);
+
+    const result = await recommendCoreV1(input, {
+      candidateRepository: mockCandidateRepository,
+      explanationProvider: async () => explanation,
+      env: {
+        RAKUTEN_APPLICATION_ID: "configured-application",
+        RAKUTEN_ACCESS_KEY: "configured-access-key",
+      },
+    });
+
+    expect(result.readiness.rakuten.status).toBe("manual_only");
+    expect(result.externalEvidence.listings).toEqual([]);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("keeps normalized Rakuten listings outside Core scoring and Decision", async () => {
     const withRakuten = await recommendCoreV1(input, {
       candidateRepository: mockCandidateRepository,
