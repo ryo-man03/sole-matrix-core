@@ -28,8 +28,8 @@ export type ProviderPolicyRecord = Readonly<{
 
 export const PROVIDER_POLICY_REGISTRY: readonly ProviderPolicyRecord[] = [
   { provider: "rakuten", verificationStatus: "implemented_unverified", temporaryDisplay: "allowed", persistence: "unknown", forecast: "prohibited", recommendationScore: "prohibited" },
-  { provider: "yahoo", verificationStatus: "implemented_unverified", temporaryDisplay: "allowed", persistence: "unknown", forecast: "prohibited", recommendationScore: "prohibited" },
-  { provider: "ebay", verificationStatus: "implemented_unverified", temporaryDisplay: "allowed", persistence: "prohibited", forecast: "prohibited", recommendationScore: "prohibited" },
+  { provider: "yahoo", verificationStatus: "live_verified", temporaryDisplay: "allowed", persistence: "unknown", forecast: "prohibited", recommendationScore: "prohibited" },
+  { provider: "ebay", verificationStatus: "live_verified", temporaryDisplay: "allowed", persistence: "prohibited", forecast: "prohibited", recommendationScore: "prohibited" },
   { provider: "stockx", verificationStatus: "policy_blocked", temporaryDisplay: "prohibited", persistence: "prohibited", forecast: "prohibited", recommendationScore: "prohibited" },
   { provider: "alias", verificationStatus: "approval_pending", temporaryDisplay: "requires_approval", persistence: "prohibited", forecast: "prohibited", recommendationScore: "prohibited" },
 ] as const;

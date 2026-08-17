@@ -18,8 +18,8 @@ describe("current market provider adapters", () => {
     const currentPriceProviders = MARKET_PROVIDER_CAPABILITIES.filter(({ provider }) => (
       provider === "rakuten" || provider === "yahoo" || provider === "ebay"
     ));
-    expect(currentPriceProviders.every(({ status }) => status === "implemented_unverified")).toBe(true);
-    expect(currentPriceProviders.some(({ status }) => status === "live_verified")).toBe(false);
+    expect(currentPriceProviders.find(({ provider }) => provider === "rakuten")?.status).toBe("implemented_unverified");
+    expect(currentPriceProviders.filter(({ status }) => status === "live_verified").map(({ provider }) => provider)).toEqual(["yahoo", "ebay"]);
   });
 
   it("normalizes Yahoo retail price and keeps unknown shipping unknown", async () => {

@@ -267,9 +267,9 @@ EXTERNAL_PROVIDERS_DISABLED=true
 通常テストとCIでは`EXTERNAL_PROVIDERS_DISABLED=true`を使います。ローカルlive smokeはProviderごとに最大1検索です。
 
 ```powershell
-pnpm market:smoke --provider rakuten
-pnpm market:smoke --provider yahoo
-pnpm market:smoke --provider ebay
+pnpm market:smoke --provider rakuten --live
+pnpm market:smoke --provider yahoo --live
+pnpm market:smoke --provider ebay --live
 ```
 
 eBay OAuth tokenとAPI raw responseは保存せず、クライアントへ返しません。
@@ -281,14 +281,15 @@ eBay OAuth tokenとAPI raw responseは保存せず、クライアントへ返し
 
 ## 14. Verification
 
-2026-08-01 時点で、以下をローカルで確認しました。
+2026-08-17 時点で、以下をローカルで確認しました。
 
 - TypeScript: passed
-- Tests: 105 files / 1,060 tests passed（market / beginner / colorwayの新規決定論的評価300件を含む）
-- Production build: passed（23 routes/pages、`/api/market/search`を含む）
+- Tests: 132 files / 1,947 tests passed（Provider 488、Security 77、RLS 117を別ゲートでも確認）
+- Production build: passed（`/api/market/search`と`/api/me/fit-confidence`を含む）
 - Market browser check: passed（320 / 360 / 390 / 430 / 600 / 768 / 1024 / 1280 / 1440 / 1920px。横overflow、console error、hydration error 0件）
 - GitHub Actions: `Typecheck` / `Tests` / `Production build` の3ジョブを PR、`main` push、merge queue で実行する構成
-- External API contract: CIではlive APIを呼ばない。2026-08-01のlive smokeは楽天が一時利用不可、Yahoo/eBayは結果未記録、AI colorwayは未実行のため、成功扱いにしていない
+- External API contract: CIではlive APIを呼ばない。2026-08-17のbounded smokeは楽天`unauthorized`、Yahoo 4件`success`、eBay 10件`success`。secret/raw response露出0件
+- Dependency audit: known vulnerabilities 0件（transitive patched版をworkspace overrideで固定）
 
 ## 15. Future improvements
 

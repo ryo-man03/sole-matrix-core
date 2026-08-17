@@ -38,8 +38,8 @@ export type MarketProviderCapability = Readonly<{
 
 export const MARKET_PROVIDER_CAPABILITIES: readonly MarketProviderCapability[] = [
   { provider: "rakuten", status: "implemented_unverified", priceSemantics: ["current_retail_price"], automatedSearch: true, persistentStorage: false },
-  { provider: "yahoo", status: "implemented_unverified", priceSemantics: ["current_retail_price"], automatedSearch: true, persistentStorage: false },
-  { provider: "ebay", status: "implemented_unverified", priceSemantics: ["current_listing_price"], automatedSearch: true, persistentStorage: false },
+  { provider: "yahoo", status: "live_verified", priceSemantics: ["current_retail_price"], automatedSearch: true, persistentStorage: false },
+  { provider: "ebay", status: "live_verified", priceSemantics: ["current_listing_price"], automatedSearch: true, persistentStorage: false },
   { provider: "stockx", status: "policy_blocked", priceSemantics: [], automatedSearch: false, persistentStorage: false },
   { provider: "alias", status: "approval_pending", priceSemantics: [], automatedSearch: false, persistentStorage: false },
 ] as const;
