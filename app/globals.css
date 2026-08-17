@@ -5525,3 +5525,61 @@ a {
     grid-template-columns: 1fr;
   }
 }
+
+.post-purchase-feedback {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+}
+
+.post-purchase-feedback h5,
+.post-purchase-feedback p {
+  margin: 0.25rem 0;
+}
+
+.post-purchase-feedback-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.post-purchase-feedback-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.post-purchase-feedback-form select,
+.post-purchase-feedback-form input,
+.post-purchase-feedback-form textarea {
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.post-purchase-feedback-note,
+.post-purchase-feedback-actions {
+  grid-column: 1 / -1;
+}
+
+.post-purchase-feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+@media (max-width: 560px) {
+  .post-purchase-feedback-form {
+    grid-template-columns: 1fr;
+  }
+}

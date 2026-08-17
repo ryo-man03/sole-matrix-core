@@ -53,19 +53,19 @@ const brandCases = Array.from({ length: 10 }, (_, index) => ({
 describe("Fit and Purchase Confidence matrix (60+ deterministic cases)", () => {
   it.each(exactCases)("treats an exact owned reference as strong: %#", (owned) => {
     const result = evaluateFitConfidence(candidate, [owned], []);
-    expect(result.state).toBe("strong_reference");
+    expect(result.state).toBe("strong");
     expect(result.referenceCount).toBe(1);
   });
 
   it.each(familyCases)("keeps another generation as a qualified family reference: %#", (owned) => {
     const result = evaluateFitConfidence(candidate, [owned], []);
-    expect(result.state).toBe("some_reference");
+    expect(result.state).toBe("limited");
     expect(result.cautions.join(" ")).toContain("別世代");
   });
 
   it.each(brandCases)("keeps a same-brand different model as limited evidence: %#", (owned) => {
     const result = evaluateFitConfidence(candidate, [owned], []);
-    expect(result.state).toBe("limited_reference");
+    expect(result.state).toBe("limited");
     expect(result.reasons.join(" ")).toContain("同じブランド");
   });
 
@@ -91,7 +91,7 @@ describe("Fit and Purchase Confidence matrix (60+ deterministic cases)", () => {
     const result = evaluatePurchaseConfidence({
       verificationState,
       providers,
-      fit: { state: "unknown", reasons: [], cautions: [], referenceCount: 0 },
+      fit: { state: "unknown", reasons: [], cautions: [], referenceCount: 0, feedbackCount: 0 },
     });
     expect(result.productIdentity).toBe(identity);
     expect(result.marketMatch).toBe(market);
@@ -108,7 +108,7 @@ describe("Fit and Purchase Confidence matrix (60+ deterministic cases)", () => {
   });
 
   it("parses only bounded fit payloads", () => {
-    const fit = { state: "some_reference", reasons: ["同系統"], cautions: ["別世代"], referenceCount: 2 };
+    const fit = { state: "medium", reasons: ["同系統"], cautions: ["同世代"], referenceCount: 2, feedbackCount: 1 };
     expect(parseFitConfidencePayload({ ok: true, data: { fit } })).toEqual(fit);
     expect(parseFitConfidencePayload({ ok: true, data: { fit: { ...fit, referenceCount: -1 } } })).toBeNull();
   });
@@ -119,9 +119,48 @@ describe("Fit and Purchase Confidence matrix (60+ deterministic cases)", () => {
     evaluatePurchaseConfidence({
       verificationState: "model_color_style_verified",
       providers: [evidence],
-      fit: { state: "strong_reference", reasons: [], cautions: [], referenceCount: 1 },
+      fit: { state: "strong", reasons: [], cautions: [], referenceCount: 1, feedbackCount: 0 },
     });
     expect(JSON.stringify(evidence)).toBe(before);
+  });
+
+  it("uses medium only for a compatible same-family, same-generation size record", () => {
+    const result = evaluateFitConfidence(candidate, [{
+      ...familyCases[0], model_name: "991 Made in UK v2", generation: "v2", size_value: 26,
+    }], []);
+    expect(result.state).toBe("medium");
+  });
+
+  it("does not treat an incompatible audience as a strong exact reference", () => {
+    const result = evaluateFitConfidence({ ...candidate, audience: "men" }, [{ ...exactCases[0], audience: "women" }], []);
+    expect(result.state).toBe("limited");
+    expect(result.cautions.join(" ")).toContain("サイズ基準");
+  });
+
+  it("uses structured post-purchase feedback as reference evidence", () => {
+    const owned = exactCases[0]!;
+    const result = evaluateFitConfidence(candidate, [], [], [{
+      size_system: "JP", size_value: 26, overall_fit: "true_to_size", same_size_again: true, owned_sneakers: owned,
+    }]);
+    expect(result).toMatchObject({ state: "strong", feedbackCount: 1, referenceCount: 1 });
+  });
+
+  it("keeps Purchase Confidence invariant when only prices change", () => {
+    const original = provider("exact");
+    const repriced = structuredClone(original) as MarketProviderResult;
+    if (repriced.status === "success") Object.assign(repriced.listings[0]!, { price: 9_999_999, totalDisplayedPrice: 9_999_999 });
+    const input = { verificationState: "model_color_style_verified" as const, fit: { state: "strong" as const, reasons: [], cautions: [], referenceCount: 1, feedbackCount: 0 }, now: "2026-08-12T00:05:00.000Z" };
+    expect(evaluatePurchaseConfidence({ ...input, providers: [original] })).toEqual(evaluatePurchaseConfidence({ ...input, providers: [repriced] }));
+  });
+
+  it("reports condition, shipping, and listing freshness independently", () => {
+    const result = evaluatePurchaseConfidence({
+      verificationState: "model_color_style_verified",
+      providers: [provider("exact")],
+      fit: { state: "unknown", reasons: [], cautions: [], referenceCount: 0, feedbackCount: 0 },
+      now: "2026-08-14T00:00:01.000Z",
+    });
+    expect(result).toMatchObject({ conditionClarity: "high", shippingClarity: "low", listingFreshness: "low" });
   });
 });
 

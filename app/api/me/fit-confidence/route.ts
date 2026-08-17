@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { evaluateFitConfidence, type FitCandidateIdentity } from "../../../_lib/market/confidence";
 import { privateUser, unauthenticated } from "../../../../src/application/personalization/routeHelpers";
 import { listOwnedRows } from "../../../../src/infrastructure/repositories/personalizationRepository";
+import { listFitFeedbackRows } from "../../../../src/infrastructure/repositories/postPurchaseRepository";
 
 export async function POST(request: Request) {
   const user = await privateUser();
@@ -12,11 +13,12 @@ export async function POST(request: Request) {
   const candidate = parseCandidate(value);
   if (!candidate) return NextResponse.json({ ok: false, error: "invalid_candidate" }, { status: 400 });
   try {
-    const [owned, sizes] = await Promise.all([
+    const [owned, sizes, feedback] = await Promise.all([
       listOwnedRows("owned_sneakers", user.id),
       listOwnedRows("user_sizes", user.id),
+      listFitFeedbackRows(user.id),
     ]);
-    return NextResponse.json({ ok: true, data: { fit: evaluateFitConfidence(candidate, owned, sizes) } }, {
+    return NextResponse.json({ ok: true, data: { fit: evaluateFitConfidence(candidate, owned, sizes, feedback) } }, {
       headers: { "Cache-Control": "private, no-store, max-age=0" },
     });
   } catch {

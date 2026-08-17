@@ -27,6 +27,20 @@ export async function recordConsent(userId: string, type: ConsentType, granted: 
   if (error) throw new Error("CONSENT_WRITE_FAILED");
 }
 
+export async function hasCurrentConsent(userId: string, type: ConsentType): Promise<boolean> {
+  const db = await createSupabaseServerClient();
+  if (!db) return false;
+  const { data, error } = await db.from("consent_records")
+    .select("granted")
+    .eq("user_id", userId)
+    .eq("consent_type", type)
+    .order("recorded_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return !error && data?.granted === true;
+}
+
 export async function createPrivacyRequest(userId: string, requestType: "export" | "delete") {
   const db = await createSupabaseServerClient();
   if (!db) throw new Error("DATABASE_NOT_CONFIGURED");

@@ -1,16 +1,16 @@
-# Fit Confidence
+# Fit Confidence V2
 
-Fit Confidence は、購入候補のサイズ感を断定する機能ではなく、ログイン利用者が登録した `owned_sneakers` と `user_sizes` から「どの程度近い履歴を参照できるか」を示す補助情報です。
+Fit Confidence はサイズの断定ではなく、購入候補にどの程度近い個人履歴があるかを示す意思決定支援です。認証済み利用者自身の `owned_sneakers`、`user_sizes`、構造化された `fit_feedback` だけを参照し、Core Score、Ryo Score、推薦順位、最終Decisionは変更しません。
 
-## 判定段階
+## 参照レベル
 
-| 状態 | 根拠 |
+| レベル | 必要な根拠 |
 | --- | --- |
-| `strong_reference` | 同一 Style Code または同一モデルに、サイズ付き所有履歴がある |
-| `some_reference` | 同一モデル、または同一モデルファミリーの履歴がある |
-| `limited_reference` | 同一ブランドの履歴、または通常サイズだけがある |
-| `unknown` | 参照できる履歴がない |
+| `strong` | 同じCanonical model（Style Codeまたはブランド＋モデル）で、互換性のあるAudienceと有効なサイズ記録がある |
+| `medium` | 同じModel family、同じGeneration、互換性のあるAudience、有効なサイズ記録がそろう |
+| `limited` | 同じブランド、別世代、通常サイズのみ、または弱い購入後フィードバックしかない |
+| `unknown` | 利用できる履歴がない |
 
-世代、メンズ／ウィメンズ／キッズ、JP・US・UK・EU表記、履歴内のサイズ差を別々に確認し、衝突は注意事項として表示します。足型の医学的評価、着用感の保証、サイズ変換の自動断定は行いません。
+Generation、メンズ／ウィメンズ／キッズ、JP・US・UK・EU表記、履歴内のサイズ差を別々に確認します。フィードバックが `too_small`、`too_large`、または「次回は同じサイズを選ばない」の場合は注意を追加します。
 
-データは認証済みユーザーIDで絞り込み、レスポンスは `private, no-store` です。DB未設定や一時障害では `unknown` に退避し、推薦結果を変更しません。
+この機能は「必ず合う」「完璧なサイズ」を保証せず、医学的・整形外科的な診断もしません。メーカーサイズ表、販売先の返品条件、実際の試着を置き換えるものではありません。レスポンスは `private, no-store` で、DB障害時は `unknown` に安全退避します。
