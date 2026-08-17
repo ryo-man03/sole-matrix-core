@@ -10,7 +10,7 @@ Release data is fixture/manual-seed only. Login and `/today` never call an exter
 
 スニーカーを、流行や価格だけでなく、歴史・素材・服との相性・文化背景まで含めて整理し、購入判断を補助する Web アプリです。
 
-商品名・URL・画像からの単体判断と、11問診断にもとづく推薦を分けて扱い、Gemini の候補調査、TypeScript Core / Ryo Mode の推薦判断、Rakuten `market_find` の購入サポート、認可境界を持つ Market Intelligence を明確に分離しています。価格、在庫、サイズ、真贋、購入可能性、将来価格、利益は保証しません。
+商品名・URL・画像からの単体判断と、11問診断にもとづく推薦を分けて扱い、Gemini の候補調査、TypeScript Core / Ryo Mode の推薦判断、楽天市場・Yahoo!ショッピング・eBayの購入参考情報、Fit / Purchase Confidenceを明確に分離しています。価格、在庫、サイズ、真贋、購入可能性、将来価格、利益は保証しません。
 
 ## 1. Overview
 
@@ -21,8 +21,8 @@ SOLE//MATRIX は、好みを言語化しにくい人でも、服装・パンツ�
 - 商品名・URL・画像から個別の商品判断ができる
 - Gemini を候補調査と補助説明に使い、Core がモデル名・正式カラー名・Style Code・根拠 URL の検証、fallback、再ランキング、最終判断を担う
 - Ryo Mode v4 で文化背景、素材の育ち、パンツ相性を強く反映する
-- Rakuten `market_find` で、推薦後に楽天市場の購入候補を別枠で探せる
-- StockX公式APIのadapter/contract、disabled provider、正規化snapshot、履歴・統計・backtest予測を推薦後の別枠で扱う
+- 推薦後、明示ボタンから楽天市場・Yahoo!ショッピングの現在販売価格とeBayの現在出品価格を別枠で確認できる
+- 商品同一性、販売商品の一致度、所有・サイズ履歴の近さを混ぜずにPurchase Confidenceとして確認できる
 - 価格・在庫・サイズ・真贋・購入可能性・利益は販売元と利用者自身で要確認
 
 ## 2. Screenshots
@@ -91,15 +91,16 @@ Ryo Mode は汎用的な AI プロンプトではなく、11問の回答を構�
 
 Gemini 候補は、モデル、カラー、Style Code の根拠を分けて確認します。カラーを同一モデルの信頼できる出典で確認できない場合は推測せず、「モデル確認済み・カラー未確認」と表示します。出典品質は公式、正規取扱店、信頼できる販売店・メディア、マーケットプレイス、未分類に分けます。Core 内の静的候補は「Core候補」、楽天の商品は「楽天市場の購入参考候補」として区別します。
 
-Rakuten `market_find` は推薦後の購入サポートです。Market Intelligence はそのさらに後段で、認可済みまたは利用者が正当に取得した価格観測だけを扱います。どちらも Core / Ryo Mode のスコア、ランキング、最終 Decision を変更しません。また、公式モデル同定、正規品判定、価格・在庫・サイズの保証には使いません。
+Market Intelligence V2 は推薦後の購入サポートです。楽天市場・Yahoo!ショッピング・eBayの規約内APIから現在情報だけを取得し、Core / Ryo Mode のスコア、ランキング、最終 Decision を変更しません。公式モデル同定、正規品判定、価格・在庫・サイズの保証にも使いません。
 
 | Role | Responsibility |
 | --- | --- |
 | Preference / recommendation logic | TypeScript Core / Ryo Mode v4 |
 | Grounded candidate research / explanation support | Gemini / Google Search Grounding |
 | Validation / schema / fallback / final decision | TypeScript Core |
-| Purchase-support product search | Rakuten `market_find` |
-| Canonical identity / authorized market data / forecast | Market Intelligence（決定論的TypeScript） |
+| Current retail / listing search | Market Intelligence V2（決定論的TypeScript） |
+| Owned-size reference | Fit Confidence（認証済み個人データ） |
+| Purchase evidence summary | Purchase Confidence（推薦後・非スコア） |
 | Feedback persistence | UI / localStorage |
 
 ## 7. Scoring structure
@@ -144,59 +145,46 @@ Rakuten `market_find` は推薦後の購入サポートです。Market Intellige
 
 ## 10. Market Intelligence
 
-市場情報は推薦判断と分離しています。AI推薦は価格予測を決定せず、価格予測も推薦順位を変更しません。
+市場情報は推薦判断と分離しています。ログイン、`/today`、推薦結果の初期表示では外部Providerへ接続せず、利用者が購入参考情報のボタンを押した場合だけ検索します。
 
 ```text
 Diagnosis
   → Search Slots
   → Verified Recommendation
   → Canonical Identity
-  → Authorized Providers
-  → Market Snapshots
-  → Historical Series
-  → Rolling-origin Backtest
-  → 7日 / 30日 Forecast
-  → Responsive Market UI
+  → Explicit user action
+  → Authorized current-price Providers
+  → Exact / Probable / Related / Rejected
+  → Purchase Confidence UI
 ```
 
 ### Provider capability
 
 | Provider | 現在の扱い | 自動通信 |
 | --- | --- | --- |
-| StockX | 公式v2 adapter、OAuth、catalog/variant/current ask・bid contractまで実装。承認済みcredentialなしでは `not_configured` | developer approval、API key、OAuth tokenが揃う場合のみ |
+| 楽天市場 | 商品検索APIの現在販売価格 | 明示ボタン時のみ |
+| Yahoo!ショッピング | v3商品検索APIの現在販売価格 | 明示ボタン時のみ |
+| eBay | Browse APIの現在出品価格 | 明示ボタン時のみ |
+| StockX | 現行ライセンスと本用途の整合が確認できないためpolicy blocked | なし |
 | SNKRDUNK | 公式APIまたは書面許可を確認できないためdisabled | なし。scraping / private endpoint / Cookie利用なし |
 | Mercari | Mercari Shops APIを一般相場検索へ転用せずmanual only | なし。一般marketplaceの許可取得後に再監査 |
-| Manual Import | 利用者が正当に取得したCSV / JSON | なし |
-
-StockX live access はdeveloper approvalが必要です。このリポジトリの検証環境にはcredentialがなく、live StockX取得は未確認です。「adapter/contract完成」と「live連携確認済み」は区別しています。
 
 ### Identity and price semantics
 
-Style Code exact matchだけを標準集計へ入れます。モデル＋確認済みカラーは `probable`、モデルだけは `model_only` とし、自動統合しません。別カラー、復刻年、US M/US W、サイズ、新品/中古、provider、通貨は別系列です。
+Style Codeは正規化後の完全一致だけを `exact` に使います。モデル＋確認済みカラーは `probable`、比較用だけの候補は `related`、衝突は `rejected` とし、自動統合しません。別カラー、別世代、メンズ／ウィメンズ／キッズ、サイズ、新品／中古、Provider、通貨を分離します。
 
 | Type | 意味 |
 | --- | --- |
-| `lowest_ask` | 現在の最低出品額 |
-| `highest_bid` | 現在の最高入札額 |
-| `listing_price` | 出品価格。成約したとは限らない |
-| `sold_price` | 成約価格として出典が明示された観測 |
-| `recommended_sell` / `recommended_buy` | providerの参考推奨値。ask/bid/soldとは別 |
+| `current_retail_price` | 楽天市場・Yahoo!ショッピングの現在販売価格 |
+| `current_listing_price` | eBayの現在出品価格。成約価格ではない |
 
-欠損価格を0円へ変換せず、sample、取得期間、最終取得、サイズ、condition、currency、source qualityを表示します。
-
-### History, statistics, and forecast
-
-`pnpm market:collect --provider stockx --limit 10` は最大100件の手動collectorです。`--dry-run`、429即停止、一時障害の最大1回retry、当日重複排除、exact identity限定、secret/raw response非保存を実装しています。schedulerやlive GitHub Actionsは追加していません。
-
-履歴はprovider・identity・variant・condition・price type・currencyごとに分離します。平均、中央値、最小、最大、最新、7日/30日変化率、直近30日volatilityを計算し、外れ値は削除しません。
-
-予測は30観測以上かつ21日以上だけで生成します。naive、moving average、exponential smoothing、linear trend、Holtをrolling-origin backtestし、MAE、sMAPE、directional accuracyで比較します。複雑なモデルはnaiveより明確に良い場合だけ採用します。7日/30日の点推定とprediction intervalは参考推移で、実取引価格を保証しません。confidenceは観測数、期間、欠損、backtest errorから決め、AIの自己申告値を使いません。
+欠損値を0円や送料無料へ変換しません。新品・中古と通貨ごとに件数、最小、中央値、最大、取得時刻を表示し、`related` は概要集計から除外します。成約価格、将来価格、売買推奨はV2の対象外です。
 
 ### Responsive and error behavior
 
-実測と予測は線種・記号・文言で分け、色だけに依存しません。SVG点はキーボードfocusと読み上げlabelを持ち、mobileで横スクロールを作りません。`loaded`、`partial`、`not_configured`、`not_authorized`、`insufficient_data`、`rate_limited`、`temporarily_unavailable` を明示し、市場障害が推薦結果を消すことはありません。
+Providerごとの成功・空・資格情報不足・認証失敗・rate limit・timeout・schema error・一時障害・policy disabledを分離し、一部障害でも他Providerと推薦結果を維持します。
 
-詳細: [provider capability](docs/market/provider-capabilities.md)、[data model](docs/market/data-model.md)、[forecast](docs/market/forecast-methodology.md)、[manual import](docs/market/manual-import.md)、[security/compliance](docs/market/security-and-compliance.md)。
+詳細: [Provider policy](docs/providers/provider-policy-registry.md)、[Provider contract](docs/providers/market-provider-contract.md)、[Fit Confidence](docs/product/fit-confidence.md)、[Purchase Confidence](docs/product/purchase-confidence.md)。
 
 ## 11. Limitations
 

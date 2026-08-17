@@ -2859,11 +2859,110 @@ h1 {
 .market-verification-summary,
 .market-verification-details,
 .beginner-market-guide,
+.purchase-confidence,
 .market-provider-result {
   border: 1px solid rgba(35, 43, 55, 0.12);
   border-radius: 8px;
   background: #fff;
   padding: 14px;
+}
+
+.purchase-confidence {
+  display: grid;
+  gap: 12px;
+}
+
+.purchase-confidence-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.purchase-confidence-heading h5,
+.purchase-confidence-heading p {
+  margin: 0;
+}
+
+.purchase-confidence-heading h5 {
+  margin-top: 6px;
+  font-size: 1rem;
+}
+
+.purchase-confidence-heading > span {
+  max-width: 260px;
+  color: #66717f;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.purchase-confidence-grid,
+.market-price-summaries {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.purchase-confidence-grid > div,
+.market-price-summaries > div {
+  min-width: 0;
+  border: 1px solid rgba(35, 43, 55, 0.1);
+  border-radius: 8px;
+  background: #f7f5ef;
+  padding: 11px;
+}
+
+.purchase-confidence-grid span,
+.purchase-confidence-grid strong,
+.market-price-summaries span,
+.market-price-summaries strong,
+.market-price-summaries small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.purchase-confidence-grid span,
+.market-price-summaries span,
+.market-price-summaries small {
+  color: #66717f;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.purchase-confidence-grid strong,
+.market-price-summaries strong {
+  margin-top: 5px;
+  color: #1d2530;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.market-price-summaries small {
+  margin-top: 5px;
+}
+
+.fit-confidence-reasons,
+.purchase-confidence-warnings ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.fit-confidence-reasons li,
+.purchase-confidence-warnings li {
+  margin-top: 5px;
+  color: #4f5965;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.purchase-confidence-warnings {
+  border-left: 3px solid #b48b46;
+  background: #fffaf0;
+  padding: 10px 12px;
+}
+
+.purchase-confidence-warnings strong {
+  font-size: 0.8rem;
 }
 
 .market-verification-summary {
@@ -3009,8 +3108,14 @@ h1 {
 
 @media (max-width: 760px) {
   .market-verification-summary,
+  .purchase-confidence-heading,
   .market-provider-heading {
     display: grid;
+  }
+
+  .purchase-confidence-grid,
+  .market-price-summaries {
+    grid-template-columns: 1fr;
   }
 }
 

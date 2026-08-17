@@ -11,19 +11,16 @@ import type {
 import { emptyProviderAudit } from "./contracts";
 import { isMarketListing } from "./runtime-validation";
 
-export type ListingDraft = Omit<
-  MarketListing,
-  "matchLevel" | "matchReasons" | "mismatchWarnings"
->;
+export type ListingDraft = Omit<MarketListing, "matchLevel" | "matchReasons" | "mismatchWarnings">;
 
 const GENERATION_PATTERN = /\b(?:v\d+|\d{3,4}v\d+|og|adv|pro|44\s*dx|golf|kids?|gs)\b/giu;
 const KNOWN_BRANDS = [
-  ["newbalance", /\bnew\s*balance\b|\bnb\b/iu],
-  ["adidas", /\badidas\b/iu],
-  ["nike", /\bnike\b|\bair\s*jordan\b|\baj\s*1\b/iu],
-  ["vans", /\bvans\b/iu],
-  ["asics", /\basics\b/iu],
-  ["converse", /\bconverse\b/iu],
+  ["newbalance", /\bnew\s*balance\b|\bnb\b|ニューバランス/iu],
+  ["adidas", /\badidas\b|アディダス/iu],
+  ["nike", /\bnike\b|\bair\s*jordan\b|\baj\s*1\b|ナイキ|エア\s*ジョーダン/iu],
+  ["vans", /\bvans\b|ヴァンズ|バンズ/iu],
+  ["asics", /\basics\b|アシックス/iu],
+  ["converse", /\bconverse\b|コンバース/iu],
 ] as const;
 
 export function normalizeStyleCode(value: string | null | undefined): string | null {
@@ -47,31 +44,21 @@ export function matchMarketListing(
   const reasons: string[] = [];
   const warnings: string[] = [];
   const haystack = comparable(`${listing.title} ${listing.canonicalModelName ?? ""}`);
-  const expectedModel = comparable(context.identity.modelName);
   const expectedBrand = comparable(context.identity.brand ?? "");
   const expectedStyle = normalizeStyleCode(context.identity.styleCode);
   const observedStyle = normalizeStyleCode(listing.styleCode);
 
-  if (expectedStyle && observedStyle && expectedStyle !== observedStyle) {
-    return rejected("Style Code が一致しません。", "generation_conflict");
-  }
-  if (hasBrandConflict(context.identity.brand, listing.canonicalBrand, listing.title)) {
-    return rejected("ブランドが一致しません。", "brand_conflict");
-  }
+  if (expectedStyle && observedStyle && expectedStyle !== observedStyle) return rejected("Style Codeが一致しません。", "style_code_conflict");
+  if (hasBrandConflict(context.identity.brand, listing.canonicalBrand, listing.title)) return rejected("ブランドが一致しません。", "brand_conflict");
   if (hasDerivativeConflict(context.identity.modelName, `${listing.title} ${listing.canonicalModelName ?? ""}`)
     || hasGenerationConflict(context.identity.modelName, `${listing.title} ${listing.generation ?? ""}`)) {
-    return rejected("モデル世代が一致しません。", "generation_conflict");
+    return rejected("モデル世代または派生モデルが一致しません。", "generation_conflict");
   }
-  if (isAudienceConflict(context.gender, listing.audience)) {
-    return rejected("メンズ／ウィメンズ／キッズ区分が一致しません。", "gender_conflict");
-  }
-  if (isSizeConflict(context, listing)) {
-    return rejected("指定サイズと一致しません。", "size_conflict");
-  }
+  if (isAudienceConflict(context.gender, listing.audience)) return rejected("メンズ・ウィメンズ・キッズ区分が一致しません。", "gender_conflict");
+  if (isSizeConflict(context, listing)) return rejected("指定サイズと一致しません。", "size_conflict");
 
   if (expectedStyle && observedStyle === expectedStyle) {
-    reasons.push("Style Code が完全一致");
-    return { matchLevel: "exact", reasons, warnings };
+    return { matchLevel: "exact", reasons: ["Style Codeが完全一致"], warnings };
   }
 
   const modelTokens = significantTokens(context.identity.modelName);
@@ -79,30 +66,31 @@ export function matchMarketListing(
   const modelRatio = modelTokens.length ? matchedTokens.length / modelTokens.length : 0;
   const brandMatches = !expectedBrand || haystack.includes(expectedBrand);
   const expectedColor = context.identity.verificationState === "model_color_style_verified"
-    || context.identity.verificationState === "model_color_verified"
-    ? context.identity.colorwayName
-    : null;
+    || context.identity.verificationState === "model_color_verified" ? context.identity.colorwayName : null;
   const colorTokens = significantTokens(expectedColor ?? "");
   const colorHaystack = comparable(`${listing.title} ${listing.colorwayName ?? ""}`);
   const colorMatches = colorTokens.length === 0 || colorTokens.every((token) => colorHaystack.includes(token));
 
   if (context.identity.verificationState === "unverified" && brandMatches && modelRatio >= 0.4) {
-    reasons.push("入力されたモデル名に近い可能性があります。");
-    warnings.push("モデル自体の事実確認が完了していないため、比較用として表示します。");
-    return { matchLevel: "related", reasons, warnings };
+    return {
+      matchLevel: "related",
+      reasons: ["入力されたモデル名に近い可能性があります。"],
+      warnings: ["モデル自体の事実確認が完了していないため、比較用として表示します。"],
+    };
   }
-
   if (brandMatches && modelRatio >= 0.8 && colorMatches) {
     reasons.push("モデル名が一致", ...(colorTokens.length ? ["確認済みカラーと一致"] : []));
-    if (!expectedStyle) warnings.push("Style Code が未確認のため完全一致ではありません。");
+    if (!expectedStyle) warnings.push("Style Codeが未確認のため、完全一致ではありません。");
     return { matchLevel: "probable", reasons, warnings };
   }
   if (brandMatches && modelRatio >= 0.4) {
-    reasons.push("同じモデル系列の可能性があります。");
-    warnings.push("別カラー・別世代・別サイズの可能性があります。購入候補ではなく比較用です。");
-    return { matchLevel: "related", reasons, warnings };
+    return {
+      matchLevel: "related",
+      reasons: ["同じモデル系列の可能性があります。"],
+      warnings: ["別カラー・別世代・別サイズの可能性があります。購入候補ではなく比較用です。"],
+    };
   }
-  return rejected("推薦モデルとの一致を確認できません。", "identity_conflict");
+  return rejected("おすすめモデルとの一致を確認できません。", "identity_conflict");
 }
 
 export function finalizeListing(context: MarketSearchContext, draft: ListingDraft): MarketListing | null {
@@ -110,12 +98,7 @@ export function finalizeListing(context: MarketSearchContext, draft: ListingDraf
   if (!Number.isFinite(draft.price) || draft.price < 0 || !/^[A-Z]{3}$/u.test(draft.currency)) return null;
   const match = matchMarketListing(context, draft);
   if (match.matchLevel === "rejected") return null;
-  const listing: MarketListing = {
-    ...draft,
-    matchLevel: match.matchLevel,
-    matchReasons: match.reasons,
-    mismatchWarnings: match.warnings,
-  };
+  const listing: MarketListing = { ...draft, matchLevel: match.matchLevel, matchReasons: match.reasons, mismatchWarnings: match.warnings };
   return isMarketListing(listing, draft.provider) ? listing : null;
 }
 
@@ -125,24 +108,23 @@ export function auditListings(
   rejected: readonly ListingMatchResult[] = [],
   extra: Partial<Pick<ProviderResponseAudit, "schemaWarningCount" | "unsafeUrlCount" | "duplicateCount">> = {},
 ): ProviderResponseAudit {
-  const audit = emptyProviderAudit(provider);
   const currencyCount: Record<string, number> = {};
   for (const listing of listings) currencyCount[listing.currency] = (currencyCount[listing.currency] ?? 0) + 1;
   return {
-    ...audit,
+    ...emptyProviderAudit(provider),
     normalizedCount: listings.length,
-    exactCount: listings.filter((item) => item.matchLevel === "exact").length,
-    probableCount: listings.filter((item) => item.matchLevel === "probable").length,
-    relatedCount: listings.filter((item) => item.matchLevel === "related").length,
+    exactCount: listings.filter(({ matchLevel }) => matchLevel === "exact").length,
+    probableCount: listings.filter(({ matchLevel }) => matchLevel === "probable").length,
+    relatedCount: listings.filter(({ matchLevel }) => matchLevel === "related").length,
     rejectedCount: rejected.length,
-    missingStyleCodeCount: listings.filter((item) => !item.styleCode).length,
-    missingColorwayCount: listings.filter((item) => !item.colorwayName).length,
-    missingSizeCount: listings.filter((item) => !item.size).length,
-    missingConditionCount: listings.filter((item) => item.condition === "unknown").length,
-    missingShippingCount: listings.filter((item) => item.shippingPrice === null).length,
-    generationConflictCount: rejected.filter((item) => item.warnings.includes("generation_conflict")).length,
-    audienceConflictCount: rejected.filter((item) => item.warnings.includes("gender_conflict")).length,
-    sizeConflictCount: rejected.filter((item) => item.warnings.includes("size_conflict")).length,
+    missingStyleCodeCount: listings.filter(({ styleCode }) => !styleCode).length,
+    missingColorwayCount: listings.filter(({ colorwayName }) => !colorwayName).length,
+    missingSizeCount: listings.filter(({ size }) => !size).length,
+    missingConditionCount: listings.filter(({ condition }) => condition === "unknown").length,
+    missingShippingCount: listings.filter(({ shippingKnown }) => !shippingKnown).length,
+    generationConflictCount: rejected.filter(({ warnings }) => warnings.includes("generation_conflict")).length,
+    audienceConflictCount: rejected.filter(({ warnings }) => warnings.includes("gender_conflict")).length,
+    sizeConflictCount: rejected.filter(({ warnings }) => warnings.includes("size_conflict")).length,
     currencyCount,
     schemaWarningCount: extra.schemaWarningCount ?? 0,
     unsafeUrlCount: extra.unsafeUrlCount ?? 0,
@@ -164,8 +146,7 @@ export function dedupeListings(listings: readonly MarketListing[]): { listings: 
 export function normalizeCondition(value: unknown): MarketCondition {
   if (typeof value !== "string") return "unknown";
   const normalized = value.normalize("NFKC").toLocaleLowerCase("en-US");
-  if (/refurb|再生|整備/iu.test(normalized)) return "used";
-  if (/used|pre-owned|中古/iu.test(normalized)) return "used";
+  if (/refurb|再生|整備|used|pre-owned|中古/iu.test(normalized)) return "used";
   if (/new|新品|new_with/iu.test(normalized)) return "new";
   return "unknown";
 }
@@ -198,9 +179,7 @@ export function isSafePublicHttpsUrl(value: string): boolean {
     return host !== "localhost" && host !== "0.0.0.0" && host !== "::1"
       && !/^127\./u.test(host) && !/^10\./u.test(host) && !/^192\.168\./u.test(host)
       && !/^169\.254\./u.test(host) && !/^172\.(?:1[6-9]|2\d|3[01])\./u.test(host);
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
 function significantTokens(value: string): string[] {
@@ -232,15 +211,13 @@ function hasBrandConflict(expected: string | null, observed: string | null, titl
 }
 
 function canonicalBrand(value: string): string | null {
-  const match = KNOWN_BRANDS.find(([, pattern]) => pattern.test(value.normalize("NFKC")));
-  return match?.[0] ?? null;
+  return KNOWN_BRANDS.find(([, pattern]) => pattern.test(value.normalize("NFKC")))?.[0] ?? null;
 }
 
 function hasDerivativeConflict(expected: string, observed: string): boolean {
   const expectedIdentity = derivativeIdentity(expected);
   const observedIdentity = derivativeIdentity(observed);
-  if (!expectedIdentity || !observedIdentity) return false;
-  return expectedIdentity.family === observedIdentity.family && expectedIdentity.variant !== observedIdentity.variant;
+  return Boolean(expectedIdentity && observedIdentity && expectedIdentity.family === observedIdentity.family && expectedIdentity.variant !== observedIdentity.variant);
 }
 
 function derivativeIdentity(value: string): { family: string; variant: string } | null {
