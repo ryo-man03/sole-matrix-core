@@ -4,7 +4,7 @@ import { MainContainer } from "./_components/MainContainer";
 
 const entryCards = [
   { eyebrow: "01 / PREFERENCE", title: "11問で好みを整理する", description: "商品を決めていなくても始められます。具体的なモデル名と参考リンクまで表示します。", items: ["11問を1問ずつ進める", "候補を検証してCoreで再評価", "外部API失敗時も具体モデルを提示"], href: "/app?session=guest&path=diagnosis", actionLabel: "スニーカー診断を始める" },
-  { eyebrow: "02 / PRODUCT", title: "気になる一足を購入判断する", description: "商品名・URL・画像のいずれかから、買う理由と待つ理由を整理します。", items: ["URL・画像は外部参考情報として分離", "最終DecisionはCoreが決定", "楽天検索は結果を見てから手動実行"], href: "/app?session=guest&path=product", actionLabel: "商品判断を始める" },
+  { eyebrow: "02 / PRODUCT", title: "気になる一足を購入判断する", description: "商品名・URL・画像のいずれかから、買う理由と待つ理由を整理します。", items: ["URL・画像は外部参考情報として分離", "最終DecisionはCoreが決定", "販売・出品情報は結果を見てから手動確認"], href: "/app?session=guest&path=product", actionLabel: "商品判断を始める" },
 ] as const;
 
 export default function Page() {
@@ -44,7 +44,7 @@ export default function Page() {
           <ol>
             <li><span>Core</span><strong>スコアと最終判断</strong><p>同じ入力には同じルールで答えます。</p></li>
             <li><span>Research</span><strong>候補と説明の補助</strong><p>取得できない場合はfallbackを明示します。</p></li>
-            <li><span>Market</span><strong>購入前の外部確認</strong><p>楽天検索は推薦結果と分離して手動実行します。</p></li>
+            <li><span>Market</span><strong>購入前の外部確認</strong><p>楽天市場・Yahoo!ショッピング・eBayの確認は推薦結果と分離して手動実行します。</p></li>
           </ol>
         </section>
 

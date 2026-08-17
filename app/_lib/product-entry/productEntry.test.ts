@@ -30,7 +30,7 @@ describe("product entry", () => {
     expect(html).toContain('href="/app?session=guest&amp;path=product"');
     expect(html).toContain("はじめる");
     expect(html).toContain("スニーカー診断を始める");
-    expect(html).toContain("楽天検索は推薦結果と分離して手動実行します");
+    expect(html).toContain("楽天市場・Yahoo!ショッピング・eBayの確認は推薦結果と分離して手動実行します");
     expect(html).not.toContain("recommendation-workspace");
     expect(html).not.toContain("preference-diagnosis-section");
   });
