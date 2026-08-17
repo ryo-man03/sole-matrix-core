@@ -262,6 +262,8 @@ EBAY_PRODUCTION_CLIENT_SECRET=
 EBAY_PRODUCTION_DEV_ID=
 EBAY_PRODUCTION_MARKETPLACE_ID=
 EXTERNAL_PROVIDERS_DISABLED=true
+SUPABASE_SECRET_KEY=
+INTERNAL_JOB_SIGNING_SECRET=
 ```
 
 通常テストとCIでは`EXTERNAL_PROVIDERS_DISABLED=true`を使います。ローカルlive smokeはProviderごとに最大1検索です。
@@ -273,6 +275,8 @@ pnpm market:smoke --provider ebay --live
 ```
 
 eBay OAuth tokenとAPI raw responseは保存せず、クライアントへ返しません。
+
+`SUPABASE_SECRET_KEY` と `INTERNAL_JOB_SIGNING_SECRET` は server-only です。内部 job は timestamp、job 名、idempotency key、raw JSON body を HMAC-SHA256 で署名し、secret 自体を URL、body、log、client bundle に含めません。本番 scheduler と migration 適用はこのリポジトリ作業では実行しません。
 
 - 基本デモはゲスト導線で、11問診断 → 回答サマリー → Ryo Mode v4 推薦結果まで確認できます。
 - Gemini が利用できない場合は具体モデルの fallback、Rakuten が利用できない場合は推薦結果を維持した soft error になります。
