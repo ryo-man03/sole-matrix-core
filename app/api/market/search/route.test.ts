@@ -44,6 +44,28 @@ describe("POST /api/market/search", () => {
     }));
     expect(response.status).toBe(400);
   });
+
+  it.each(["userId", "admin", "providerToken", "unexpected"])("rejects unknown or identity-like field %s", async (field) => {
+    const response = await POST(request({
+      query: "Nike Air Force 1 Low",
+      identity: { brand: "Nike", modelName: "Nike Air Force 1 Low", colorwayName: null, styleCode: null, verificationState: "model_only" },
+      gender: "unknown",
+      sizeSystem: "UNKNOWN",
+      size: null,
+      condition: "unknown",
+      [field]: "not-accepted",
+    }));
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects an oversized body before any provider work", async () => {
+    const response = await POST(new Request("https://example.com/api/market/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: "x".repeat(40_000) }),
+    }));
+    expect(response.status).toBe(400);
+  });
 });
 
 function request(body: unknown): Request {

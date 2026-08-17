@@ -44,4 +44,13 @@ describe("beginner market price result UI", () => {
     expect(marketSource).toContain("おすすめ結果には影響しません");
     expect(marketSource).toContain("確認できていないカラーは表示しません");
   });
+
+  it("separates domestic retail from international marketplace evidence", () => {
+    expect(marketSource).toContain("国内の販売情報");
+    expect(marketSource).toContain("Rakuten・Yahoo!ショッピング");
+    expect(marketSource).toContain("海外の出品情報");
+    expect(marketSource).toContain("通貨・送料・関税と商品の状態");
+    expect(marketSource).toContain("summary.condition");
+    expect(marketSource).toContain("summary.currency");
+  });
 });

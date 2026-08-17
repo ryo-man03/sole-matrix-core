@@ -3015,6 +3015,28 @@ h1 {
   gap: 14px;
 }
 
+.market-provider-group {
+  display: grid;
+  gap: 12px;
+}
+
+.market-provider-group + .market-provider-group {
+  border-top: 1px solid #dfe4e1;
+  padding-top: 18px;
+}
+
+.market-provider-group-heading h5,
+.market-provider-group-heading p {
+  margin: 0;
+}
+
+.market-provider-group-heading p {
+  margin-top: 4px;
+  color: #5f6975;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
 .market-provider-heading {
   display: flex;
   align-items: flex-start;
@@ -3022,9 +3044,13 @@ h1 {
   gap: 16px;
 }
 
-.market-provider-heading h5,
+.market-provider-heading h6,
 .market-provider-heading p {
   margin: 0;
+}
+
+.market-provider-heading h6 {
+  font-size: 1rem;
 }
 
 .market-provider-heading p {

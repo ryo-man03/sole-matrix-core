@@ -3,10 +3,13 @@ import { authorizeInternalJob } from "../../../../../src/application/daily-picks
 import { ingestReleases } from "../../../../../src/application/release-ingestion/ingestReleases";
 import { createManualReleaseProvider } from "../../../../../src/infrastructure/release-providers/manualReleaseProvider";
 import { createReleaseEvidenceStore } from "../../../../../src/infrastructure/repositories/releaseEvidenceStore";
+import { readBoundedTextBody } from "../../../../../src/application/http/requestSecurity";
 
 export async function POST(request: Request) {
   if (declaredBodyTooLarge(request, 65_536)) return NextResponse.json({ ok: false, error: { code: "BODY_TOO_LARGE" } }, { status: 413 });
-  const rawBody = await request.text();
+  let rawBody: string;
+  try { rawBody = await readBoundedTextBody(request, 65_536); }
+  catch { return NextResponse.json({ ok: false, error: { code: "BODY_TOO_LARGE" } }, { status: 413 }); }
   const authorization = authorizeInternalJob(request, rawBody, "release-ingestion", { maxBodyBytes: 65_536, rateLimit: 5 });
   if (!authorization.ok) return NextResponse.json({ ok: false, error: { code: authorization.code } }, { status: authorization.status });
   try {

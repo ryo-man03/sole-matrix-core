@@ -61,7 +61,7 @@ export type SneakerUrlServiceDependencies = {
  *
  * Product-link verification reuses this check so redirects, localhost,
  * private IPs, tunnel hosts, credentials, and non-standard ports follow the
- * same policy as URL analysis.
+ * same HTTPS-only policy as URL analysis.
  */
 export async function validatePublicHttpUrl(
   input: string | URL,
@@ -394,10 +394,10 @@ async function validatePublicUrl(
   url: URL,
   resolveHostname: ResolveHostname,
 ): Promise<URL> {
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
+  if (url.protocol !== "https:") {
     throw new SneakerUrlError(
-      "BLOCKED_PROTOCOL",
-      "HTTPまたはHTTPSのURLだけを利用できます。",
+      "HTTPS_REQUIRED",
+      "HTTPSのURLだけを利用できます。",
     );
   }
   if (url.username || url.password) {
@@ -406,10 +406,7 @@ async function validatePublicUrl(
       "認証情報を含むURLは利用できません。",
     );
   }
-  if (
-    (url.protocol === "http:" && url.port && url.port !== "80") ||
-    (url.protocol === "https:" && url.port && url.port !== "443")
-  ) {
+  if (url.port && url.port !== "443") {
     throw new SneakerUrlError(
       "BLOCKED_PORT",
       "標準ポート以外の商品URLは利用できません。",

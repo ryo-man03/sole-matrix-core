@@ -2,14 +2,17 @@ import { NextResponse } from "next/server";
 
 import { evaluateFitConfidence, type FitCandidateIdentity } from "../../../_lib/market/confidence";
 import { privateUser, unauthenticated } from "../../../../src/application/personalization/routeHelpers";
+import { readBoundedJsonBody, validateMutationRequest } from "../../../../src/application/http/requestSecurity";
 import { listOwnedRows } from "../../../../src/infrastructure/repositories/personalizationRepository";
 import { listFitFeedbackRows } from "../../../../src/infrastructure/repositories/postPurchaseRepository";
 
 export async function POST(request: Request) {
+  const mutation = validateMutationRequest(request, { key: "fit-confidence", limit: 30 });
+  if (!mutation.ok) return NextResponse.json({ ok: false, error: mutation.code }, { status: mutation.status });
   const user = await privateUser();
   if (!user) return unauthenticated();
   let value: unknown;
-  try { value = await request.json(); } catch { return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 }); }
+  try { value = await readBoundedJsonBody(request); } catch { return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 }); }
   const candidate = parseCandidate(value);
   if (!candidate) return NextResponse.json({ ok: false, error: "invalid_candidate" }, { status: 400 });
   try {
@@ -30,6 +33,7 @@ export async function POST(request: Request) {
 
 function parseCandidate(value: unknown): FitCandidateIdentity | null {
   if (!isRecord(value)) return null;
+  if (Object.keys(value).some((key) => !["brand", "modelName", "modelFamily", "generation", "styleCode", "audience"].includes(key))) return null;
   const modelName = text(value.modelName, 160);
   if (!modelName) return null;
   const audience = value.audience;

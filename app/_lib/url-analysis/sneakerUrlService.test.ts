@@ -11,6 +11,7 @@ const publicResolver: ResolveHostname = async () => [
 
 describe("safe sneaker URL analysis", () => {
   it.each([
+    "http://shop.example/item",
     "http://localhost/item",
     "http://127.0.0.1/item",
     "http://0.0.0.0/item",
@@ -109,12 +110,12 @@ describe("safe sneaker URL analysis", () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(null, {
         status: 302,
-        headers: { location: "http://127.0.0.1/admin" },
+        headers: { location: "https://127.0.0.1/admin" },
       }),
     );
 
     await expect(
-      analyzeSneakerUrl("http://shop.example/item", {
+      analyzeSneakerUrl("https://shop.example/item", {
         fetcher,
         resolveHostname: publicResolver,
       }),
@@ -141,21 +142,38 @@ describe("safe sneaker URL analysis", () => {
     expect(JSON.stringify(result)).not.toContain("provider details");
   });
 
-  it.each(["http://shop.example/item", "https://shop.example/item"])(
-    "allows public %s URLs",
-    async (inputUrl) => {
-      const result = await analyzeSneakerUrl(inputUrl, {
-        fetcher: vi.fn<typeof fetch>().mockResolvedValue(
-          new Response("<title>Public sneaker page</title>", {
-            status: 200,
-            headers: { "content-type": "text/html" },
-          }),
-        ),
-        resolveHostname: publicResolver,
-      });
-      expect(result.finalUrl).toBe(inputUrl);
-    },
-  );
+  it("allows a public HTTPS URL", async () => {
+    const inputUrl = "https://shop.example/item";
+    const result = await analyzeSneakerUrl(inputUrl, {
+      fetcher: vi.fn<typeof fetch>().mockResolvedValue(
+        new Response("<title>Public sneaker page</title>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        }),
+      ),
+      resolveHostname: publicResolver,
+    });
+    expect(result.finalUrl).toBe(inputUrl);
+  });
+
+  it.each([
+    "::1",
+    "fc00::1",
+    "fd12:3456:789a::1",
+    "fe80::1",
+    "ff02::1",
+    "2001:db8::1",
+    "::ffff:127.0.0.1",
+    "::ffff:10.0.0.8",
+    "::ffff:169.254.169.254",
+  ])("blocks a hostname resolving to private or reserved IPv6 %s", async (address) => {
+    const fetcher = vi.fn<typeof fetch>();
+    await expect(analyzeSneakerUrl("https://shop.example/item", {
+      fetcher,
+      resolveHostname: async () => [{ address, family: 6 }],
+    })).rejects.toMatchObject({ code: "BLOCKED_ADDRESS" });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 
   it("uses validated Gemini URL Context as a fallback", async () => {
     const geminiFetcher = vi.fn<typeof fetch>().mockResolvedValue(

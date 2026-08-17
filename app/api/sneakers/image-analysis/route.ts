@@ -6,10 +6,14 @@ import {
   SneakerImageValidationError,
   validateSneakerImage,
 } from "../../../../server/services/sneakerVisionService";
+import { readBoundedBody, RequestBodyError } from "../../../../src/application/http/requestSecurity";
+
+const MAX_IMAGE_REQUEST_BYTES = MAX_SNEAKER_IMAGE_BYTES + 64 * 1024;
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
+    const body = await readBoundedBody(request, MAX_IMAGE_REQUEST_BYTES);
+    const formData = await new Request(request.url, { method: "POST", headers: request.headers, body: body.buffer as ArrayBuffer }).formData();
     const file = formData.get("image");
     if (!(file instanceof File)) {
       throw new SneakerImageValidationError(
@@ -31,6 +35,9 @@ export async function POST(request: Request) {
     const data = await analyzeSneakerImage(image);
     return NextResponse.json({ ok: true, data });
   } catch (error) {
+    if (error instanceof RequestBodyError && error.code === "BODY_TOO_LARGE") {
+      return NextResponse.json({ ok: false, error: { code: error.code, message: "画像リクエストのサイズを確認してください。" } }, { status: 413 });
+    }
     if (error instanceof SneakerImageValidationError) {
       return NextResponse.json(
         { ok: false, error: { code: error.code, message: error.message } },

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { authorizeDataSteward } from "../../../../../../src/application/admin/authorization";
 import { adminRequestId } from "../../../../../../src/application/admin/request";
-import { validateMutationRequest } from "../../../../../../src/application/http/requestSecurity";
+import { readBoundedJsonBody, validateMutationRequest } from "../../../../../../src/application/http/requestSecurity";
 import { parseEvidenceReview } from "../../../../../../src/domain/admin/manualEntry";
 import { reviewReleaseEvidence } from "../../../../../../src/infrastructure/repositories/dataStewardRepository";
 
@@ -14,7 +14,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const { id } = await context.params;
   if (!uuid(id)) return NextResponse.json({ ok: false, error: { code: "INVALID_EVIDENCE" } }, { status: 400 });
   try {
-    const input = parseEvidenceReview(await request.json());
+    const input = parseEvidenceReview(await readBoundedJsonBody(request));
     const item = await reviewReleaseEvidence(authorization.actorId, id, input.reviewState, input.reasonCode!, adminRequestId(request));
     return NextResponse.json({ ok: true, data: { item } });
   } catch (error) {

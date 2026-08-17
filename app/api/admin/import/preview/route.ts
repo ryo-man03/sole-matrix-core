@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { authorizeDataSteward } from "../../../../../src/application/admin/authorization";
 import { CSV_IMPORT_MAX_BYTES, previewStewardCsv } from "../../../../../src/application/admin/csvPreview";
-import { validateMutationRequest } from "../../../../../src/application/http/requestSecurity";
+import { readBoundedBody, validateMutationRequest } from "../../../../../src/application/http/requestSecurity";
 
 export async function POST(request: Request) {
   const guard = validateMutationRequest(request, { key: "admin-csv-preview", limit: 10, bodyRequired: false });
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const authorization = await authorizeDataSteward();
   if (!authorization.authorized) return NextResponse.json({ ok: false, error: { code: authorization.reason.toLocaleUpperCase("en-US") } }, { status: authorization.reason === "unauthenticated" ? 401 : authorization.reason === "forbidden" ? 403 : 503 });
   try {
-    const bytes = new Uint8Array(await request.arrayBuffer());
+    const bytes = await readBoundedBody(request, CSV_IMPORT_MAX_BYTES);
     const result = previewStewardCsv(bytes);
     return NextResponse.json({ ok: true, data: result }, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
   } catch (error) {

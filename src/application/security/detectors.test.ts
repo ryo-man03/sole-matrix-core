@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   detectBrokenFixture,
   detectSecurityViolations,
+  finalReadinessDetectorKinds,
   totalSecurityViolations,
   type SecurityDetectors,
   type SecurityObservation,
@@ -15,6 +16,10 @@ const detectorKinds: (keyof SecurityDetectors)[] = [
   "dailyScoreCoreMutationCount", "marketPriceCoreMutationCount", "externalRequestOnLoginCount", "externalRequestOnTodayCount",
   "duplicateDailyBatchCount", "rumorAsOfficialCount", "fixtureDataProductionLeakCount", "unauthorizedReleaseWriteCount",
   "secretExposureCount", "rawProviderResponsePersistenceCount",
+  "clientCredentialBundleCount", "crossUserFeedbackLinkCount", "coreMutationFromMarketCount", "ryoMutationFromMarketCount",
+  "marketplaceOfficialPromotionCount", "ebayPersistentWriteCount", "ebayForecastUseCount", "autoProviderLoginCount",
+  "autoProviderTodayCount", "releaseConflictHiddenCount", "duplicateEvidenceLostCount", "unauthorizedAdminAccessCount",
+  "fitGuaranteeClaimCount", "medicalClaimCount",
 ];
 
 const brokenCases = Array.from({ length: 50 }, (_, index): SecurityObservation => ({
@@ -52,5 +57,19 @@ describe("active security detectors (50+ broken fixtures)", () => {
       { kind: "secretExposureCount", detected: true, occurrences: 3 },
     ]);
     expect(result.secretExposureCount).toBe(5);
+  });
+
+  it("reports every named final detector as zero for a clean observation fixture", () => {
+    const result = detectSecurityViolations(finalReadinessDetectorKinds.map((kind) => ({ kind, detected: false })));
+    expect(Object.fromEntries(finalReadinessDetectorKinds.map((kind) => [kind, result[kind]]))).toEqual(
+      Object.fromEntries(finalReadinessDetectorKinds.map((kind) => [kind, 0])),
+    );
+  });
+
+  it.each(finalReadinessDetectorKinds)("trips final detector %s for its broken fixture", (kind) => {
+    const occurrences = (finalReadinessDetectorKinds.indexOf(kind) % 3) + 1;
+    const result = detectSecurityViolations([{ kind, detected: true, occurrences, evidence: `broken:${kind}` }]);
+    expect(result[kind]).toBe(occurrences);
+    expect(totalSecurityViolations(result)).toBe(occurrences);
   });
 });

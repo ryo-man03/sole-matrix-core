@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "../../../../src/infrastructure/auth/supabase/server";
-import { validateMutationRequest } from "../../../../src/application/http/requestSecurity";
+import { readBoundedJsonBody, validateMutationRequest } from "../../../../src/application/http/requestSecurity";
 
 export async function POST(request: Request) {
   const guard = validateMutationRequest(request, { key: "sign-up", limit: 5 });
   if (!guard.ok) return NextResponse.json({ ok: false, error: { code: guard.code } }, { status: guard.status });
-  const body = await request.json().catch(() => null);
-  if (!isRecord(body) || typeof body.email !== "string" || typeof body.password !== "string" || body.password.length < 8 || body.password.length > 200 || typeof body.displayName !== "string" || !/^[^<>\u0000-\u001f\u007f]{1,80}$/u.test(body.displayName.trim())) return invalid();
+  const body = await readBoundedJsonBody(request).catch(() => null);
+  if (!isRecord(body) || !hasOnlyKeys(body, ["email", "password", "displayName"]) || typeof body.email !== "string" || typeof body.password !== "string" || body.password.length < 8 || body.password.length > 200 || typeof body.displayName !== "string" || !/^[^<>\u0000-\u001f\u007f]{1,80}$/u.test(body.displayName.trim())) return invalid();
   const client = await createSupabaseServerClient();
   if (!client) return unavailable();
   const origin = new URL(request.url).origin;
@@ -17,3 +17,4 @@ export async function POST(request: Request) {
 function invalid() { return NextResponse.json({ ok: false, error: { code: "INVALID_AUTH_INPUT", message: "表示名、メールアドレス、8文字以上のパスワードを確認してください。" } }, { status: 400 }); }
 function unavailable() { return NextResponse.json({ ok: false, error: { code: "AUTH_NOT_CONFIGURED", message: "認証は現在準備中です。" } }, { status: 503 }); }
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]) { return Object.keys(value).every((key) => allowed.includes(key)); }

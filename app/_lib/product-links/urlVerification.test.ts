@@ -8,6 +8,7 @@ const fixedNow = () => new Date("2026-06-29T03:04:05.000Z");
 
 describe("live product URL verification", () => {
   it.each([
+    "http://example.com/item",
     "ftp://example.com/item",
     "javascript:alert(1)",
     "data:text/html,secret",

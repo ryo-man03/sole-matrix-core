@@ -4,18 +4,23 @@ import {
   resolveManualProductUrl,
 } from "../../../_lib/product-links/liveProductUrlResolver";
 import type { ProductUrlSource } from "../../../_lib/product-links/types";
+import { readBoundedJsonBody, validateMutationRequest } from "../../../../src/application/http/requestSecurity";
 
 export async function POST(request: Request) {
+  const mutation = validateMutationRequest(request, { key: "product-links", limit: 20 });
+  if (!mutation.ok) return NextResponse.json({ ok: false, error: { code: mutation.code } }, { status: mutation.status });
   const body = await readJson(request);
   if (!isRecord(body)) return invalidRequest();
 
   if (body["mode"] === "manual") {
+    if (!hasOnlyKeys(body, ["mode", "url"])) return invalidRequest();
     const url = boundedString(body["url"], 2_048);
     if (!url) return invalidRequest();
     return NextResponse.json({ ok: true, data: await resolveManualProductUrl(url) });
   }
 
   if (body["mode"] !== "recommendation") return invalidRequest();
+  if (!hasOnlyKeys(body, ["mode", "productName", "directUrls"])) return invalidRequest();
   const productName = boundedString(body["productName"], 160);
   const directUrls = normalizeDirectUrls(body["directUrls"]);
   if (!productName || directUrls === null) return invalidRequest();
@@ -23,7 +28,7 @@ export async function POST(request: Request) {
 }
 
 async function readJson(request: Request): Promise<unknown> {
-  try { return await request.json(); } catch { return null; }
+  try { return await readBoundedJsonBody(request); } catch { return null; }
 }
 
 function normalizeDirectUrls(value: unknown) {
@@ -31,7 +36,7 @@ function normalizeDirectUrls(value: unknown) {
   if (!Array.isArray(value) || value.length > 6) return null;
   const output: { href: string; source: Exclude<ProductUrlSource, "search_fallback"> }[] = [];
   for (const item of value) {
-    if (!isRecord(item)) return null;
+    if (!isRecord(item) || !hasOnlyKeys(item, ["href", "source"])) return null;
     const href = boundedString(item["href"], 2_048);
     if (!href) return null;
     const source = classifyDirectUrlSource(href);
@@ -75,4 +80,8 @@ function invalidRequest() {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  return Object.keys(value).every((key) => allowed.includes(key));
 }

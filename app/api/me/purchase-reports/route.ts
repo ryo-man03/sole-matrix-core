@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { failure, guard, privateUser, unauthenticated } from "../../../../src/application/personalization/routeHelpers";
+import { readBoundedJsonBody } from "../../../../src/application/http/requestSecurity";
 import { parsePurchaseReport } from "../../../../src/domain/feedback/postPurchase";
 import { createPurchaseReport, listPurchaseReports } from "../../../../src/infrastructure/repositories/postPurchaseRepository";
 
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   const user = await privateUser();
   if (!user) return unauthenticated();
   try {
-    const result = await createPurchaseReport(user.id, parsePurchaseReport(await request.json()));
+    const result = await createPurchaseReport(user.id, parsePurchaseReport(await readBoundedJsonBody(request)));
     return NextResponse.json({ ok: true, data: result }, { status: result.created ? 201 : 200 });
   } catch (error) {
     return failure(error);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { canonicalSneakerKey } from "../../../../src/domain/identity/canonicalSneaker";
 import { saveRecommendationFeedback } from "../../../../src/infrastructure/repositories/recommendationHistoryRepository";
 import { failure, guard, privateUser, unauthenticated, validUuid } from "../../../../src/application/personalization/routeHelpers";
+import { readBoundedJsonBody } from "../../../../src/application/http/requestSecurity";
 
 export async function POST(request: Request) {
   const mutationGuard = guard(request, "recommendation-feedback");
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
   if (!user) return unauthenticated();
 
   try {
-    const body: unknown = await request.json();
+    const body: unknown = await readBoundedJsonBody(request);
     if (!isRecord(body) || Object.keys(body).some((key) => !["snapshotId", "sentiment", "reasonCodes", "comment", "sneaker"].includes(key))) {
       throw new Error("INVALID_FEEDBACK");
     }
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
       || !Array.isArray(body.reasonCodes)
       || body.reasonCodes.length > 10
       || !isRecord(body.sneaker)
+      || Object.keys(body.sneaker).some((key) => !["brand", "modelName", "modelFamily", "generation", "styleCode", "audience"].includes(key))
     ) {
       throw new Error("INVALID_FEEDBACK");
     }

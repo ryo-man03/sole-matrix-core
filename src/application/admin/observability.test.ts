@@ -14,6 +14,14 @@ describe("provider observability boundary", () => {
     expect(route).toContain("Observability must not delay or fail a market response");
   });
 
+  it("persists request-scoped cache hit, miss, bypass, and single-flight state", () => {
+    expect(route).toContain("providerMetrics");
+    expect(repository).toContain("providerCacheStatus");
+    expect(repository).toContain('statuses.includes("single_flight_hit")');
+    expect(repository).toContain('statuses.includes("cache_hit")');
+    expect(repository).toContain('return statuses.length ? "miss"');
+  });
+
   it.each(["rawProviderResponse", "oauth_token", "provider_secret", "authorization", "cookie", "password"])("does not store secret/raw field %s", (field) => {
     expect(repository).not.toContain(field);
   });

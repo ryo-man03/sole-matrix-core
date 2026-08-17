@@ -7,6 +7,9 @@ import {
   validateSneakerImage,
 } from "../services/sneakerVisionService";
 import { analyzeSneakerUrlSafely } from "../services/sneakerUrlService";
+import { readBoundedBody, RequestBodyError } from "../../src/application/http/requestSecurity";
+
+const MAX_ANALYZE_REQUEST_BYTES = MAX_SNEAKER_IMAGE_BYTES + 64 * 1024;
 
 export type AnalyzeSneakerDependencies = {
   analyzeUrl?: (url: string) => Promise<SneakerUrlAnalysis>;
@@ -20,7 +23,7 @@ export async function analyzeSneakerRequest(
   dependencies: AnalyzeSneakerDependencies = {},
 ): Promise<Response> {
   try {
-    const formData = await request.formData();
+    const formData = await boundedFormData(request);
     const sneakerName = normalizeText(formData.get("sneakerName"), 160);
     const url = normalizeText(formData.get("url"), 2_048);
     const fileValue = formData.get("image");
@@ -56,6 +59,9 @@ export async function analyzeSneakerRequest(
       },
     });
   } catch (error) {
+    if (error instanceof RequestBodyError && error.code === "BODY_TOO_LARGE") {
+      return Response.json({ ok: false, error: { code: error.code, message: "リクエストサイズを確認してください。" } }, { status: 413 });
+    }
     if (error instanceof SneakerImageValidationError) {
       return Response.json(
         { ok: false, error: { code: error.code, message: error.message } },
@@ -70,6 +76,11 @@ export async function analyzeSneakerRequest(
       { status: 500 },
     );
   }
+}
+
+async function boundedFormData(request: Request): Promise<FormData> {
+  const body = await readBoundedBody(request, MAX_ANALYZE_REQUEST_BYTES);
+  return new Request(request.url, { method: "POST", headers: request.headers, body: body.buffer as ArrayBuffer }).formData();
 }
 
 async function analyzeImageFile(
