@@ -5583,3 +5583,160 @@ a {
     grid-template-columns: 1fr;
   }
 }
+
+.admin-shell {
+  width: min(100% - 2rem, 1480px);
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.admin-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-header h1,
+.admin-header p,
+.admin-page > header h2,
+.admin-page > header p {
+  margin: 0.25rem 0;
+}
+
+.admin-nav {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+  padding-bottom: 0.4rem;
+}
+
+.admin-nav a,
+.admin-header > a {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.55rem 0.85rem;
+  white-space: nowrap;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.admin-page,
+.admin-review-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-card,
+.admin-quality-summary {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+}
+
+.admin-quality-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.admin-quality-summary strong {
+  text-transform: uppercase;
+}
+
+.admin-quality-summary[data-state="degraded"] strong { color: #9a5b00; }
+.admin-quality-summary[data-state="blocked"] strong { color: #a32121; }
+.admin-quality-summary[data-state="healthy"] strong { color: #17663a; }
+
+.admin-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+}
+
+.admin-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+}
+
+.admin-table caption {
+  padding: 1rem;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.admin-table th,
+.admin-table td {
+  max-width: 18rem;
+  padding: 0.65rem;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.admin-form,
+.admin-inline-review {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.admin-form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-form label,
+.admin-inline-review label {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.admin-form input,
+.admin-inline-review input,
+.admin-inline-review select {
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.admin-form button,
+.admin-inline-review button {
+  min-height: 2.75rem;
+  justify-self: start;
+}
+
+.admin-preview {
+  max-height: 34rem;
+  overflow: auto;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: #15191f;
+  color: #f5f5f5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 800px) {
+  .admin-header { display: grid; }
+  .admin-form-grid { grid-template-columns: 1fr; }
+}
