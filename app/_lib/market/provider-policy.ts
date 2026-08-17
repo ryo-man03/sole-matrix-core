@@ -1,10 +1,38 @@
 import type { MarketProviderId } from "./contracts";
 
+export type PolicyDecision = "allowed" | "prohibited" | "requires_approval" | "unknown";
+export type ProviderVerificationStatus =
+  | "not_researched"
+  | "terms_reviewed"
+  | "credential_missing"
+  | "approval_pending"
+  | "implemented_unverified"
+  | "live_verified"
+  | "policy_blocked"
+  | "disabled";
+
 export type MarketProviderOperation =
   | "temporary_display"
   | "persist"
   | "forecast"
   | "recommendation_score";
+
+export type ProviderPolicyRecord = Readonly<{
+  provider: MarketProviderId | "stockx" | "alias";
+  verificationStatus: ProviderVerificationStatus;
+  temporaryDisplay: PolicyDecision;
+  persistence: PolicyDecision;
+  forecast: PolicyDecision;
+  recommendationScore: PolicyDecision;
+}>;
+
+export const PROVIDER_POLICY_REGISTRY: readonly ProviderPolicyRecord[] = [
+  { provider: "rakuten", verificationStatus: "implemented_unverified", temporaryDisplay: "allowed", persistence: "unknown", forecast: "prohibited", recommendationScore: "prohibited" },
+  { provider: "yahoo", verificationStatus: "implemented_unverified", temporaryDisplay: "allowed", persistence: "unknown", forecast: "prohibited", recommendationScore: "prohibited" },
+  { provider: "ebay", verificationStatus: "implemented_unverified", temporaryDisplay: "allowed", persistence: "prohibited", forecast: "prohibited", recommendationScore: "prohibited" },
+  { provider: "stockx", verificationStatus: "policy_blocked", temporaryDisplay: "prohibited", persistence: "prohibited", forecast: "prohibited", recommendationScore: "prohibited" },
+  { provider: "alias", verificationStatus: "approval_pending", temporaryDisplay: "requires_approval", persistence: "prohibited", forecast: "prohibited", recommendationScore: "prohibited" },
+] as const;
 
 export class MarketProviderOperationDeniedError extends Error {
   override name = "MarketProviderOperationDeniedError";
@@ -18,10 +46,16 @@ export class MarketProviderOperationDeniedError extends Error {
 }
 
 export function isMarketProviderOperationAllowed(
-  _provider: MarketProviderId,
+  provider: MarketProviderId,
   operation: MarketProviderOperation,
 ): boolean {
-  return operation === "temporary_display";
+  const policy = PROVIDER_POLICY_REGISTRY.find((item) => item.provider === provider);
+  if (!policy) return false;
+  const decision = operation === "temporary_display" ? policy.temporaryDisplay
+    : operation === "persist" ? policy.persistence
+    : operation === "forecast" ? policy.forecast
+    : policy.recommendationScore;
+  return decision === "allowed";
 }
 
 export function assertMarketProviderOperationAllowed(

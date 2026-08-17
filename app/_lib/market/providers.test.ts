@@ -5,8 +5,10 @@ import { toPricePresentation } from "./contracts";
 import { styleCodeFromTitle } from "./listing-match";
 import { MARKET_PROVIDER_CAPABILITIES, searchEbayListings, searchYahooListings } from "./providers";
 import { fetchMarketJson, MarketProviderRequestError } from "./provider-request";
+import { getEbayApplicationToken, resetEbayTokenManagerForTests } from "./ebay-token-manager";
 
 afterEach(() => {
+  resetEbayTokenManagerForTests();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
@@ -81,6 +83,32 @@ describe("current market provider adapters", () => {
     const searchHeaders = new Headers(fetcher.mock.calls[1]?.[1]?.headers);
     expect(searchHeaders.get("authorization")).toBe("Bearer <test-oauth-token>");
     expect(JSON.stringify(result)).not.toMatch(/temporary-token|client-secret/iu);
+  });
+
+  it("single-flights concurrent eBay application token requests", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json({ access_token: "shared-token", expires_in: 7200 }));
+    const credentials = { clientId: "client-id", clientSecret: "client-secret" };
+    await expect(Promise.all([
+      getEbayApplicationToken(credentials, fetcher, 1_000),
+      getEbayApplicationToken(credentials, fetcher, 1_000),
+      getEbayApplicationToken(credentials, fetcher, 1_000),
+    ])).resolves.toEqual(["shared-token", "shared-token", "shared-token"]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates an eBay token on 401 and retries authorization exactly once", async () => {
+    vi.stubEnv("EBAY_PRODUCTION_CLIENT_ID", "client-id");
+    vi.stubEnv("EBAY_PRODUCTION_CLIENT_SECRET", "client-secret");
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(json({ access_token: "expired-token", expires_in: 7200 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 401 }))
+      .mockResolvedValueOnce(json({ access_token: "fresh-token", expires_in: 7200 }))
+      .mockResolvedValueOnce(json({ itemSummaries: [] }));
+    const result = await searchEbayListings(context(), fetcher);
+    expect(result.status).toBe("empty");
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(new Headers(fetcher.mock.calls[3]?.[1]?.headers).get("authorization")).toBe("Bearer fresh-token");
+    expect(JSON.stringify(result)).not.toMatch(/expired-token|fresh-token|client-secret/iu);
   });
 
   it("does not retry 429 and retries one temporary 503", async () => {

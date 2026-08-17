@@ -10,10 +10,12 @@ export type MarketPriceSemantic =
   | "recommended_sell"
   | "recommended_buy";
 
-export type MarketMatchLevel = "exact" | "high" | "related";
-export type MarketCondition = "new" | "used" | "refurbished" | "unknown";
+export type MarketMatchLevel = "exact" | "probable" | "related" | "rejected";
+export type MarketCondition = "new" | "used" | "unknown";
 export type MarketSizeSystem = "US_M" | "US_W" | "UK" | "EU" | "JP" | "UNKNOWN";
 export type MarketListingFormat = "fixed_price" | "auction" | "unknown";
+export type MarketAudience = "men" | "women" | "unisex" | "kids" | "unknown";
+export type MarketQueryMode = "strict" | "relaxed" | "model_only";
 
 export type ColorwayVerificationState =
   | "model_color_style_verified"
@@ -32,35 +34,38 @@ export type VerifiedRecommendationIdentity = Readonly<{
 export type MarketSearchContext = Readonly<{
   query: string;
   identity: VerifiedRecommendationIdentity;
-  gender: "men" | "women" | "unisex" | "kids" | "unknown";
+  gender: MarketAudience;
   sizeSystem: MarketSizeSystem;
   size: string | null;
   condition: MarketCondition;
 }>;
 
 export type ListingMatchResult = Readonly<{
-  matchLevel: MarketMatchLevel | "rejected";
+  matchLevel: MarketMatchLevel;
   reasons: string[];
   warnings: string[];
 }>;
 
 export type MarketListing = Readonly<{
   provider: MarketProviderId;
-  providerItemId: string | null;
+  externalId: string | null;
   title: string;
-  modelName: string | null;
+  canonicalBrand: string | null;
+  canonicalModelName: string | null;
+  modelFamily: string | null;
+  generation: string | null;
   colorwayName: string | null;
   styleCode: string | null;
-  productFamily: string | null;
-  releaseYear: number | null;
-  gender: "men" | "women" | "unisex" | "kids" | "unknown";
+  audience: MarketAudience;
   price: number;
   currency: string;
   shippingPrice: number | null;
+  shippingKnown: boolean;
   totalDisplayedPrice: number | null;
   priceType: Extract<MarketPriceSemantic, "current_retail_price" | "current_listing_price">;
   listingFormat: MarketListingFormat;
   condition: MarketCondition;
+  providerConditionLabel: string | null;
   sizeSystem: MarketSizeSystem;
   size: string | null;
   inStock: boolean | null;
@@ -98,7 +103,7 @@ export type ProviderResponseAudit = Readonly<{
   provider: MarketProviderId;
   normalizedCount: number;
   exactCount: number;
-  highCount: number;
+  probableCount: number;
   relatedCount: number;
   rejectedCount: number;
   missingStyleCodeCount: number;
@@ -107,7 +112,7 @@ export type ProviderResponseAudit = Readonly<{
   missingConditionCount: number;
   missingShippingCount: number;
   generationConflictCount: number;
-  genderConflictCount: number;
+  audienceConflictCount: number;
   sizeConflictCount: number;
   currencyCount: Record<string, number>;
   schemaWarningCount: number;
@@ -122,17 +127,29 @@ export type MarketProviderStatus =
   | "unauthorized"
   | "rate_limited"
   | "timeout"
-  | "network_error"
   | "schema_error"
-  | "temporarily_unavailable";
+  | "temporarily_unavailable"
+  | "policy_disabled";
 
-export type MarketProviderResult = Readonly<{
-  provider: MarketProviderId;
-  status: MarketProviderStatus;
-  listings: MarketListing[];
-  audit: ProviderResponseAudit;
-  message: string;
-}>;
+export type MarketProviderResult =
+  | Readonly<{
+      provider: MarketProviderId;
+      status: "success";
+      listings: MarketListing[];
+      fetchedAt: string;
+      audit: ProviderResponseAudit;
+      message: string;
+      safeCode?: string;
+    }>
+  | Readonly<{
+      provider: MarketProviderId;
+      status: Exclude<MarketProviderStatus, "success">;
+      listings: [];
+      fetchedAt: string | null;
+      audit: ProviderResponseAudit;
+      message: string;
+      safeCode?: string;
+    }>;
 
 export type MarketSearchResponse = Readonly<{
   query: string;
@@ -141,8 +158,25 @@ export type MarketSearchResponse = Readonly<{
   providers: MarketProviderResult[];
 }>;
 
+export type MarketSearchQuery = Readonly<{
+  mode: MarketQueryMode;
+  query: string;
+  reason: "style_code" | "brand_style_code" | "model_style_code" | "model_colorway" | "model";
+}>;
+
+export type MarketPriceSummary = Readonly<{
+  provider: MarketProviderId;
+  condition: MarketCondition;
+  currency: string;
+  listingCount: number;
+  minimum: number | null;
+  median: number | null;
+  maximum: number | null;
+  fetchedAt: string | null;
+}>;
+
 export function toPricePresentation(listing: MarketListing): PricePresentation {
-  const shippingKnown = listing.shippingPrice !== null;
+  const shippingKnown = listing.shippingKnown;
   const totalKnown = listing.totalDisplayedPrice !== null;
   const totalAmount = listing.totalDisplayedPrice;
   return {
@@ -171,7 +205,7 @@ export function emptyProviderAudit(provider: MarketProviderId): ProviderResponse
     provider,
     normalizedCount: 0,
     exactCount: 0,
-    highCount: 0,
+    probableCount: 0,
     relatedCount: 0,
     rejectedCount: 0,
     missingStyleCodeCount: 0,
@@ -180,7 +214,7 @@ export function emptyProviderAudit(provider: MarketProviderId): ProviderResponse
     missingConditionCount: 0,
     missingShippingCount: 0,
     generationConflictCount: 0,
-    genderConflictCount: 0,
+    audienceConflictCount: 0,
     sizeConflictCount: 0,
     currencyCount: {},
     schemaWarningCount: 0,

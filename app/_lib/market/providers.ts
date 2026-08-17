@@ -25,10 +25,12 @@ import {
   type ListingDraft,
 } from "./listing-match";
 import { fetchMarketJson, MarketProviderRequestError } from "./provider-request";
+import { getEbayApplicationToken, invalidateEbayApplicationToken } from "./ebay-token-manager";
+import type { ProviderVerificationStatus } from "./provider-policy";
 
 export type MarketProviderCapability = Readonly<{
-  provider: MarketProviderId | "stockx" | "alias" | "snkrdunk" | "mercari" | "grailed";
-  status: "implemented_unverified" | "live_verified" | "contract_only" | "pending_approval" | "disabled" | "manual_only";
+  provider: MarketProviderId | "stockx" | "alias";
+  status: ProviderVerificationStatus;
   priceSemantics: readonly string[];
   automatedSearch: boolean;
   persistentStorage: boolean;
@@ -38,11 +40,8 @@ export const MARKET_PROVIDER_CAPABILITIES: readonly MarketProviderCapability[] =
   { provider: "rakuten", status: "implemented_unverified", priceSemantics: ["current_retail_price"], automatedSearch: true, persistentStorage: false },
   { provider: "yahoo", status: "implemented_unverified", priceSemantics: ["current_retail_price"], automatedSearch: true, persistentStorage: false },
   { provider: "ebay", status: "implemented_unverified", priceSemantics: ["current_listing_price"], automatedSearch: true, persistentStorage: false },
-  { provider: "stockx", status: "pending_approval", priceSemantics: ["lowest_ask", "highest_bid"], automatedSearch: false, persistentStorage: false },
-  { provider: "alias", status: "pending_approval", priceSemantics: [], automatedSearch: false, persistentStorage: false },
-  { provider: "snkrdunk", status: "disabled", priceSemantics: [], automatedSearch: false, persistentStorage: false },
-  { provider: "mercari", status: "manual_only", priceSemantics: [], automatedSearch: false, persistentStorage: false },
-  { provider: "grailed", status: "disabled", priceSemantics: [], automatedSearch: false, persistentStorage: false },
+  { provider: "stockx", status: "policy_blocked", priceSemantics: [], automatedSearch: false, persistentStorage: false },
+  { provider: "alias", status: "approval_pending", priceSemantics: [], automatedSearch: false, persistentStorage: false },
 ] as const;
 
 export async function searchRakutenListings(
@@ -53,21 +52,24 @@ export async function searchRakutenListings(
     const products = await searchRakutenProducts({ query: context.query, hits: 10, page: 1 });
     const drafts: ListingDraft[] = products.map((product) => ({
       provider: "rakuten",
-      providerItemId: product.itemCode ?? null,
+      externalId: product.itemCode ?? null,
       title: product.title,
-      modelName: product.normalizedModelName,
+      canonicalBrand: product.brand,
+      canonicalModelName: product.normalizedModelName,
+      modelFamily: context.identity.modelName,
+      generation: generationFromText(product.title),
       colorwayName: null,
       styleCode: styleCodeFromTitle(product.title, context.identity.styleCode),
-      productFamily: context.identity.modelName,
-      releaseYear: null,
-      gender: genderFromText(product.title),
+      audience: audienceFromText(product.title),
       price: product.price ?? Number.NaN,
       currency: "JPY",
       shippingPrice: null,
+      shippingKnown: false,
       totalDisplayedPrice: null,
       priceType: "current_retail_price",
       listingFormat: "fixed_price",
       condition: "unknown",
+      providerConditionLabel: null,
       sizeSystem: "UNKNOWN",
       size: null,
       inStock: product.availability === undefined ? null : product.availability > 0,
@@ -84,7 +86,7 @@ export async function searchRakutenListings(
       const status = error.status === 401 || error.status === 403 ? "unauthorized" : error.status === 429 ? "rate_limited" : "temporarily_unavailable";
       return unavailable("rakuten", safeProviderMessage(status), status);
     }
-    return unavailable("rakuten", safeProviderMessage("network_error"), "network_error");
+    return unavailable("rakuten", safeProviderMessage("temporarily_unavailable"), "temporarily_unavailable");
   }
 }
 
@@ -115,21 +117,24 @@ export async function searchYahooListings(
       const condition = normalizeCondition(value["condition"]);
       return [{
         provider: "yahoo",
-        providerItemId: text(value["code"], 200),
+        externalId: text(value["code"], 200),
         title,
-        modelName: null,
+        canonicalBrand: isRecord(value["brand"]) ? text(value["brand"]["name"], 120) : null,
+        canonicalModelName: null,
+        modelFamily: context.identity.modelName,
+        generation: generationFromText(title),
         colorwayName: null,
         styleCode: styleCodeFromTitle(title, context.identity.styleCode),
-        productFamily: context.identity.modelName,
-        releaseYear: null,
-        gender: genderFromText(`${title} ${text(value["description"], 500) ?? ""}`),
+        audience: audienceFromText(`${title} ${text(value["description"], 500) ?? ""}`),
         price,
         currency: "JPY",
         shippingPrice: shipping,
+        shippingKnown: shipping !== null,
         totalDisplayedPrice: null,
         priceType: "current_retail_price",
         listingFormat: "fixed_price",
         condition,
+        providerConditionLabel: text(value["condition"], 100),
         sizeSystem: "UNKNOWN",
         size: null,
         inStock: typeof value["inStock"] === "boolean" ? value["inStock"] : null,
@@ -155,33 +160,20 @@ export async function searchEbayListings(
   const clientSecret = process.env["EBAY_PRODUCTION_CLIENT_SECRET"]?.trim();
   if (!clientId || !clientSecret) return unavailable("ebay", "eBayの価格サービスは現在利用できません。", "not_configured");
   try {
-    const tokenPayload = await fetchMarketJson("https://api.ebay.com/identity/v1/oauth2/token", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: "grant_type=client_credentials&scope=https%3A%2F%2Fapi.ebay.com%2Foauth%2Fapi_scope",
-      cache: "no-store",
-    }, fetcher);
-    if (!isRecord(tokenPayload) || !text(tokenPayload["access_token"], 8_192)) {
-      return unavailable("ebay", safeProviderMessage("schema_error"), "schema_error");
-    }
-    const token = text(tokenPayload["access_token"], 8_192)!;
+    let token = await getEbayApplicationToken({ clientId, clientSecret }, fetcher);
     const url = new URL("https://api.ebay.com/buy/browse/v1/item_summary/search");
     url.searchParams.set("q", context.query);
     url.searchParams.set("limit", "10");
     const marketplace = process.env["EBAY_PRODUCTION_MARKETPLACE_ID"]?.trim() || "EBAY_US";
-    const payload = await fetchMarketJson(url, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-        "X-EBAY-C-MARKETPLACE-ID": marketplace,
-      },
-      cache: "no-store",
-    }, fetcher);
+    let payload: unknown;
+    try {
+      payload = await fetchEbayBrowse(url, marketplace, token, fetcher);
+    } catch (error) {
+      if (!(error instanceof MarketProviderRequestError) || error.upstreamStatus !== 401) throw error;
+      invalidateEbayApplicationToken(token);
+      token = await getEbayApplicationToken({ clientId, clientSecret }, fetcher);
+      payload = await fetchEbayBrowse(url, marketplace, token, fetcher);
+    }
     if (!isRecord(payload) || !Array.isArray(payload["itemSummaries"])) return unavailable("ebay", safeProviderMessage("schema_error"), "schema_error");
     let schemaWarnings = 0;
     const drafts = payload["itemSummaries"].slice(0, 10).flatMap((value): ListingDraft[] => {
@@ -198,21 +190,24 @@ export async function searchEbayListings(
       const buyingOptions = Array.isArray(value["buyingOptions"]) ? value["buyingOptions"].filter((item): item is string => typeof item === "string") : [];
       return [{
         provider: "ebay",
-        providerItemId: text(value["itemId"], 200),
+        externalId: text(value["itemId"], 200),
         title,
-        modelName: null,
+        canonicalBrand: aspects.get("brand") ?? null,
+        canonicalModelName: null,
+        modelFamily: context.identity.modelName,
+        generation: generationFromText(title),
         colorwayName: aspects.get("color") ?? null,
         styleCode: normalizeAspectStyle(aspects, title, context.identity.styleCode),
-        productFamily: context.identity.modelName,
-        releaseYear: null,
-        gender: genderFromText(`${title} ${aspects.get("department") ?? ""}`),
+        audience: audienceFromText(`${title} ${aspects.get("department") ?? ""}`),
         price,
         currency,
         shippingPrice,
+        shippingKnown: shippingPrice !== null,
         totalDisplayedPrice: null,
         priceType: "current_listing_price",
         listingFormat: normalizeListingFormat(buyingOptions.join(" ")),
         condition: normalizeCondition(text(value["condition"], 100)),
+        providerConditionLabel: text(value["condition"], 100),
         sizeSystem,
         size,
         inStock: null,
@@ -258,22 +253,21 @@ function successful(
       warnings: ["schema_warning"],
     })),
   ], { schemaWarningCount, unsafeUrlCount, duplicateCount: deduped.duplicateCount });
-  return {
-    provider,
-    status: deduped.listings.length ? "success" : "empty",
-    listings: deduped.listings,
-    audit,
-    message: deduped.listings.length ? "現在表示されている価格を取得しました。" : "一致する販売商品を確認できませんでした。",
-  };
+  if (!deduped.listings.length) {
+    return { provider, status: "empty", listings: [], fetchedAt: null, audit, message: "一致する販売商品を確認できませんでした。" };
+  }
+  return { provider, status: "success", listings: deduped.listings, fetchedAt: new Date().toISOString(), audit, message: "現在表示されている価格を取得しました。" };
 }
 
-function unavailable(provider: MarketProviderId, message: string, status: MarketProviderResult["status"]): MarketProviderResult {
-  return { provider, status, listings: [], audit: emptyProviderAudit(provider), message };
+function unavailable(provider: MarketProviderId, message: string, status: Exclude<MarketProviderResult["status"], "success">, safeCode?: string): MarketProviderResult {
+  return { provider, status, listings: [], fetchedAt: null, audit: emptyProviderAudit(provider), message, ...(safeCode ? { safeCode } : {}) };
 }
 
 function requestFailure(provider: MarketProviderId, error: unknown): MarketProviderResult {
-  const status = error instanceof MarketProviderRequestError ? error.status : "network_error";
-  return unavailable(provider, safeProviderMessage(status), status);
+  const status: Exclude<MarketProviderResult["status"], "success"> = error instanceof MarketProviderRequestError
+    ? error.status === "success" ? "schema_error" : error.status
+    : "temporarily_unavailable";
+  return unavailable(provider, safeProviderMessage(status), status, error instanceof MarketProviderRequestError && error.upstreamStatus ? `upstream_${error.upstreamStatus}` : undefined);
 }
 
 function safeProviderMessage(status: MarketProviderResult["status"]): string {
@@ -288,13 +282,30 @@ function providersDisabled(): boolean {
   return process.env["EXTERNAL_PROVIDERS_DISABLED"]?.trim().toLocaleLowerCase("en-US") === "true";
 }
 
-function genderFromText(value: string): ListingDraft["gender"] {
+function audienceFromText(value: string): ListingDraft["audience"] {
   const textValue = value.normalize("NFKC").toLocaleLowerCase("en-US");
   if (/kids?|youth|gs\b|キッズ/iu.test(textValue)) return "kids";
   if (/women|womens|wmns|ladies|ウィメンズ|レディース/iu.test(textValue)) return "women";
   if (/men|mens|メンズ/iu.test(textValue)) return "men";
   if (/unisex|ユニセックス/iu.test(textValue)) return "unisex";
   return "unknown";
+}
+
+function generationFromText(value: string): string | null {
+  const match = value.normalize("NFKC").match(/\b(?:v\d+|\d{3,4}v\d+|OG|ADV|44\s*DX|Golf)\b/iu);
+  return match?.[0]?.toLocaleLowerCase("en-US").replace(/\s+/gu, "") ?? null;
+}
+
+async function fetchEbayBrowse(url: URL, marketplace: string, token: string, fetcher: typeof fetch): Promise<unknown> {
+  return fetchMarketJson(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+      "X-EBAY-C-MARKETPLACE-ID": marketplace,
+    },
+    cache: "no-store",
+  }, fetcher);
 }
 
 function yahooImage(value: Record<string, unknown>): string | null {

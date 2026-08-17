@@ -10,6 +10,7 @@ import type {
 } from "./contracts";
 import { emptyProviderAudit } from "./contracts";
 import { isSafePublicHttpsUrl } from "./listing-match";
+import { parseMarketProviderResult } from "./runtime-validation";
 import { buildRakutenMarketQuery } from "./ui";
 
 type BeginnerCandidate = Pick<
@@ -90,7 +91,7 @@ export function verificationLabel(state: ColorwayVerificationState): string {
 
 export function matchLabel(level: MarketListing["matchLevel"]): string {
   if (level === "exact") return "おすすめ商品と一致";
-  if (level === "high") return "おすすめ商品と一致する可能性が高い";
+  if (level === "probable") return "おすすめ商品と一致する可能性が高い";
   return "関連候補：別カラー・別世代・別サイズの可能性";
 }
 
@@ -119,19 +120,9 @@ export function parseMarketSearchResponse(value: unknown): MarketSearchResponse 
   for (const item of value["providers"]) {
     if (!isRecord(item) || !isProvider(item["provider"]) || seenProviders.has(item["provider"])) return null;
     seenProviders.add(item["provider"]);
-    providers.push(parseProvider(item, item["provider"]));
+    providers.push(parseMarketProviderResult(item, item["provider"]));
   }
   return { query: value["query"], searchedAt: value["searchedAt"], recommendationRankingChanged: false, providers };
-}
-
-function parseProvider(value: Record<string, unknown>, provider: MarketProviderId): MarketProviderResult {
-  if (!isProviderStatus(value["status"]) || !Array.isArray(value["listings"])
-    || value["listings"].length > 10 || typeof value["message"] !== "string"
-    || !isAudit(value["audit"], provider)
-    || !value["listings"].every((listing) => isListing(listing, provider))) return schemaErrorProvider(provider);
-  const listings = value["listings"] as MarketListing[];
-  const audit = value["audit"] as MarketProviderResult["audit"];
-  return { provider, status: value["status"], listings, audit, message: value["message"].slice(0, 240) };
 }
 
 function schemaErrorProvider(provider: MarketProviderId): MarketProviderResult {
@@ -139,6 +130,7 @@ function schemaErrorProvider(provider: MarketProviderId): MarketProviderResult {
     provider,
     status: "schema_error",
     listings: [],
+    fetchedAt: null,
     audit: emptyProviderAudit(provider),
     message: "価格情報を安全に検証できなかったため、この販売先の結果だけを表示していません。",
   };
@@ -147,9 +139,9 @@ function schemaErrorProvider(provider: MarketProviderId): MarketProviderResult {
 function isAudit(value: unknown, provider: MarketProviderId): value is MarketProviderResult["audit"] {
   if (!isRecord(value) || value["provider"] !== provider || !isRecord(value["currencyCount"])) return false;
   const numericKeys = [
-    "normalizedCount", "exactCount", "highCount", "relatedCount", "rejectedCount",
+    "normalizedCount", "exactCount", "probableCount", "relatedCount", "rejectedCount",
     "missingStyleCodeCount", "missingColorwayCount", "missingSizeCount", "missingConditionCount",
-    "missingShippingCount", "generationConflictCount", "genderConflictCount", "sizeConflictCount",
+    "missingShippingCount", "generationConflictCount", "audienceConflictCount", "sizeConflictCount",
     "schemaWarningCount", "unsafeUrlCount", "duplicateCount",
   ];
   return numericKeys.every((key) => Number.isSafeInteger(value[key]) && Number(value[key]) >= 0)
@@ -158,27 +150,30 @@ function isAudit(value: unknown, provider: MarketProviderId): value is MarketPro
 
 function isListing(value: unknown, provider: MarketProviderId): value is MarketListing {
   if (!isRecord(value) || value["provider"] !== provider
-    || !isNullableString(value["providerItemId"])
+    || !isNullableString(value["externalId"])
     || typeof value["title"] !== "string" || value["title"].trim().length === 0
-    || !isNullableString(value["modelName"])
+    || !isNullableString(value["canonicalBrand"])
+    || !isNullableString(value["canonicalModelName"])
+    || !isNullableString(value["modelFamily"])
+    || !isNullableString(value["generation"])
     || !isNullableString(value["colorwayName"])
     || !isNullableString(value["styleCode"])
-    || !isNullableString(value["productFamily"])
-    || !(value["releaseYear"] === null || (Number.isSafeInteger(value["releaseYear"]) && Number(value["releaseYear"]) >= 1900 && Number(value["releaseYear"]) <= 2200))
-    || !["men", "women", "unisex", "kids", "unknown"].includes(String(value["gender"]))
+    || !["men", "women", "unisex", "kids", "unknown"].includes(String(value["audience"]))
     || typeof value["price"] !== "number" || !Number.isFinite(value["price"]) || value["price"] < 0
     || typeof value["currency"] !== "string" || !/^[A-Z]{3}$/u.test(value["currency"])
     || !isNullableMoney(value["shippingPrice"])
+    || typeof value["shippingKnown"] !== "boolean"
     || !isNullableMoney(value["totalDisplayedPrice"])
     || typeof value["itemUrl"] !== "string" || !isSafePublicHttpsUrl(value["itemUrl"])
     || !isProviderPriceType(value["priceType"], provider)
     || !["fixed_price", "auction", "unknown"].includes(String(value["listingFormat"]))
-    || !["new", "used", "refurbished", "unknown"].includes(String(value["condition"]))
+    || !["new", "used", "unknown"].includes(String(value["condition"]))
+    || !isNullableString(value["providerConditionLabel"])
     || !["US_M", "US_W", "UK", "EU", "JP", "UNKNOWN"].includes(String(value["sizeSystem"]))
     || !isNullableString(value["size"])
     || !(value["inStock"] === null || typeof value["inStock"] === "boolean")
     || !isNullableString(value["shopName"])
-    || !["exact", "high", "related"].includes(String(value["matchLevel"]))
+    || !["exact", "probable", "related"].includes(String(value["matchLevel"]))
     || !isStringArray(value["matchReasons"])
     || !isStringArray(value["mismatchWarnings"])
     || !isDateString(value["fetchedAt"])
@@ -211,7 +206,7 @@ function isProvider(value: unknown): value is MarketProviderId {
 }
 
 function isProviderStatus(value: unknown): value is MarketProviderStatus {
-  return typeof value === "string" && ["success", "empty", "not_configured", "unauthorized", "rate_limited", "timeout", "network_error", "schema_error", "temporarily_unavailable"].includes(value);
+  return typeof value === "string" && ["success", "empty", "not_configured", "unauthorized", "rate_limited", "timeout", "schema_error", "temporarily_unavailable", "policy_disabled"].includes(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

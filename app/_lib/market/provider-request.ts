@@ -2,8 +2,8 @@ import "server-only";
 
 import type { MarketProviderStatus } from "./contracts";
 
-const MAX_RESPONSE_BYTES = 1_500_000;
-const REQUEST_TIMEOUT_MS = 8_000;
+export const MAX_MARKET_RESPONSE_BYTES = 1_500_000;
+export const MARKET_REQUEST_TIMEOUT_MS = 8_000;
 
 export class MarketProviderRequestError extends Error {
   override name = "MarketProviderRequestError";
@@ -26,24 +26,24 @@ export async function fetchMarketJson(
     try {
       const response = await fetcher(url, {
         ...init,
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(MARKET_REQUEST_TIMEOUT_MS),
       });
       if (!response.ok) {
-        const retryable = (response.status === 502 || response.status === 503) && attempt === 0;
+        const retryable = (response.status === 502 || response.status === 503 || response.status === 504) && attempt === 0;
         if (retryable) continue;
         if (response.status === 401 || response.status === 403) throw new MarketProviderRequestError("unauthorized", response.status);
         if (response.status === 429) throw new MarketProviderRequestError("rate_limited", 429, parseRetryAfter(response.headers.get("retry-after")));
-        if (response.status === 502 || response.status === 503 || response.status >= 500) {
+        if (response.status === 502 || response.status === 503 || response.status === 504 || response.status >= 500) {
           throw new MarketProviderRequestError("temporarily_unavailable", response.status);
         }
         throw new MarketProviderRequestError("schema_error", response.status);
       }
       const declaredLength = Number(response.headers.get("content-length"));
-      if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+      if (Number.isFinite(declaredLength) && declaredLength > MAX_MARKET_RESPONSE_BYTES) {
         throw new MarketProviderRequestError("schema_error", response.status);
       }
       const body = await response.text();
-      if (Buffer.byteLength(body, "utf8") > MAX_RESPONSE_BYTES) throw new MarketProviderRequestError("schema_error", response.status);
+      if (Buffer.byteLength(body, "utf8") > MAX_MARKET_RESPONSE_BYTES) throw new MarketProviderRequestError("schema_error", response.status);
       if (!body.trim()) throw new MarketProviderRequestError("schema_error", response.status);
       try {
         return JSON.parse(body) as unknown;
@@ -55,7 +55,7 @@ export async function fetchMarketJson(
       const timeout = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
       const reset = error instanceof Error && /ECONNRESET|connection reset/iu.test(`${error.message} ${String(error.cause ?? "")}`);
       if ((timeout || reset) && attempt === 0) continue;
-      throw new MarketProviderRequestError(timeout ? "timeout" : "network_error");
+      throw new MarketProviderRequestError(timeout ? "timeout" : "temporarily_unavailable");
     }
   }
   throw new MarketProviderRequestError("temporarily_unavailable");

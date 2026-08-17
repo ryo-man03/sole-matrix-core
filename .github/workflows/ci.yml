@@ -68,6 +68,9 @@ jobs:
       - name: Run tests
         run: pnpm test
 
+      - name: Run market provider contracts
+        run: pnpm test:providers
+
   build:
     name: Production build
     runs-on: ubuntu-latest
