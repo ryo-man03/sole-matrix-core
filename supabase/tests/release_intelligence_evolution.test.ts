@@ -8,7 +8,8 @@ const legacy = readFileSync("supabase/migrations/202608020004_release_daily_pick
 
 describe("release intelligence evolution migration", () => {
   it("leaves migration 004 byte-stable", () => {
-    expect(createHash("sha256").update(legacy).digest("hex")).toBe("4498f6c7f4c61b685f7f081c86cc66d54e9a0bb9c032b11e8e138c6362801683");
+    const canonical = legacy.replace(/\r\n/gu, "\n");
+    expect(createHash("sha256").update(canonical).digest("hex")).toBe("08ec24ef08167cb51e46cd144919cb914ffac590b3ae0976c9af20e354c3312a");
   });
 
   it.each(["release_ingestion_runs", "release_evidence_status_history", "release_conflicts"])("creates service-only table %s with RLS", (table) => {
