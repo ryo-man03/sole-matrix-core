@@ -45,10 +45,14 @@ describe("Rakuten server-side candidate provider", () => {
 
       expect(url.searchParams.get("formatVersion")).toBe("2");
       expect(url.searchParams.get("accessKey")).toBeNull();
+      expect(url.pathname).toContain("/20260701");
       expect(url.searchParams.get("keyword")).toBe(
         "adidas Tobacco brown クラシック スニーカー",
       );
       expect(headers.get("accessKey")).toBe("access-key");
+      expect(headers.get("origin")).toBe("https://sole-matrix.example");
+      expect(headers.get("referer")).toBe("https://sole-matrix.example/");
+      expect(init?.cache).toBe("no-store");
 
       return jsonResponse({
         items: [
@@ -205,6 +209,7 @@ function configuredEnv() {
   return {
     RAKUTEN_APPLICATION_ID: "application-id",
     RAKUTEN_ACCESS_KEY: "access-key",
+    RAKUTEN_REQUEST_ORIGIN: "https://sole-matrix.example/app",
   };
 }
 

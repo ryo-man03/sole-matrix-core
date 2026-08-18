@@ -81,6 +81,7 @@ describe("GET /api/market/rakuten", () => {
     const [, init] = fetcher.mock.calls[0] ?? [];
     const requestHeaders = new Headers(init?.headers);
     expect(requestHeaders.get("origin")).toBe("https://example.com");
+    expect(requestHeaders.get("referer")).toBe("https://example.com/");
   });
 
   it("does not make market_find safety guarantees or label it as Gemini grounding", async () => {

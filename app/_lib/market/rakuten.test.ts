@@ -108,7 +108,7 @@ describe("Rakuten market product search", () => {
     ]);
   });
 
-  it("sends an Origin header when a request origin is provided", async () => {
+  it("sends Origin and Referer headers when a request origin is provided", async () => {
     configureCredentials();
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
       items: [],
@@ -123,6 +123,7 @@ describe("Rakuten market product search", () => {
     const [, init] = fetcher.mock.calls[0] ?? [];
     const requestHeaders = new Headers(init?.headers);
     expect(requestHeaders.get("origin")).toBe("https://abc123.ngrok-free.app");
+    expect(requestHeaders.get("referer")).toBe("https://abc123.ngrok-free.app/");
   });
 
   it("throws a recognizable error when credentials are missing", async () => {
@@ -133,6 +134,32 @@ describe("Rakuten market product search", () => {
 
     await expect(searchRakutenProducts({ query: "adidas Tobacco" }))
       .rejects.toBeInstanceOf(RakutenCredentialsMissingError);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["application id", "", "access-key"],
+    ["access key", "application-id", ""],
+  ])("does not call Rakuten when the %s is missing", async (_label, applicationId, accessKey) => {
+    vi.stubEnv("RAKUTEN_APPLICATION_ID", applicationId);
+    vi.stubEnv("RAKUTEN_ACCESS_KEY", accessKey);
+    const fetcher = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(searchRakutenProducts({ query: "adidas Tobacco" }))
+      .rejects.toBeInstanceOf(RakutenCredentialsMissingError);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty normalized query before network access", async () => {
+    configureCredentials();
+    const fetcher = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(searchRakutenProducts({ query: "  \n\t " })).rejects.toMatchObject({
+      name: "RakutenApiError",
+      code: "invalid_query",
+    });
     expect(fetcher).not.toHaveBeenCalled();
   });
 
@@ -210,6 +237,62 @@ describe("Rakuten market product search", () => {
       status: 429,
       message: "Please try again soon.",
     } satisfies Partial<RakutenApiError>);
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it("retries one 503 response and then normalizes the successful response", async () => {
+    configureCredentials();
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ error: "service_unavailable" }, 503))
+      .mockResolvedValueOnce(jsonResponse({ items: [] }));
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(searchRakutenProducts({ query: "New Balance 991v2" }))
+      .resolves.toEqual([]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries one aborted request without exposing transport details", async () => {
+    configureCredentials();
+    const aborted = new Error("credential-like transport detail");
+    aborted.name = "AbortError";
+    const fetcher = vi.fn<typeof fetch>()
+      .mockRejectedValueOnce(aborted)
+      .mockResolvedValueOnce(jsonResponse({ items: [] }));
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(searchRakutenProducts({ query: "ASICS GEL-LYTE III" }))
+      .resolves.toEqual([]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["malformed JSON", new Response("not-json", { status: 200 })],
+    ["schema drift", jsonResponse({ products: [] })],
+  ])("rejects %s as an invalid response", async (_label, response) => {
+    configureCredentials();
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(response));
+
+    await expect(searchRakutenProducts({ query: "PUMA Clyde" }))
+      .rejects.toMatchObject({
+        name: "RakutenApiError",
+        code: "invalid_response",
+      });
+  });
+
+  it("redacts every configured Rakuten value from safe upstream errors", async () => {
+    configureCredentials();
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
+      error: "forbidden",
+      error_description: "application-id access-key affiliate-id",
+    }, 403)));
+
+    const result = searchRakutenProducts({ query: "PUMA Clyde" });
+    await expect(result).rejects.toMatchObject({
+      name: "RakutenApiError",
+      status: 403,
+      message: "[redacted] [redacted] [redacted]",
+    });
   });
 
   it("maps the 2026 gateway error shape into a structured API error", async () => {

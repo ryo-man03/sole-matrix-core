@@ -169,6 +169,9 @@ function ProviderSection({ provider }: { provider: MarketProviderResult }) {
         <div><h5 id={`market-provider-${provider.provider}`}>{PROVIDER_LABELS[provider.provider]}</h5><p>{PROVIDER_PRICE_EXPLANATIONS[provider.provider]}</p></div>
         <span>{providerStatusMessage(provider.status)}</span>
       </div>
+      {provider.provider === "rakuten" ? (
+        <a href="https://developers.rakuten.com/" target="_blank" rel="noreferrer">Supported by Rakuten Developers</a>
+      ) : null}
       {summaries.length ? <div className="market-price-summaries" aria-label={`${PROVIDER_LABELS[provider.provider]}の価格概要`}>
         {summaries.map((summary) => <div key={`${summary.condition}:${summary.currency}`}>
           <span>{conditionLabel(summary.condition)} / {summary.currency}</span>

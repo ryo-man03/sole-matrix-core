@@ -699,12 +699,13 @@ describe("Rakuten isolated smoke", () => {
   });
 
   it("builds only the expected Rakuten endpoint and parameter names", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
       const url = input instanceof URL ? input : new URL(input.toString());
+      const headers = new Headers(init?.headers);
 
       expect(url.origin).toBe("https://openapi.rakuten.co.jp");
       expect(url.pathname).toBe(
-        "/ichibams/api/IchibaItem/Search/20260401"
+        "/ichibams/api/IchibaItem/Search/20260701"
       );
       expect([...url.searchParams.keys()].sort()).toEqual(
         [
@@ -716,12 +717,17 @@ describe("Rakuten isolated smoke", () => {
           "keyword",
         ].sort()
       );
+      expect(headers.get("origin")).toBe("https://sole-matrix.example");
+      expect(headers.get("referer")).toBe("https://sole-matrix.example/");
 
       return new Response(JSON.stringify({ items: [{}] }));
     });
 
     await runRakutenIsolatedSmoke({
-      env: rakutenOptInEnv(),
+      env: {
+        ...rakutenOptInEnv(),
+        RAKUTEN_REQUEST_ORIGIN: "https://sole-matrix.example/app",
+      },
       fetcher,
     });
   });

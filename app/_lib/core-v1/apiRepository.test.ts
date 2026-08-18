@@ -49,7 +49,7 @@ describe("Core v1 recommend API", () => {
     expect(payload.data.candidate.source).toBe("local");
     expect(payload.data.decision).toMatch(/strong_buy|consider|wait|avoid|unknown/);
     expect(payload.data.explanation.source).toBe("rule_based");
-    expect(payload.data.readiness.rakuten.status).toBe("missing_config");
+    expect(payload.data.readiness.rakuten.status).toBe("manual_only");
   });
 
   it("validates and applies the 11-question Ryo Mode payload", async () => {

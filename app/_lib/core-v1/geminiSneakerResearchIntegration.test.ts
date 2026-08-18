@@ -79,7 +79,7 @@ describe("Gemini candidate research and Core re-evaluation", () => {
       reasonCode: "missing_api_key",
     });
     expect(result.readiness.geminiExplanation.status).toBe("not_configured");
-    expect(result.readiness.rakuten.status).toBe("missing_config");
+    expect(result.readiness.rakuten.status).toBe("manual_only");
   });
 
   it("does not mark candidate research ready when only Gemini explanation succeeds", async () => {

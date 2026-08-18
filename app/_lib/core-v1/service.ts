@@ -33,7 +33,6 @@ import type { ExplanationInput } from "./explanation";
 import { generateCoreV1Explanation } from "./geminiExplanation";
 import { createPreferenceVector } from "./preferenceVector";
 import {
-  fetchRakutenCandidates,
   type RakutenCandidateProvider,
   type RakutenCandidateProviderResult,
 } from "./rakutenProvider";
@@ -100,7 +99,7 @@ export async function recommendCoreV1(
   });
   const ryoRerankingEnabled = !isProductJudgement && input.ryoModeAnswers !== undefined;
   const rakutenCandidateProvider = dependencies.rakutenCandidateProvider ??
-    ((providerInput) => fetchRakutenCandidates(providerInput, { env: providerEnv }));
+    (async () => manualOnlyRakutenResult());
 
   const [rawFallbackCandidates, rakutenResult, geminiResearch] = await Promise.all([
     candidateRepository.listCandidates(candidateInput),
@@ -633,6 +632,18 @@ async function loadRakutenCandidatesSafely(
       shapeValid: false,
     };
   }
+}
+
+function manualOnlyRakutenResult(): RakutenCandidateProviderResult {
+  return {
+    status: "manual_only",
+    candidates: [],
+    evidence: [],
+    readiness: createRakutenProviderReadiness("manual_only"),
+    networkAttempted: false,
+    responseOk: false,
+    shapeValid: false,
+  };
 }
 
 function normalize(value: string): string {

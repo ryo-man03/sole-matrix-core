@@ -14,9 +14,9 @@ import type {
 
 const rakutenEndpointContractAvailable = true;
 const rakutenItemSearchEndpoint =
-  "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401";
+  "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701";
 const rakutenEndpointHost = "openapi.rakuten.co.jp";
-const rakutenEndpointPathname = "/ichibams/api/IchibaItem/Search/20260401";
+const rakutenEndpointPathname = "/ichibams/api/IchibaItem/Search/20260701";
 
 export async function runRakutenIsolatedSmoke(
   options: {
@@ -42,6 +42,7 @@ export async function runRakutenIsolatedSmoke(
 
   const applicationId = env.RAKUTEN_APPLICATION_ID?.trim();
   const accessKey = env.RAKUTEN_ACCESS_KEY?.trim();
+  const requestOrigin = normalizeHttpOrigin(env.RAKUTEN_REQUEST_ORIGIN);
   const fetcher = options.fetcher ?? globalThis.fetch;
   const accessKeyTransport = options.accessKeyTransport ?? "header";
 
@@ -95,9 +96,15 @@ export async function runRakutenIsolatedSmoke(
   let response: Response;
 
   try {
+    const requestContextHeaders = requestOrigin
+      ? { Origin: requestOrigin, Referer: `${requestOrigin}/` }
+      : {};
+    const headers = accessKeyTransport === "header"
+      ? { accessKey, ...requestContextHeaders }
+      : requestContextHeaders;
     response = await fetcher(
       url,
-      accessKeyTransport === "header" ? { headers: { accessKey } } : undefined
+      Object.keys(headers).length > 0 ? { headers } : undefined,
     );
   } catch {
     return rakutenFailure("network_error", {
@@ -402,6 +409,17 @@ function classifyCredentialContractError(input: {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeHttpOrigin(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length > 512) return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    return url.origin;
+  } catch {
+    return undefined;
+  }
 }
 
 function rakutenFailure(
