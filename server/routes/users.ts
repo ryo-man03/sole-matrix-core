@@ -4,6 +4,7 @@ import {
   userMemoryService,
   type UserMemoryService,
 } from "../services/userMemoryService";
+import { readBoundedJsonBody } from "../../src/application/http/requestSecurity";
 
 export async function registerUserRequest(
   request: Request,
@@ -77,7 +78,7 @@ function userErrorResponse(error: unknown, fallbackMessage: string): Response {
 
 async function readJsonRecord(request: Request): Promise<Record<string, unknown>> {
   try {
-    const value = (await request.json()) as unknown;
+    const value = await readBoundedJsonBody(request);
     return isRecord(value) ? value : {};
   } catch {
     return {};

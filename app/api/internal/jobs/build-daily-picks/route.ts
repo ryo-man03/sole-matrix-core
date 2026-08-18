@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { authorizeInternalJob } from "../../../../../src/application/daily-picks/internalJobAuth";
 import { buildDailyBatch } from "../../../../../src/application/daily-picks/buildDailyBatch";
+import { readBoundedTextBody } from "../../../../../src/application/http/requestSecurity";
 
 export async function POST(request: Request) {
   const contentLength = request.headers.get("content-length");
   if (contentLength !== null && (!/^\d+$/u.test(contentLength) || Number(contentLength) > 65_536)) return NextResponse.json({ ok: false, error: { code: "BODY_TOO_LARGE" } }, { status: 413 });
-  const rawBody = await request.text();
+  let rawBody: string;
+  try { rawBody = await readBoundedTextBody(request, 65_536); }
+  catch { return NextResponse.json({ ok: false, error: { code: "BODY_TOO_LARGE" } }, { status: 413 }); }
   const authorization = authorizeInternalJob(request, rawBody, "build-daily-picks");
   if (!authorization.ok) return NextResponse.json({ ok: false, error: { code: authorization.code } }, { status: authorization.status });
   try {

@@ -18,9 +18,12 @@ export type ProviderMetricEvent = Readonly<{
 
 const recentMetrics: ProviderMetricEvent[] = [];
 
-export async function providerSingleFlight<T>(key: string, operation: () => Promise<T>): Promise<T> {
+export async function providerSingleFlight<T>(key: string, operation: () => Promise<T>, onReuse?: () => void): Promise<T> {
   const active = flights.get(key) as Promise<T> | undefined;
-  if (active) return active;
+  if (active) {
+    onReuse?.();
+    return active;
+  }
   const promise = operation().finally(() => flights.delete(key));
   flights.set(key, promise);
   return promise;

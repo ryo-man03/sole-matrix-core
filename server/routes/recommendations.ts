@@ -3,6 +3,7 @@ import {
   type RecommendCoreV1Dependencies,
   validateRecommendRequest,
 } from "../services/recommendationService";
+import { readBoundedJsonBody } from "../../src/application/http/requestSecurity";
 
 export function createRecommendationHandler(
   dependencies: RecommendCoreV1Dependencies = {},
@@ -36,9 +37,5 @@ export function createRecommendationHandler(
 }
 
 async function readJson(request: Request): Promise<unknown> {
-  try {
-    return (await request.json()) as unknown;
-  } catch {
-    return null;
-  }
+  try { return await readBoundedJsonBody(request); } catch { return null; }
 }

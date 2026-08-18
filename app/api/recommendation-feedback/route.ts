@@ -2,6 +2,7 @@ import {
   appendGlobalFeedbackEntry,
   normalizeGlobalFeedbackInput,
 } from "../../_lib/recommendation-feedback/globalFeedbackCorpus";
+import { readBoundedJsonBody } from "../../../src/application/http/requestSecurity";
 
 export const runtime = "nodejs";
 
@@ -48,9 +49,5 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 async function readJson(request: Request): Promise<unknown> {
-  try {
-    return (await request.json()) as unknown;
-  } catch {
-    return null;
-  }
+  try { return await readBoundedJsonBody(request); } catch { return null; }
 }

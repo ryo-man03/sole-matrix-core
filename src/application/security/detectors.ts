@@ -21,7 +21,46 @@ export type SecurityDetectors = {
   unauthorizedReleaseWriteCount: number;
   secretExposureCount: number;
   rawProviderResponsePersistenceCount: number;
+  clientCredentialBundleCount: number;
+  crossUserFeedbackLinkCount: number;
+  coreMutationFromMarketCount: number;
+  ryoMutationFromMarketCount: number;
+  marketplaceOfficialPromotionCount: number;
+  ebayPersistentWriteCount: number;
+  ebayForecastUseCount: number;
+  autoProviderLoginCount: number;
+  autoProviderTodayCount: number;
+  releaseConflictHiddenCount: number;
+  duplicateEvidenceLostCount: number;
+  unauthorizedAdminAccessCount: number;
+  fitGuaranteeClaimCount: number;
+  medicalClaimCount: number;
 };
+
+export const finalReadinessDetectorKinds = [
+  "secretExposureCount",
+  "clientCredentialBundleCount",
+  "crossUserReadCount",
+  "crossUserWriteCount",
+  "crossUserFeedbackLinkCount",
+  "coreMutationFromMarketCount",
+  "ryoMutationFromMarketCount",
+  "marketplaceOfficialPromotionCount",
+  "partialStyleCodeAcceptedCount",
+  "generationMismatchCount",
+  "audienceMismatchCount",
+  "ebayPersistentWriteCount",
+  "ebayForecastUseCount",
+  "autoProviderLoginCount",
+  "autoProviderTodayCount",
+  "releaseConflictHiddenCount",
+  "duplicateEvidenceLostCount",
+  "unauthorizedAdminAccessCount",
+  "fitGuaranteeClaimCount",
+  "medicalClaimCount",
+] as const satisfies readonly (keyof SecurityDetectors)[];
+
+export type FinalReadinessDetector = typeof finalReadinessDetectorKinds[number];
 
 export type SecurityObservation = Readonly<{
   kind: keyof SecurityDetectors;
@@ -79,5 +118,19 @@ function emptyDetectorResult(): SecurityDetectors {
     unauthorizedReleaseWriteCount: 0,
     secretExposureCount: 0,
     rawProviderResponsePersistenceCount: 0,
+    clientCredentialBundleCount: 0,
+    crossUserFeedbackLinkCount: 0,
+    coreMutationFromMarketCount: 0,
+    ryoMutationFromMarketCount: 0,
+    marketplaceOfficialPromotionCount: 0,
+    ebayPersistentWriteCount: 0,
+    ebayForecastUseCount: 0,
+    autoProviderLoginCount: 0,
+    autoProviderTodayCount: 0,
+    releaseConflictHiddenCount: 0,
+    duplicateEvidenceLostCount: 0,
+    unauthorizedAdminAccessCount: 0,
+    fitGuaranteeClaimCount: 0,
+    medicalClaimCount: 0,
   };
 }

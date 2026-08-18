@@ -18,12 +18,14 @@ import {
   recordProviderOutcome,
   setMarketCache,
 } from "./reliability";
+import type { ProviderMetricEvent } from "./reliability";
 import { parseMarketProviderResult } from "./runtime-validation";
 
 export type MarketProviderSearch = Readonly<{
   provider: MarketProviderId;
   search: (context: MarketSearchContext) => Promise<MarketProviderResult>;
 }>;
+export type MarketMetricRecorder = (event: Omit<ProviderMetricEvent, "at">) => void;
 
 const DEFAULT_PROVIDER_SEARCHES: readonly MarketProviderSearch[] = [
   { provider: "rakuten", search: searchRakutenListings },
@@ -34,12 +36,17 @@ const DEFAULT_PROVIDER_SEARCHES: readonly MarketProviderSearch[] = [
 export async function searchCurrentMarketPrices(
   context: MarketSearchContext,
   providers: readonly MarketProviderSearch[] = DEFAULT_PROVIDER_SEARCHES,
+  recordMetric: MarketMetricRecorder = recordProviderMetric,
 ): Promise<MarketSearchResponse> {
   const results = await Promise.all(providers.map(async ({ provider, search }) => {
     const startedAt = performance.now();
     try {
       assertMarketProviderOperationAllowed(provider, "temporary_display");
-      if (isProviderCircuitOpen(provider)) return unavailable(provider, "temporarily_unavailable", "provider_circuit_open");
+      if (isProviderCircuitOpen(provider)) {
+        const result = unavailable(provider, "temporarily_unavailable", "provider_circuit_open");
+        recordMetric({ provider, status: "circuit_open", latencyMs: 0, responseBytes: 0, normalizedCount: 0 });
+        return result;
+      }
       const queries = planMarketQueries(context);
       let finalResult: MarketProviderResult = unavailable(provider, "empty", "no_matching_listing");
       for (const query of queries) {
@@ -47,11 +54,21 @@ export async function searchCurrentMarketPrices(
         const key = searchKey(provider, requestContext, query.mode);
         const cached = getMarketCache<MarketProviderResult>(key);
         if (cached) {
-          recordProviderMetric({ provider, status: "cache_hit", latencyMs: 0, responseBytes: normalizedBytes(cached), normalizedCount: cached.listings.length });
+          recordMetric({ provider, status: "cache_hit", latencyMs: 0, responseBytes: normalizedBytes(cached), normalizedCount: cached.listings.length });
           return cached;
         }
-        const result = await providerSingleFlight(key, () => search(requestContext));
+        let reusedFlight = false;
+        const result = await providerSingleFlight(key, () => search(requestContext), () => { reusedFlight = true; });
         const parsed = parseMarketProviderResult(result, provider);
+        if (reusedFlight) {
+          recordMetric({
+            provider,
+            status: "single_flight_hit",
+            latencyMs: Math.max(0, performance.now() - startedAt),
+            responseBytes: normalizedBytes(parsed),
+            normalizedCount: parsed.listings.length,
+          });
+        }
         finalResult = parsed;
         if (parsed.status === "success") {
           setMarketCache(key, parsed);
@@ -60,7 +77,7 @@ export async function searchCurrentMarketPrices(
         if (parsed.status !== "empty") break;
       }
       recordProviderOutcome(provider, finalResult.status);
-      recordProviderMetric({
+      recordMetric({
         provider,
         status: finalResult.status,
         latencyMs: Math.max(0, performance.now() - startedAt),
@@ -70,7 +87,7 @@ export async function searchCurrentMarketPrices(
       return finalResult;
     } catch {
       const result = schemaError(provider);
-      recordProviderMetric({ provider, status: result.status, latencyMs: Math.max(0, performance.now() - startedAt), responseBytes: 0, normalizedCount: 0 });
+      recordMetric({ provider, status: result.status, latencyMs: Math.max(0, performance.now() - startedAt), responseBytes: 0, normalizedCount: 0 });
       return result;
     }
   }));

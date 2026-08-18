@@ -1,5 +1,6 @@
 import { createMockFeedbackRepository } from "../../../_lib/core-v1/repository";
 import { validateFeedbackRequest } from "../../../_lib/core-v1/validation";
+import { readBoundedJsonBody } from "../../../../src/application/http/requestSecurity";
 
 const feedbackRepository = createMockFeedbackRepository();
 
@@ -36,9 +37,5 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 async function readJson(request: Request): Promise<unknown> {
-  try {
-    return (await request.json()) as unknown;
-  } catch {
-    return null;
-  }
+  try { return await readBoundedJsonBody(request); } catch { return null; }
 }

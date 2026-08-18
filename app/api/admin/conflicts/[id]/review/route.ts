@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { authorizeDataSteward } from "../../../../../../src/application/admin/authorization";
 import { adminRequestId } from "../../../../../../src/application/admin/request";
-import { validateMutationRequest } from "../../../../../../src/application/http/requestSecurity";
+import { readBoundedJsonBody, validateMutationRequest } from "../../../../../../src/application/http/requestSecurity";
 import { parseConflictReview } from "../../../../../../src/domain/admin/manualEntry";
 import { reviewReleaseConflict } from "../../../../../../src/infrastructure/repositories/dataStewardRepository";
 
@@ -14,7 +14,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const { id } = await context.params;
   if (!uuid(id)) return NextResponse.json({ ok: false, error: { code: "INVALID_CONFLICT" } }, { status: 400 });
   try {
-    const input = parseConflictReview(await request.json());
+    const input = parseConflictReview(await readBoundedJsonBody(request));
     const item = await reviewReleaseConflict(authorization.actorId, id, input.status, input.resolutionNote!, adminRequestId(request));
     return NextResponse.json({ ok: true, data: { item } });
   } catch (error) {

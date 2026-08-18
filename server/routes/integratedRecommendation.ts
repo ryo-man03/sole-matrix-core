@@ -3,6 +3,7 @@ import {
   type IntegratedRecommendationDependencies,
 } from "../../app/_lib/integrated-recommendation/service";
 import { validateIntegratedRecommendationRequest } from "../../app/_lib/integrated-recommendation/validation";
+import { readBoundedJsonBody } from "../../src/application/http/requestSecurity";
 
 export function createIntegratedRecommendationHandler(
   dependencies: IntegratedRecommendationDependencies = {},
@@ -32,5 +33,5 @@ export function createIntegratedRecommendationHandler(
 }
 
 async function readJson(request: Request): Promise<unknown> {
-  try { return (await request.json()) as unknown; } catch { return null; }
+  try { return await readBoundedJsonBody(request); } catch { return null; }
 }

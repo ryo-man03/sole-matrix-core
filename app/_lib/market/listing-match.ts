@@ -175,10 +175,31 @@ export function isSafePublicHttpsUrl(value: string): boolean {
   try {
     const url = new URL(value);
     if (url.protocol !== "https:" || url.username || url.password) return false;
-    const host = url.hostname.toLocaleLowerCase("en-US");
-    return host !== "localhost" && host !== "0.0.0.0" && host !== "::1"
-      && !/^127\./u.test(host) && !/^10\./u.test(host) && !/^192\.168\./u.test(host)
-      && !/^169\.254\./u.test(host) && !/^172\.(?:1[6-9]|2\d|3[01])\./u.test(host);
+    if (url.port && url.port !== "443") return false;
+    const host = url.hostname.toLocaleLowerCase("en-US")
+      .replace(/^\[|\]$/gu, "")
+      .replace(/\.$/u, "");
+    if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false;
+    if (["metadata", "metadata.google.internal", "instance-data", "instance-data.ec2.internal"].includes(host)) return false;
+    // Browser-side provider normalization cannot safely resolve DNS. Literal
+    // IPv6 destinations are therefore rejected here; server-side consumers
+    // resolve and validate every address (including redirects) separately.
+    if (host.includes(":")) return false;
+    const octets = host.split(".").map(Number);
+    if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) return true;
+    const [a, b, c] = octets as [number, number, number, number];
+    return !(
+      a === 0 || a === 10 || a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 0) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      (a === 198 && b === 51 && c === 100) ||
+      (a === 203 && b === 0 && c === 113) ||
+      a >= 224
+    );
   } catch { return false; }
 }
 

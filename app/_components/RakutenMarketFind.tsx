@@ -169,11 +169,35 @@ export function RakutenMarketFind({ candidate }: Props) {
       </p>
 
       {result ? <div className="market-provider-results">
-        {result.providers.map((provider) => <ProviderSection key={provider.provider} provider={provider} />)}
+        <ProviderGroup
+          description="Rakuten・Yahoo!ショッピングの国内向け販売情報です。"
+          providers={result.providers.filter(({ provider }) => provider === "rakuten" || provider === "yahoo")}
+          title="国内の販売情報"
+        />
+        <ProviderGroup
+          description="eBayの海外出品です。通貨・送料・関税と商品の状態を国内情報と分けて確認してください。"
+          providers={result.providers.filter(({ provider }) => provider === "ebay")}
+          title="海外の出品情報"
+        />
       </div> : null}
       <PostPurchaseFitFeedback candidate={candidate} audience={context.gender} />
     </section>
   );
+}
+
+function ProviderGroup({
+  title,
+  description,
+  providers,
+}: {
+  title: string;
+  description: string;
+  providers: MarketProviderResult[];
+}) {
+  return <section className="market-provider-group" aria-label={title}>
+    <div className="market-provider-group-heading"><h5>{title}</h5><p>{description}</p></div>
+    {providers.map((provider) => <ProviderSection key={provider.provider} provider={provider} />)}
+  </section>;
 }
 
 function ProviderSection({ provider }: { provider: MarketProviderResult }) {
@@ -183,7 +207,7 @@ function ProviderSection({ provider }: { provider: MarketProviderResult }) {
   return (
     <section className="market-provider-result" aria-labelledby={`market-provider-${provider.provider}`} data-status={provider.status}>
       <div className="market-provider-heading">
-        <div><h5 id={`market-provider-${provider.provider}`}>{PROVIDER_LABELS[provider.provider]}</h5><p>{PROVIDER_PRICE_EXPLANATIONS[provider.provider]}</p></div>
+        <div><h6 id={`market-provider-${provider.provider}`}>{PROVIDER_LABELS[provider.provider]}</h6><p>{PROVIDER_PRICE_EXPLANATIONS[provider.provider]}</p></div>
         <span>{providerStatusMessage(provider.status)}</span>
       </div>
       {provider.provider === "rakuten" ? (

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { authorizeDataSteward } from "../../../../src/application/admin/authorization";
 import { adminRequestId } from "../../../../src/application/admin/request";
-import { validateMutationRequest } from "../../../../src/application/http/requestSecurity";
+import { readBoundedJsonBody, validateMutationRequest } from "../../../../src/application/http/requestSecurity";
 import { parseManualReleaseDraft } from "../../../../src/domain/admin/manualEntry";
 import { createManualReleaseDraft } from "../../../../src/infrastructure/repositories/dataStewardRepository";
 
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   const authorization = await authorizeDataSteward();
   if (!authorization.authorized) return denied(authorization.reason);
   try {
-    const item = await createManualReleaseDraft(authorization.actorId, parseManualReleaseDraft(await request.json()), adminRequestId(request));
+    const item = await createManualReleaseDraft(authorization.actorId, parseManualReleaseDraft(await readBoundedJsonBody(request)), adminRequestId(request));
     return NextResponse.json({ ok: true, data: { item, productionWritePerformed: false } }, { status: 201 });
   } catch (error) {
     return failure(error);

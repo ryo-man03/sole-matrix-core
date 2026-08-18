@@ -4,7 +4,7 @@
 
 The application now includes Supabase SSR session refresh, RLS-backed profiles and consent, structured preferences and sizes, private collection/wishlist/history, canonical sneaker identity, and deterministic daily picks at `/today`. Database changes are additive migrations under `supabase/migrations`; run `pnpm test:migrations` and `pnpm test:rls` before applying them to a local Supabase stack.
 
-Release data is fixture/manual-seed only. Login and `/today` never call an external Release Provider, market search, or AI service. Fixture releases are disabled in production. Production migration and deployment are intentionally outside this change; the authorized-provider next phase is documented in `docs/roadmap/authorized-release-provider-handoff.md`.
+Release data has an evidence/conflict model, reviewed database boundary, and staging-only manual pipeline. An authorized automated Release Provider is not yet available. Login and `/today` never call an external Release Provider, market search, or AI service. Production migration and deployment are intentionally outside this change; the authorized-provider next phase is documented in `docs/roadmap/authorized-release-provider-handoff.md`.
 
 [![CI](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml/badge.svg)](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml)
 
@@ -285,12 +285,12 @@ eBay OAuth tokenとAPI raw responseは保存せず、クライアントへ返し
 
 ## 14. Verification
 
-2026-08-17 時点で、以下をローカルで確認しました。
+2026-08-18 時点で、以下をローカルで確認しました。詳細は [`docs/audits/final-product-readiness-v2.md`](docs/audits/final-product-readiness-v2.md) を参照してください。
 
 - TypeScript: passed
-- Tests: 132 files / 1,947 tests passed（Provider 488、Security 77、RLS 117を別ゲートでも確認）
+- Tests: 157 files / 2,343 tests passed（baselineからmeaningful deterministic cases +396。Provider 569、Security 112、RLS 184を別ゲートでも確認）
 - Production build: passed（`/api/market/search`と`/api/me/fit-confidence`を含む）
-- Market browser check: passed（320 / 360 / 390 / 430 / 600 / 768 / 1024 / 1280 / 1440 / 1920px。横overflow、console error、hydration error 0件）
+- Market browser check: passed（320 / 360 / 390 / 430 / 600 / 768 / 1024 / 1280 / 1440 / 1920px。横overflow、duplicate request、console error、hydration error 0件）
 - GitHub Actions: `Typecheck` / `Tests` / `Production build` の3ジョブを PR、`main` push、merge queue で実行する構成
 - External API contract: CIではlive APIを呼ばない。2026-08-17のbounded smokeは楽天`unauthorized`、Yahoo 4件`success`、eBay 10件`success`。secret/raw response露出0件
 - Dependency audit: known vulnerabilities 0件（transitive patched版をworkspace overrideで固定）

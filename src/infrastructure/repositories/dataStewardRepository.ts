@@ -3,13 +3,19 @@ import "server-only";
 import { createHash } from "node:crypto";
 
 import type { MarketProviderResult } from "../../../app/_lib/market/contracts";
+import type { ProviderMetricEvent } from "../../../app/_lib/market/reliability";
 import type { ProviderObservation, ReleaseQualityInput, UserQualityInput } from "../../application/admin/quality";
 import { evaluateDataQuality } from "../../application/admin/quality";
 import { createSupabaseAdminClient } from "../db/supabase/admin";
 
 const MAX_ADMIN_ROWS = 10_000;
 
-export async function recordMarketProviderObservations(requestId: string, durationMs: number, providers: readonly MarketProviderResult[]) {
+export async function recordMarketProviderObservations(
+  requestId: string,
+  durationMs: number,
+  providers: readonly MarketProviderResult[],
+  metrics: readonly Omit<ProviderMetricEvent, "at">[] = [],
+) {
   const db = createSupabaseAdminClient();
   if (!db || !isUuid(requestId)) return false;
   const rows = providers.map((provider) => ({
@@ -19,7 +25,7 @@ export async function recordMarketProviderObservations(requestId: string, durati
     status: provider.status,
     duration_ms: Math.max(0, Math.min(300_000, Math.round(durationMs))),
     retry_count: 0,
-    cache_status: "unknown",
+    cache_status: providerCacheStatus(provider.provider, metrics),
     normalized_count: provider.audit.normalizedCount,
     exact_count: provider.audit.exactCount,
     probable_count: provider.audit.probableCount,
@@ -28,6 +34,14 @@ export async function recordMarketProviderObservations(requestId: string, durati
   }));
   const { error } = await db.from("provider_observations").insert(rows);
   return !error;
+}
+
+function providerCacheStatus(provider: MarketProviderResult["provider"], metrics: readonly Omit<ProviderMetricEvent, "at">[]) {
+  const statuses = metrics.filter((metric) => metric.provider === provider).map((metric) => metric.status);
+  if (statuses.includes("single_flight_hit")) return "single_flight_hit" as const;
+  if (statuses.includes("cache_hit")) return "hit" as const;
+  if (statuses.includes("circuit_open")) return "bypass" as const;
+  return statuses.length ? "miss" as const : "unknown" as const;
 }
 
 export async function loadProviderAdminData() {

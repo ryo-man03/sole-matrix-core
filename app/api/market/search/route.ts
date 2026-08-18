@@ -3,12 +3,16 @@ import { randomUUID } from "node:crypto";
 
 import type { ColorwayVerificationState, MarketSearchContext, MarketSizeSystem } from "../../../_lib/market/contracts";
 import { searchCurrentMarketPrices } from "../../../_lib/market/search";
+import { recordProviderMetric, type ProviderMetricEvent } from "../../../_lib/market/reliability";
+import { readBoundedJsonBody, validateMutationRequest } from "../../../../src/application/http/requestSecurity";
 import { recordMarketProviderObservations } from "../../../../src/infrastructure/repositories/dataStewardRepository";
 
 export async function POST(request: Request) {
+  const mutation = validateMutationRequest(request, { key: "market-search", limit: 30 });
+  if (!mutation.ok) return NextResponse.json({ error: mutation.code, message: "検索条件を確認してください。" }, { status: mutation.status });
   let value: unknown;
   try {
-    value = await request.json();
+    value = await readBoundedJsonBody(request);
   } catch {
     return NextResponse.json({ error: "invalid_json", message: "検索条件を読み取れませんでした。" }, { status: 400 });
   }
@@ -18,10 +22,14 @@ export async function POST(request: Request) {
   const requestId = suppliedRequestId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(suppliedRequestId)
     ? suppliedRequestId : randomUUID();
   const startedAt = performance.now();
-  const result = await searchCurrentMarketPrices(context);
+  const providerMetrics: Omit<ProviderMetricEvent, "at">[] = [];
+  const result = await searchCurrentMarketPrices(context, undefined, (event) => {
+    providerMetrics.push(event);
+    recordProviderMetric(event);
+  });
   const durationMs = performance.now() - startedAt;
   try {
-    after(async () => { await recordMarketProviderObservations(requestId, durationMs, result.providers).catch(() => false); });
+    after(async () => { await recordMarketProviderObservations(requestId, durationMs, result.providers, providerMetrics).catch(() => false); });
   } catch { /* Observability must not delay or fail a market response outside a Next request context. */ }
   return NextResponse.json(result, {
     headers: { "Cache-Control": "no-store, max-age=0", "X-Request-Id": requestId },
@@ -30,6 +38,8 @@ export async function POST(request: Request) {
 
 function parseContext(value: unknown): MarketSearchContext | null {
   if (!isRecord(value) || !isRecord(value["identity"])) return null;
+  if (!hasOnlyKeys(value, ["query", "identity", "gender", "sizeSystem", "size", "condition"])) return null;
+  if (!hasOnlyKeys(value["identity"], ["brand", "modelName", "colorwayName", "styleCode", "verificationState"])) return null;
   const query = safeText(value["query"], 128);
   const modelName = safeText(value["identity"]["modelName"], 160);
   if (!query || !modelName) return null;
@@ -92,4 +102,8 @@ function isSizeSystem(value: unknown): value is MarketSizeSystem {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  return Object.keys(value).every((key) => allowed.includes(key));
 }

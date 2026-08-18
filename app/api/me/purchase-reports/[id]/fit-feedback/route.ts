@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { failure, guard, privateUser, unauthenticated, validUuid } from "../../../../../../src/application/personalization/routeHelpers";
+import { readBoundedJsonBody } from "../../../../../../src/application/http/requestSecurity";
 import { parseFitFeedback } from "../../../../../../src/domain/feedback/postPurchase";
 import { createFitFeedback } from "../../../../../../src/infrastructure/repositories/postPurchaseRepository";
 
@@ -12,7 +13,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   if (!validUuid(id)) return NextResponse.json({ ok: false, error: { code: "INVALID_PURCHASE" } }, { status: 400 });
   try {
-    const result = await createFitFeedback(user.id, id, parseFitFeedback(await request.json()));
+    const result = await createFitFeedback(user.id, id, parseFitFeedback(await readBoundedJsonBody(request)));
     return NextResponse.json({
       ok: true,
       data: {
