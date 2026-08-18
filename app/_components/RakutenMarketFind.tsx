@@ -22,17 +22,22 @@ import {
 import type { MarketListing, MarketProviderResult, MarketSearchResponse } from "../_lib/market/contracts";
 import { toPricePresentation } from "../_lib/market/contracts";
 import { summarizeMarketPrices } from "../_lib/market/price-summary";
+import { PostPurchaseFitFeedback } from "./PostPurchaseFitFeedback";
 
 type Props = {
   candidate: Pick<CandidateProfile,
     "name" | "searchKeywords" | "brand" | "modelName" | "colorwayName" | "styleCode" | "verificationStatus" | "factualVerification" | "researchSource">;
 };
 
+let authenticatedSessionPromise: Promise<boolean> | null = null;
+let authenticatedSessionCheckedAt = 0;
+
 const UNKNOWN_FIT: FitConfidenceResult = {
   state: "unknown",
   reasons: [],
   cautions: ["サイズ履歴を利用できません。メーカーサイズ表と返品条件を確認してください。"],
   referenceCount: 0,
+  feedbackCount: 0,
 };
 
 export function RakutenMarketFind({ candidate }: Props) {
@@ -42,6 +47,7 @@ export function RakutenMarketFind({ candidate }: Props) {
   const [fit, setFit] = useState<FitConfidenceResult>({ ...UNKNOWN_FIT, cautions: ["サイズ履歴を確認中です。"] });
   const [fitLoading, setFitLoading] = useState(true);
   const activeRequest = useRef(0);
+  const viewEventKey = useRef(eventKey("view")).current;
   const context = buildMarketSearchContext(candidate);
   const purchaseConfidence = evaluatePurchaseConfidence({
     verificationState: context.identity.verificationState,
@@ -74,12 +80,19 @@ export function RakutenMarketFind({ candidate }: Props) {
     return () => { active = false; };
   }, [context.gender, context.identity.brand, context.identity.modelName, context.identity.styleCode]);
 
+  useEffect(() => {
+    void emitProductEvent("recommendation_viewed", "recommendation", context.identity.styleCode ?? context.identity.modelName, {
+      verificationState: context.identity.verificationState,
+    }, viewEventKey);
+  }, [context.identity.modelName, context.identity.styleCode, context.identity.verificationState, viewEventKey]);
+
   async function searchProducts() {
     if (status === "loading") return;
     const requestId = activeRequest.current + 1;
     activeRequest.current = requestId;
     setStatus("loading");
     setMessage("楽天市場・Yahoo!ショッピング・eBayの現在情報を確認しています…");
+    void emitProductEvent("market_search_requested", "recommendation", context.identity.styleCode ?? context.identity.modelName, {});
     try {
       const response = await fetch("/api/market/search", {
         method: "POST",
@@ -137,6 +150,9 @@ export function RakutenMarketFind({ candidate }: Props) {
           <ConfidenceItem label="商品情報" value={confidenceLabel(purchaseConfidence.productIdentity)} />
           <ConfidenceItem label="販売商品の一致" value={marketConfidenceLabel(purchaseConfidence.marketMatch)} />
           <ConfidenceItem label="サイズの参考" value={fitLoading ? "履歴を確認中" : fitLabel(fit.state)} />
+          <ConfidenceItem label="商品の状態" value={evidenceLevelLabel(purchaseConfidence.conditionClarity)} />
+          <ConfidenceItem label="送料" value={evidenceLevelLabel(purchaseConfidence.shippingClarity)} />
+          <ConfidenceItem label="情報の鮮度" value={evidenceLevelLabel(purchaseConfidence.listingFreshness)} />
         </div>
         {fit.reasons.length ? <ul className="fit-confidence-reasons">{fit.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul> : null}
         {purchaseConfidence.evidenceWarnings.length ? <div className="purchase-confidence-warnings"><strong>注意して確認すること</strong><ul>{purchaseConfidence.evidenceWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div> : null}
@@ -155,6 +171,7 @@ export function RakutenMarketFind({ candidate }: Props) {
       {result ? <div className="market-provider-results">
         {result.providers.map((provider) => <ProviderSection key={provider.provider} provider={provider} />)}
       </div> : null}
+      <PostPurchaseFitFeedback candidate={candidate} audience={context.gender} />
     </section>
   );
 }
@@ -210,7 +227,7 @@ function MarketListingCard({ listing }: { listing: MarketListing }) {
           <div><dt>取得時刻</dt><dd>{formatDate(listing.fetchedAt)}</dd></div>
         </dl>
         {listing.mismatchWarnings.length ? <p className="market-listing-warning">{listing.mismatchWarnings.join(" ")}</p> : null}
-        <a href={listing.itemUrl} target="_blank" rel="noreferrer">{PROVIDER_LABELS[listing.provider]}で商品と総額を確認</a>
+        <a href={listing.itemUrl} target="_blank" rel="noreferrer" onClick={() => { void emitProductEvent("market_listing_clicked", "market_listing", listing.externalId ?? listing.itemUrl, { provider: listing.provider, matchLevel: listing.matchLevel }); }}>{PROVIDER_LABELS[listing.provider]}で商品と総額を確認</a>
       </div>
     </article>
   );
@@ -229,7 +246,11 @@ function marketConfidenceLabel(value: "high" | "medium" | "low" | "unavailable")
 }
 
 function fitLabel(value: FitConfidenceResult["state"]): string {
-  return value === "strong_reference" ? "同モデルの履歴あり" : value === "some_reference" ? "近いモデルの履歴あり" : value === "limited_reference" ? "参考情報は少なめ" : "履歴なし";
+  return value === "strong" ? "同モデルの履歴あり" : value === "medium" ? "同世代の近いモデル履歴あり" : value === "limited" ? "参考情報は少なめ" : "履歴なし";
+}
+
+function evidenceLevelLabel(value: "high" | "medium" | "low" | "unavailable"): string {
+  return value === "high" ? "確認できています" : value === "medium" ? "一部を確認" : value === "low" ? "追加確認が必要" : "まだ確認していません";
 }
 
 function shippingLabel(price: ReturnType<typeof toPricePresentation>): string {
@@ -251,4 +272,42 @@ function formatMoney(amount: number, currency: string): string {
 function formatDate(value: string): string {
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeStyle: "short" }).format(timestamp) : "未確認";
+}
+
+async function emitProductEvent(
+  eventName: "recommendation_viewed" | "market_search_requested" | "market_listing_clicked",
+  subjectType: string,
+  subjectId: string,
+  properties: Record<string, unknown>,
+  idempotencyKey = eventKey("event"),
+) {
+  if (!await hasAuthenticatedSession()) return;
+  await fetch("/api/me/product-events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    keepalive: true,
+    body: JSON.stringify({ idempotencyKey, eventName, subjectType: subjectType.slice(0, 80), subjectId: subjectId.slice(0, 200), properties }),
+  }).catch(() => undefined);
+}
+
+function hasAuthenticatedSession(): Promise<boolean> {
+  const now = Date.now();
+  if (!authenticatedSessionPromise || now - authenticatedSessionCheckedAt > 5_000) {
+    authenticatedSessionCheckedAt = now;
+    authenticatedSessionPromise = fetch("/api/auth/session", { cache: "no-store" })
+      .then(async (response) => {
+        const payload: unknown = await response.json().catch(() => null);
+        return response.ok && isRecord(payload) && isRecord(payload.data) && payload.data.status === "user";
+      })
+      .catch(() => false);
+  }
+  return authenticatedSessionPromise;
+}
+
+function eventKey(prefix: string): string {
+  return `${prefix}:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

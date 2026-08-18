@@ -1,6 +1,7 @@
 import "server-only";
 import { createSupabaseServerClient } from "../auth/supabase/server";
 import type { CanonicalSneakerKey } from "../../domain/identity/canonicalSneaker";
+import { recordExplicitProductAction } from "./postPurchaseRepository";
 
 export async function saveRecommendationSnapshot(
   userId: string,
@@ -73,6 +74,13 @@ export async function saveRecommendationFeedback(
     .select("id")
     .single();
   if (error) throw new Error("FEEDBACK_WRITE_FAILED");
+  await recordExplicitProductAction(
+    userId,
+    `recommendation-feedback:${String(data.id)}`,
+    "recommendation_feedback_submitted",
+    "recommendation_feedback",
+    String(data.id),
+  ).catch(() => undefined);
   return data;
 }
 
