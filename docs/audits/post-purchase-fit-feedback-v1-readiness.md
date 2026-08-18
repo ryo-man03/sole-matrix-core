@@ -2,8 +2,8 @@
 
 Status: **STATIC VERIFIED / LOCAL DB UNVERIFIED**
 
-Date: 2026-08-18  
-Stack base: `feat/release-intelligence-evolution-v1`  
+Date: 2026-08-18
+Stack base: `feat/release-intelligence-evolution-v1`
 Branch: `feat/post-purchase-fit-feedback-v1`
 
 ## Delivered boundary
