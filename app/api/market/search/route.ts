@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 
 import type { ColorwayVerificationState, MarketSearchContext, MarketSizeSystem } from "../../../_lib/market/contracts";
 import { searchCurrentMarketPrices } from "../../../_lib/market/search";
+import { recordMarketProviderObservations } from "../../../../src/infrastructure/repositories/dataStewardRepository";
 
 export async function POST(request: Request) {
   let value: unknown;
@@ -12,8 +14,17 @@ export async function POST(request: Request) {
   }
   const context = parseContext(value);
   if (!context) return NextResponse.json({ error: "invalid_context", message: "検索条件を確認してください。" }, { status: 400 });
-  return NextResponse.json(await searchCurrentMarketPrices(context), {
-    headers: { "Cache-Control": "no-store, max-age=0" },
+  const suppliedRequestId = request.headers.get("x-request-id");
+  const requestId = suppliedRequestId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(suppliedRequestId)
+    ? suppliedRequestId : randomUUID();
+  const startedAt = performance.now();
+  const result = await searchCurrentMarketPrices(context);
+  const durationMs = performance.now() - startedAt;
+  try {
+    after(async () => { await recordMarketProviderObservations(requestId, durationMs, result.providers).catch(() => false); });
+  } catch { /* Observability must not delay or fail a market response outside a Next request context. */ }
+  return NextResponse.json(result, {
+    headers: { "Cache-Control": "no-store, max-age=0", "X-Request-Id": requestId },
   });
 }
 
