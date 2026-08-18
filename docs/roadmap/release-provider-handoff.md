@@ -12,6 +12,6 @@ Market Intelligence V2 does not make marketplace listings into release evidence.
 
 ## Denied without new approval
 
-Do not crawl brands or retailers, scrape articles, guess RSS feeds, use cookies/private endpoints, or reinterpret a marketplace listing as official release evidence. SNKRDUNK, Mercari general listings, Grailed, StockX, and any provider whose permission is unknown remain disabled until the registry records explicit authorization for the exact operation.
+Do not crawl brands or retailers, scrape articles, guess RSS feeds, use cookies/private endpoints, or reinterpret a marketplace listing as official release evidence. SNKRDUNK, Mercari general listings, Grailed, and any provider whose permission is unknown remain disabled until the registry records explicit authorization for the exact operation. StockX has an official API but remains credential-missing and catalog-reference-only; its marketplace date cannot become brand-official evidence.
 
 The implementation handoff starts only after product owner and legal/policy approval. Raw responses remain ephemeral; only contract-approved normalized metadata may be persisted. Release data never changes Core/Ryo scoring merely because a provider is available.

@@ -7,8 +7,8 @@ Checked on 2026-08-18. Secret values are intentionally not recorded.
 | Rakuten | `RAKUTEN_APPLICATION_ID`, `RAKUTEN_ACCESS_KEY`, and `RAKUTEN_REQUEST_ORIGIN` when the app is website-allowlisted | 2026-07-01 adapter; access key header; Origin/Referer request context; no-store; required credit | `UNAUTHORIZED`; HTTP 403 referrer context missing; not live verified |
 | Yahoo! Shopping | `YAHOO_SHOPPING_APP_ID` | v3 item search adapter exists | live verified: success, 4 normalized |
 | eBay | `EBAY_PRODUCTION_CLIENT_ID`, `EBAY_PRODUCTION_CLIENT_SECRET`, optional marketplace ID | Browse adapter and in-memory token manager exist | live verified: success, 10 normalized |
-| StockX | approved developer access and an application | not enabled for user-facing market search | policy blocked |
-| alias | approved OpenAPI access | no integration | approval pending |
+| StockX | approved developer access, API key, application, OAuth client/token | v2 catalog/market adapter exists; selling/order are not used | `CREDENTIAL_MISSING`; local API key, client ID/secret, and access token are absent; catalog reference only and not release evidence |
+| alias | approved OpenAPI personal access token | no integration | `APPROVAL_PENDING`; OpenAPI exists, but approval/token are not present |
 
 `EXTERNAL_PROVIDERS_DISABLED=true` disables every external market request. Login, `/today`, and recommendation result rendering do not initiate market requests. Live smoke tests are local-only, opt-in, read-only, and limited to three requests per provider.
 

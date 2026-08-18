@@ -11,3 +11,7 @@ Market search is a request-time display feature.
 - Cache keys use only canonical product/search attributes and never user identifiers or secrets.
 
 The current eBay design therefore does not persist eBay data. Account-deletion notification requirements must be re-evaluated if any eBay user or listing data is persisted in the future.
+
+## Release evidence
+
+Release evidence is a separate, contract-approved normalized dataset. Raw responses, page HTML, images, article excerpts, credentials, and authorization headers are never persisted. Manual references may persist normalized identity, source URL/title/domain, assertions, fingerprint, review state, timestamps, and provenance needed for audit. Ingestion runs persist only cursors, counts, timing, idempotency, and safe error codes. A superseded assertion remains as evidence history rather than being overwritten. Provider-specific deletion or shorter retention overrides this default; unknown retention rights deny provider enablement.
