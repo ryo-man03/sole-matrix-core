@@ -6,11 +6,13 @@ import {
   SneakerImageValidationError,
   validateSneakerImage,
 } from "../../../../server/services/sneakerVisionService";
-import { readBoundedBody, RequestBodyError } from "../../../../src/application/http/requestSecurity";
+import { readBoundedBody, RequestBodyError, validateMutationRequest } from "../../../../src/application/http/requestSecurity";
 
 const MAX_IMAGE_REQUEST_BYTES = MAX_SNEAKER_IMAGE_BYTES + 64 * 1024;
 
 export async function POST(request: Request) {
+  const guard = validateMutationRequest(request, { key: "sneaker-image-analysis", limit: 10, bodyRequired: false });
+  if (!guard.ok) return NextResponse.json({ ok: false, error: { code: guard.code } }, { status: guard.status });
   try {
     const body = await readBoundedBody(request, MAX_IMAGE_REQUEST_BYTES);
     const formData = await new Request(request.url, { method: "POST", headers: request.headers, body: body.buffer as ArrayBuffer }).formData();

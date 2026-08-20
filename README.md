@@ -10,20 +10,21 @@ Release data has an evidence/conflict model, reviewed database boundary, and sta
 
 ## Current operational status
 
-Current source of truth, rechecked on 2026-08-20:
+Current source of truth, rechecked on 2026-08-21:
 
 ```text
-APPLICATION FOUNDATION: COMPLETE
-MAIN INTEGRATION: COMPLETE
-DATABASE EXECUTION: REAL EPHEMERAL SUPABASE VERIFIED
-LOCAL WINDOWS DATABASE: NOT REQUIRED FOR CI VERIFICATION
-PRODUCTION DATABASE: NOT TOUCHED
-PRODUCTION DATA LAYER: NOT DEPLOYED
-PRODUCTION APPLICATION: NOT DEPLOYED
-PRODUCTION READINESS: PENDING EXTERNAL REHEARSAL
+SOLE//MATRIX
+PRODUCTION READINESS FOUNDATION
+COMPLETE — MAIN INTEGRATED
+
+PERSISTENT STAGING REHEARSAL
+PENDING
+
+PRODUCTION DEPLOYMENT
+NOT STARTED
 ```
 
-The latest verified `main` run applied all seven migrations to a fresh ephemeral Supabase/PostgreSQL environment and passed 65 pgTAP migration, ownership, RLS, and Data Steward checks. This is non-production evidence only; it is not a staging or production deployment claim. The current reconciliation and remaining operational gates are maintained in [final product readiness v2](docs/audits/final-product-readiness-v2.md) and the [production integration review](docs/operations/production-integration-review.md).
+The latest verified `main` run applied all seven migrations to a fresh ephemeral Supabase/PostgreSQL environment and passed 65 pgTAP migration, ownership, RLS, and Data Steward checks. This is non-production evidence only; it is not a staging or production deployment claim. The single current source of truth is the [Production Readiness Program Report](docs/audits/production-readiness-program-report.md); the [production integration review](docs/operations/production-integration-review.md) is its operator runbook.
 
 スニーカーを、流行や価格だけでなく、歴史・素材・服との相性・文化背景まで含めて整理し、購入判断を補助する Web アプリです。
 

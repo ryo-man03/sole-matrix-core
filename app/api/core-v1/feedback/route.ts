@@ -1,10 +1,12 @@
 import { createMockFeedbackRepository } from "../../../_lib/core-v1/repository";
 import { validateFeedbackRequest } from "../../../_lib/core-v1/validation";
-import { readBoundedJsonBody } from "../../../../src/application/http/requestSecurity";
+import { readBoundedJsonBody, validateMutationRequest } from "../../../../src/application/http/requestSecurity";
 
 const feedbackRepository = createMockFeedbackRepository();
 
 export async function POST(request: Request): Promise<Response> {
+  const guard = validateMutationRequest(request, { key: "core-feedback", limit: 20 });
+  if (!guard.ok) return Response.json({ ok: false, error: { code: guard.code } }, { status: guard.status });
   const body = await readJson(request);
   const validation = validateFeedbackRequest(body);
 
