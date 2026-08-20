@@ -2,6 +2,8 @@
 
 Market Intelligence V2 does not make marketplace listings into release evidence. A future Release Provider must remain a separate capability and preserve official, retailer, editorial, and rumor states without promotion between them.
 
+The current official-source provider research, classifications, approval state, and acquisition checklist are maintained in [authorized release provider readiness](authorized-release-provider-handoff.md).
+
 ## Preferred route
 
 1. Use an official brand, retailer, or licensed release-calendar API with explicit automated-access terms.

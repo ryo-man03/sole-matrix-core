@@ -1,6 +1,6 @@
 # Market provider policy registry
 
-Last verified: 2026-08-18
+Last verified: 2026-08-20
 
 This registry is the deny-by-default boundary for market data. Market data supports a purchase decision after recommendation; it never changes the Core score, Ryo ordering, recommendation decision, release verification, or colorway verification.
 
@@ -9,8 +9,8 @@ This registry is the deny-by-default boundary for market data. Market data suppo
 | Rakuten Ichiba | Current shop listings | implemented / live unauthorized | allowed | prohibited by project policy | prohibited | prohibited |
 | Yahoo! Shopping | Current shop listings | live verified | allowed | prohibited by project policy | prohibited | prohibited |
 | eBay Browse | Current marketplace listings | live verified | allowed | prohibited by project policy | prohibited | prohibited |
-| StockX | Marketplace catalog reference | credential missing; release role not suitable | prohibited | prohibited | prohibited | prohibited |
-| alias | Marketplace integration | approval pending | prohibited | prohibited | prohibited | prohibited |
+| StockX | Marketplace catalog reference | policy blocked for user-facing display/persistence; credentials missing | prohibited | prohibited | prohibited | prohibited |
+| alias | Marketplace catalog reference | approval pending; PAT missing | prohibited | prohibited | prohibited | prohibited |
 
 Unknown operations are prohibited. Provider failures are isolated and must not fail recommendation rendering.
 
@@ -28,6 +28,8 @@ Unknown operations are prohibited. Provider failures are isolated and must not f
 
 Provider terms and documentation can change. Re-verify before enabling new storage, commercial use, or a new provider capability.
 
-Rakuten contract record: `providerId=rakuten`, role `current_shop_listing`, verification `UNAUTHORIZED`, credentials `applicationId + accessKey + registered request origin when allowlisted`, automatic collection `manual market action only`, persistence/raw persistence `prohibited`, image display `temporary`, attribution `required`, rate limit `provider-managed / identical URL bursts prohibited`, cache `no-store`, commercial use `terms-restricted; no unsupported monetization`, `termsCheckedAt=2026-08-18`.
+Rakuten contract record: `providerId=rakuten`, role `current_shop_listing`, verification `UNAUTHORIZED`, endpoint/version `IchibaItem/Search/20260701`, credentials `applicationId query parameter + accessKey header + registered request origin when allowlisted`, format `JSON formatVersion=2`, automatic collection `manual market action only`, persistence/raw persistence `prohibited`, image display `temporary`, attribution `required badge/credit`, rate limit `provider-managed; 429 on excess; identical URL bursts may be temporarily blocked`, cache `no-store by project policy`, commercial use `terms-restricted; non-affiliate monetization requires explicit permission`, `termsCheckedAt=2026-08-20`.
+
+The public Rakuten guide requires registered application information including application URL and Allowed Websites. It does not expose the already-registered Allowed Website for this credential. The local request origin remains missing, so no request was sent during the 2026-08-20 review and the status remains `UNAUTHORIZED`.
 
 StockX reassessment: the official v2 API documents OAuth, API-key-gated Catalog Search by free text/GTIN/styleId, product fields including marketplace `releaseDate`, and separate market/selling/order operations. Local StockX credentials are all missing. The license limits data to internal use and prohibits archiving/resale, so user-facing display and persistence remain prohibited. Even if approved later, catalog data defaults to `catalog_reference`; it is never `brand_official` evidence. Selling and order operations remain out of scope.
