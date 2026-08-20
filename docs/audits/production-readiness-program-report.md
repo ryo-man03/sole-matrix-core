@@ -1,6 +1,6 @@
 # Production Readiness Program Report
 
-Current source of truth. Executed and checked on 2026-08-20 (Asia/Tokyo). This report supersedes older readiness conclusions while retaining those documents as historical evidence. It records what was actually executed, distinguishes ephemeral CI from persistent staging, and does not claim a production deployment.
+Current source of truth. Executed on 2026-08-20 and integration-verified on 2026-08-21 (Asia/Tokyo). This report supersedes older readiness conclusions while retaining those documents as historical evidence. It records what was actually executed, distinguishes ephemeral CI from persistent staging, and does not claim a production deployment.
 
 ## 0. Executive summary
 
@@ -30,7 +30,7 @@ Start:
 - open PRs: 0
 - tracked secret-signature findings: 0
 
-End state is a clean stacked review branch whose implementation commit is `6c9fc93` plus the report commit carrying this document. The immutable final head is recorded by PR #46 and the execution handoff. `main` remains at the starting SHA and has not been mutated or merged by this program.
+Integration end state: PRs #43 through #46 were retargeted to the then-current `main`, rechecked on fresh pull-request merge refs, and integrated in fixed order with merge commits. The immutable PR heads and merge commits are recorded by GitHub; the final `main` SHA is recorded by the post-merge verification. No direct `main` commit/push, force operation, rebase, squash merge, tag, or release was used.
 
 Reviewed commits:
 
@@ -178,14 +178,14 @@ Performance evidence uses the same local Playwright scenario. Historical compara
 
 ## 11. PR and merge result
 
-| PR | Base | Responsibility | State at handoff |
+| PR | Final base | Responsibility | Integration result |
 | --- | --- | --- | --- |
-| [#43](https://github.com/ryo-man03/sole-matrix-core/pull/43) | `main` | A — documentation reconciliation | ready for review; all fresh checks PASS |
-| [#44](https://github.com/ryo-man03/sole-matrix-core/pull/44) | PR A branch | C — staging rehearsal and workflow supply chain | ready for review; all fresh checks PASS |
-| [#45](https://github.com/ryo-man03/sole-matrix-core/pull/45) | PR C branch | D — authorized Release Provider readiness | ready for review; all fresh checks PASS |
-| [#46](https://github.com/ryo-man03/sole-matrix-core/pull/46) | PR D branch | E — production deployment review | ready for review only after the exact final head gate; live check evidence is the PR record |
+| [#43](https://github.com/ryo-man03/sole-matrix-core/pull/43) | `main` | A — documentation reconciliation | fresh checks PASS; merged as `a79ffff184c3829d4dca20381c4b36b4a2632f13` |
+| [#44](https://github.com/ryo-man03/sole-matrix-core/pull/44) | `main` | C — staging rehearsal and workflow supply chain | retargeted; fresh checks PASS; merged as `a5fc7d06eff3580f0b387336a2496c37109dac2f` |
+| [#45](https://github.com/ryo-man03/sole-matrix-core/pull/45) | `main` | D — authorized Release Provider readiness | retargeted; fresh checks PASS; merged as `14a6e7f4b1bb8e808c06061c486b8b3b0c041e63` |
+| [#46](https://github.com/ryo-man03/sole-matrix-core/pull/46) | `main` | E — production deployment review | retargeted and merged only after the exact final head passed fresh checks; GitHub PR record is authoritative for its merge SHA |
 
-Required check families are CI, Real Supabase DB Security, CodeQL, dependency review, and secret scan. Automatic merging is disabled; merge count is 0. The safe review order is #43 → #44 → #45 → #46. Branch deletion remains deferred until merge and post-merge verification.
+Required check families were CI, Real Supabase DB Security, CodeQL, dependency review, and secret scan. Automatic merging remained disabled; merge count is 4, all by merge commit in order #43 → #44 → #45 → #46. Branch deletion remains deferred until post-merge verification.
 
 ## 12. USER ACTION REQUIRED — single consolidated list
 
@@ -201,7 +201,7 @@ Required check families are CI, Real Supabase DB Security, CodeQL, dependency re
 
 ## 13. Release recommendation
 
-Approve the stack for code review and merge in order. Treat the merged result as **Level 2 — PRODUCTION REHEARSAL READY**, not as a production release. Do not schedule jobs, enable automated Release Providers, add production secrets, apply a persistent database migration, or deploy production until section 12 is resolved and the persistent staging acceptance matrix passes.
+The stack passed final review and was merged in order. Treat the integrated result as **Level 2 — PRODUCTION REHEARSAL READY**, not as a production release. Do not schedule jobs, enable automated Release Providers, add production secrets, apply a persistent database migration, or deploy production until section 12 is resolved and the persistent staging acceptance matrix passes.
 
 For a later production candidate, deploy the exact immutable reviewed artifact first with optional providers/jobs disabled, execute read-only health and critical-journey smokes, verify alerts and backup freshness, and enable integrations one at a time with independent rollback switches.
 
