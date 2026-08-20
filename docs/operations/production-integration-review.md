@@ -5,7 +5,7 @@ This runbook starts after the stacked PRs are approved. It does not authorize pr
 ## Required order
 
 1. Merge PR A through PR E in stack order and confirm the resulting migration files are byte-identical to their reviewed versions. Migrations 001–004 must remain immutable.
-2. Create a non-production database backup/restore point, then apply migrations 005, 006, and 007 in order. Run real PostgreSQL constraint, RLS user A/B, cross-user feedback linkage, and Data Steward allow/deny tests.
+2. Follow the [staging production rehearsal](staging-production-rehearsal.md). On a fresh staging project apply migrations 001–007 in order; on an existing staging project prove immutable history before applying only unapplied 005–007. Run real PostgreSQL constraint, RLS user A/B, cross-user feedback linkage, and Data Steward allow/deny tests.
 3. Assign a Data Steward role to a named test account through the controlled server-side process. Verify anonymous/user denial, authorized reads, staging-only manual drafts, review audit entries, and zero client role bypass.
 4. Configure separate non-production internal-job HMAC secrets. Invoke release ingestion and Daily Picks with bounded, signed, idempotent requests. Verify replay behavior before scheduling anything.
 5. Configure `RAKUTEN_REQUEST_ORIGIN` to the exact Allowed Websites origin. Run one bounded, read-only Rakuten smoke and retain only the safe status/normalization summary. If 403 remains, keep status `UNAUTHORIZED`.
