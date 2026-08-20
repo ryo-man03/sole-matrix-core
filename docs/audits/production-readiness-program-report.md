@@ -183,7 +183,7 @@ Performance evidence uses the same local Playwright scenario. Historical compara
 | [#43](https://github.com/ryo-man03/sole-matrix-core/pull/43) | `main` | A — documentation reconciliation | ready for review; all fresh checks PASS |
 | [#44](https://github.com/ryo-man03/sole-matrix-core/pull/44) | PR A branch | C — staging rehearsal and workflow supply chain | ready for review; all fresh checks PASS |
 | [#45](https://github.com/ryo-man03/sole-matrix-core/pull/45) | PR C branch | D — authorized Release Provider readiness | ready for review; all fresh checks PASS |
-| [#46](https://github.com/ryo-man03/sole-matrix-core/pull/46) | PR D branch | E — production deployment review | draft until the exact final head passes every fresh check |
+| [#46](https://github.com/ryo-man03/sole-matrix-core/pull/46) | PR D branch | E — production deployment review | ready for review only after the exact final head gate; live check evidence is the PR record |
 
 Required check families are CI, Real Supabase DB Security, CodeQL, dependency review, and secret scan. Automatic merging is disabled; merge count is 0. The safe review order is #43 → #44 → #45 → #46. Branch deletion remains deferred until merge and post-merge verification.
 
