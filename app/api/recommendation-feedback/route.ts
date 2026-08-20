@@ -2,11 +2,13 @@ import {
   appendGlobalFeedbackEntry,
   normalizeGlobalFeedbackInput,
 } from "../../_lib/recommendation-feedback/globalFeedbackCorpus";
-import { readBoundedJsonBody } from "../../../src/application/http/requestSecurity";
+import { readBoundedJsonBody, validateMutationRequest } from "../../../src/application/http/requestSecurity";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request): Promise<Response> {
+  const guard = validateMutationRequest(request, { key: "global-recommendation-feedback", limit: 20 });
+  if (!guard.ok) return Response.json({ ok: false, error: { code: guard.code } }, { status: guard.status });
   const body = await readJson(request);
   const entry = normalizeGlobalFeedbackInput(body);
   if (!entry) {
