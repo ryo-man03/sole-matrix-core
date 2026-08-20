@@ -19,6 +19,7 @@
     "test:migrations": "tsx scripts/verify-migrations.ts",
     "test:security": "vitest run src/application/security",
     "test:providers": "vitest run app/_lib/market app/api/market",
+    "staging:preflight": "tsx scripts/staging-preflight.ts",
     "typecheck": "tsc --noEmit",
     "web:dev": "next dev",
     "web:build": "next build",
