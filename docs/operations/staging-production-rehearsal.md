@@ -83,4 +83,3 @@ Hard blockers detected: 0. Migration 005 still requires a verified staging backu
 ## Operations log template
 
 Record timestamp, operator, staging identifier fingerprint, action, migration names, test-user aliases, internal-job name/idempotency result, external request count/status, before/after schema fingerprint, rollback point, and outcome. Record credential values, raw provider bodies, queries, user identity, access tokens, and authorization headers: **0**.
-
