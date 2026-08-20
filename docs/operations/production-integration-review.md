@@ -31,7 +31,7 @@ pnpm audit --audit-level=high
 git diff --check
 ```
 
-Expected code-foundation status is `STATIC VERIFIED / LOCAL DB UNVERIFIED` until a real non-production PostgreSQL run succeeds.
+Current code-foundation status is `REAL EPHEMERAL SUPABASE VERIFIED`: the required workflow applied migrations 001–007 and passed 65 pgTAP tests at `main` `245d3f354dbb8c48dbac77dfe98a225ef164d2d3`. This does not substitute for the persistent staging rehearsal in the order above. Local Windows database execution is not required for CI verification, and production remains untouched.
 
 ## Stop conditions
 

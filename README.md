@@ -8,6 +8,23 @@ Release data has an evidence/conflict model, reviewed database boundary, and sta
 
 [![CI](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml/badge.svg)](https://github.com/ryo-man03/sole-matrix-core/actions/workflows/ci.yml)
 
+## Current operational status
+
+Current source of truth, rechecked on 2026-08-20:
+
+```text
+APPLICATION FOUNDATION: COMPLETE
+MAIN INTEGRATION: COMPLETE
+DATABASE EXECUTION: REAL EPHEMERAL SUPABASE VERIFIED
+LOCAL WINDOWS DATABASE: NOT REQUIRED FOR CI VERIFICATION
+PRODUCTION DATABASE: NOT TOUCHED
+PRODUCTION DATA LAYER: NOT DEPLOYED
+PRODUCTION APPLICATION: NOT DEPLOYED
+PRODUCTION READINESS: PENDING EXTERNAL REHEARSAL
+```
+
+The latest verified `main` run applied all seven migrations to a fresh ephemeral Supabase/PostgreSQL environment and passed 65 pgTAP migration, ownership, RLS, and Data Steward checks. This is non-production evidence only; it is not a staging or production deployment claim. The current reconciliation and remaining operational gates are maintained in [final product readiness v2](docs/audits/final-product-readiness-v2.md) and the [production integration review](docs/operations/production-integration-review.md).
+
 スニーカーを、流行や価格だけでなく、歴史・素材・服との相性・文化背景まで含めて整理し、購入判断を補助する Web アプリです。
 
 商品名・URL・画像からの単体判断と、11問診断にもとづく推薦を分けて扱い、Gemini の候補調査、TypeScript Core / Ryo Mode の推薦判断、楽天市場・Yahoo!ショッピング・eBayの購入参考情報、Fit / Purchase Confidenceを明確に分離しています。価格、在庫、サイズ、真贋、購入可能性、将来価格、利益は保証しません。
