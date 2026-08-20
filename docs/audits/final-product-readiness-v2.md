@@ -1,12 +1,29 @@
 # SOLE//MATRIX final product readiness v2
 
-Audit date: 2026-08-18
+Historical audit date: 2026-08-18
 
-Baseline: `origin/main` at `ef31341`
+Historical baseline: `origin/main` at `ef31341`
 
-Stack: PR A `#38` → PR B `#39` → PR C `#40` → PR D → PR E
+Historical stack: PR A `#38` → PR B `#39` → PR C `#40` → PR D → PR E
 
-Verification status: **STATIC VERIFIED / LOCAL DB UNVERIFIED**
+## Current source of truth
+
+Rechecked on 2026-08-20 at `origin/main` `245d3f354dbb8c48dbac77dfe98a225ef164d2d3`.
+
+```text
+APPLICATION FOUNDATION: COMPLETE
+MAIN INTEGRATION: COMPLETE
+DATABASE EXECUTION: REAL EPHEMERAL SUPABASE VERIFIED
+LOCAL WINDOWS DATABASE: NOT REQUIRED FOR CI VERIFICATION
+PRODUCTION DATABASE: NOT TOUCHED
+PRODUCTION DATA LAYER: NOT DEPLOYED
+PRODUCTION APPLICATION: NOT DEPLOYED
+PRODUCTION READINESS: PENDING EXTERNAL REHEARSAL
+```
+
+Fresh local gates passed at this SHA: 157 files / 2,343 tests, 569 provider tests, 112 security tests, 184 static RLS tests, seven migration checks, five browser E2E tests, two accessibility E2E tests, production build, and dependency audit with Critical 0 / High 0. The latest `main` Real Supabase DB Security run applied migrations 001–007 to a fresh ephemeral Supabase/PostgreSQL environment and passed three pgTAP files / 65 tests. Production and a separately identified persistent staging project were not touched.
+
+The historical audit below remains as the record of the 2026-08-18 stacked review.
 
 ## Decision
 
@@ -30,9 +47,11 @@ This decision covers the code foundation and the stacked review artifacts. It is
 | Accessibility E2E | 2 | 2 |
 | Dependency audit | 0 known vulnerabilities | 0 known vulnerabilities |
 
-The build retains one pre-existing Turbopack NFT trace warning from `next.config.ts` to the development-only local feedback corpus. It does not cause a compile, route, browser, hydration, or test failure.
+The 2026-08-20 rebuild retains one Turbopack NFT trace warning from `next.config.ts` to the development-only local feedback corpus. It does not cause a compile, route, browser, hydration, or test failure. Resolving it would require changing the file-loading boundary and is deferred until it can be isolated without altering production behavior.
 
-Docker is unavailable in this environment. The migration order, SQL invariants, constraints, grants, and RLS policies were statically verified; real PostgreSQL migration application and user A/B RLS execution remain unverified locally.
+The latest `main` GitHub Actions logs also report the runner's Node.js 20 action-runtime deprecation for `actions/checkout@v4`, `actions/setup-node@v4`, and `pnpm/action-setup@v4`; GitHub currently forces those actions to Node.js 24 and all required jobs pass. Any action-major change must be reviewed together with the full-commit-SHA pin policy instead of being mixed into this documentation reconciliation.
+
+At the historical audit point, Docker was unavailable locally and the real PostgreSQL run remained outstanding. That gap was subsequently closed by the required `Real Supabase DB Security` workflow on a fresh ephemeral environment: migrations 001–007 and 65 pgTAP tests passed at the current `main` SHA. A local Windows database is not required for this CI verification; a persistent staging rehearsal remains separate and pending.
 
 ## Architecture disposition
 
