@@ -4,7 +4,9 @@ Checked on 2026-08-20. This runbook authorizes only a separately identified, non
 
 ## Current discovery result
 
-`STAGING PROJECT: UNAVAILABLE / USER ACTION REQUIRED`.
+`STAGING PROJECT: UNAVAILABLE`.
+
+The exact external prerequisites are consolidated once in the [Production Readiness Program Report](../audits/production-readiness-program-report.md#12-user-action-required--single-consolidated-list).
 
 The repository has no GitHub Environment, repository Action secret/variable, Vercel project metadata, staging URL, staging project ref, or staging-to-repository mapping. Local configuration contains generic Supabase browser settings, but it has no staging designation and no independently recorded production project ref for comparison. Those generic values were not displayed and were not used for a remote connection.
 
