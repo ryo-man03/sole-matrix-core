@@ -1,6 +1,6 @@
 # Provider access status
 
-Checked on 2026-08-18. Secret values are intentionally not recorded.
+Checked on 2026-08-20. Secret values are intentionally not recorded.
 
 | Provider | Required local configuration | Repository implementation | Live status |
 | --- | --- | --- | --- |
@@ -30,3 +30,11 @@ These are current retail/listing observations, not completed-sale evidence. The 
 - Root cause: the registered Rakuten application requires an HTTP referrer context, while the local `RAKUTEN_REQUEST_ORIGIN` configuration is absent. This is not a missing Application ID or missing Access Key result.
 - Code correction: the existing origin setting now produces both `Origin` and root `Referer`; the legacy candidate and isolated-smoke endpoints were advanced from 2026-04-01 to 2026-07-01. Recommendation defaults to `manual_only` and performs no Rakuten request.
 - Remaining provider-local action: set `RAKUTEN_REQUEST_ORIGIN` to the exact origin registered in Rakuten Allowed Websites, then run one bounded smoke. Until that succeeds, the literal status remains `UNAUTHORIZED`, not live verified.
+
+## 2026-08-20 contract and configuration recheck
+
+- Configuration presence is unchanged: Application ID `present`, Access Key `present`, request origin `missing`; no values were printed.
+- Official Rakuten documentation still identifies Ichiba Item Search `2026-07-01`, requires `applicationId` with `accessKey`, supports the access key in the header, and documents UTF-8 keyword encoding, `formatVersion=2`, 429 behavior, identical-URL burst caution, and required credit.
+- Application registration requires an application URL and Allowed Websites, but the public documentation does not reveal this application's registered value. No origin was guessed and no request was sent.
+- Terms continue to restrict reuse/storage and unsupported monetization. Project policy remains request-time display, no-store, no raw persistence, and required attribution.
+- Final status: `UNAUTHORIZED / LIVE NORMALIZATION UNVERIFIED`.
